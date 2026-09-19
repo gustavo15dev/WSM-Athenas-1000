@@ -9,6 +9,7 @@ import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import { motion, AnimatePresence } from 'motion/react';
+import { checkFastSafetyViolation } from '../utils/safetyCheck';
 
 declare global {
   interface Window {
@@ -677,6 +678,66 @@ export default function WsmChat({
     setIsLoading(true);
     setErrorMessage('');
 
+    // Fast client-side safety guardrail for dangerous questions (explosives, weapons, poisons, self-harm)
+    const safetyViolationMsg = checkFastSafetyViolation(rawText);
+    if (safetyViolationMsg) {
+      setTimeout(async () => {
+        let sessionId = currentSessionId;
+        if (!sessionId) {
+          try {
+            let title = studyExamTheme ? `Estudos: ${studyExamTheme}` : rawText.trim();
+            if (title.length > 25) title = title.substring(0, 25) + "...";
+            const { data: newSess } = await supabase
+              .from('wsm_chat_sessions')
+              .insert([{ user_email: userEmail, title }])
+              .select()
+              .single();
+            if (newSess) {
+              sessionId = newSess.id;
+              setCurrentSessionId(sessionId);
+              setSessions(prev => [newSess, ...prev]);
+            }
+          } catch (e) {
+            console.warn("Error creating session for safety message:", e);
+          }
+        }
+
+        if (sessionId) {
+          try {
+            await supabase.from('wsm_chat_messages').insert([
+              {
+                session_id: sessionId,
+                role: 'user',
+                content: rawText,
+                attachments: currentFiles
+              },
+              {
+                session_id: sessionId,
+                role: 'assistant',
+                content: safetyViolationMsg
+              }
+            ]);
+          } catch (e) {
+            console.warn("Error saving safety messages to supabase:", e);
+          }
+        }
+
+        setIsLoading(false);
+        setIsTyping(false);
+
+        const botResponse: ChatMessage = {
+          id: `msg-${Date.now() + 1}`,
+          role: 'assistant',
+          content: safetyViolationMsg,
+          timestamp: new Date()
+        };
+
+        setMessages(prev => [...prev, botResponse]);
+      }, 350);
+
+      return;
+    }
+
     try {
       let sessionId = currentSessionId;
       if (!sessionId) {
@@ -719,20 +780,29 @@ export default function WsmChat({
         attachments: msg.attachments
       }));
 
-      const res = await fetch("/api/gemini/chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          message: rawText || "Análise de arquivos anexados.",
-          history: conversationalHistory,
-          attachments: currentFiles,
-          studyExamTheme,
-          studyExamContent,
-          userRole
-        })
-      });
+      const fetchController = new AbortController();
+      const fetchTimeoutId = setTimeout(() => fetchController.abort(), 25000);
+
+      let res: Response;
+      try {
+        res = await fetch("/api/gemini/chat", {
+          method: "POST",
+          signal: fetchController.signal,
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            message: rawText || "Análise de arquivos anexados.",
+            history: conversationalHistory,
+            attachments: currentFiles,
+            studyExamTheme,
+            studyExamContent,
+            userRole
+          })
+        });
+      } finally {
+        clearTimeout(fetchTimeoutId);
+      }
 
       if (!res.ok) {
         let errorMsg = "Não foi possível obter resposta do Athenas.";

@@ -5,6 +5,7 @@ import { createServer as createViteServer } from "vite";
 import { createClient } from "@supabase/supabase-js";
 import nodemailer from "nodemailer";
 import fs from "fs";
+import { checkFastSafetyViolation, EDUCATIONAL_SAFETY_REFUSAL_MESSAGE } from "./src/utils/safetyCheck.js";
 
 async function startServer() {
   const app = express();
@@ -46,6 +47,13 @@ async function startServer() {
       const { message, history, studyExamTheme, studyExamContent, userRole } = req.body;
       if (!message) {
         return res.status(400).json({ error: "Mensagem obrigatória." });
+      }
+
+      // Fast Safety Guardrail for dangerous queries (weapons, bombs, explosives, poisons, drugs, self-harm)
+      const fastSafetyRefusal = checkFastSafetyViolation(message);
+      if (fastSafetyRefusal && userRole !== "teacher") {
+        console.log(`[Safety Guardrail - Server] Interceptado preventivamente: "${message}"`);
+        return res.json({ text: fastSafetyRefusal });
       }
 
       if (!apiKeyToUse) {
@@ -726,26 +734,50 @@ Responda APENAS "SIM" ou "NÃO".`;
             parts: currentUserParts
           });
 
-          const response = await fetch(url, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              contents,
-              systemInstruction: {
-                parts: [{ text: systemInstruction }]
+          const fetchController = new AbortController();
+          const fetchTimeoutId = setTimeout(() => fetchController.abort(), 15000);
+
+          let response: Response;
+          try {
+            response = await fetch(url, {
+              method: 'POST',
+              signal: fetchController.signal,
+              headers: {
+                'Content-Type': 'application/json',
               },
-              generationConfig: {
-                temperature: 0.7,
-                maxOutputTokens: 8192
-              }
-            })
-          });
+              body: JSON.stringify({
+                contents,
+                systemInstruction: {
+                  parts: [{ text: systemInstruction }]
+                },
+                generationConfig: {
+                  temperature: 0.7,
+                  maxOutputTokens: 8192
+                }
+              })
+            });
+          } finally {
+            clearTimeout(fetchTimeoutId);
+          }
 
           if (response.ok) {
             const data = await response.json() as any;
             const candidate = data.candidates?.[0];
+            const finishReason = candidate?.finishReason;
+            const blockReason = data.promptFeedback?.blockReason;
+
+            // Retorno imediato caso a API do Gemini ative o filtro de segurança (sem retentativas lentas)
+            if (
+              finishReason === 'SAFETY' ||
+              finishReason === 'BLOCKLIST' ||
+              finishReason === 'PROHIBITED_CONTENT' ||
+              finishReason === 'SPII' ||
+              blockReason
+            ) {
+              console.log(`[Gemini Safety Filter] Bloqueado pela API (${finishReason || blockReason}) no modelo ${modelName}. Retornando recusa educativa instantaneamente.`);
+              return res.json({ text: EDUCATIONAL_SAFETY_REFUSAL_MESSAGE });
+            }
+
             const parts = candidate?.content?.parts || [];
             const textParts = parts.map((p: any) => p.text || "").filter(Boolean);
             const text = textParts.join("\n").trim();
@@ -758,12 +790,17 @@ Responda APENAS "SIM" ou "NÃO".`;
               console.log(`Sucesso absoluto via REST com o modelo ${modelName}!`);
               break;
             }
+          } else {
+            const errText = await response.text().catch(() => "");
+            throw new Error(`Chamada REST falhou com status ${response.status}: ${errText}`);
           }
-          
-          const errText = await response.text();
-          throw new Error(`Chamada REST falhou com status ${response.status}: ${errText}`);
         } catch (fetchError: any) {
-          console.warn(`Erro na chamada REST direta (${modelName}):`, fetchError.message || fetchError);
+          const fetchErrMsg = String(fetchError?.message || fetchError || "");
+          if (fetchErrMsg.toLowerCase().includes("safety") || fetchErrMsg.toLowerCase().includes("blocked") || fetchErrMsg.toLowerCase().includes("prohibited")) {
+            console.log(`[Gemini Safety Filter] Exceção de segurança capturada. Retornando recusa imediatamente.`);
+            return res.json({ text: EDUCATIONAL_SAFETY_REFUSAL_MESSAGE });
+          }
+          console.warn(`Erro na chamada REST direta (${modelName}):`, fetchErrMsg);
           lastError = fetchError;
         }
       }
@@ -827,7 +864,12 @@ Responda APENAS "SIM" ou "NÃO".`;
               lastError = null;
               break;
             }
-          } catch (sdkError) {
+          } catch (sdkError: any) {
+            const sdkMsg = String(sdkError?.message || sdkError || '');
+            if (sdkMsg.toLowerCase().includes('safety') || sdkMsg.toLowerCase().includes('blocked') || sdkMsg.toLowerCase().includes('prohibited')) {
+              console.log(`[SDK Safety Filter] Bloqueado pelo filtro de segurança no SDK:`, sdkMsg);
+              return res.json({ text: EDUCATIONAL_SAFETY_REFUSAL_MESSAGE });
+            }
             console.warn(`Erro no SDK fallback (${modelName}):`, sdkError);
             lastError = sdkError;
           }
