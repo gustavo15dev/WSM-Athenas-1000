@@ -9,20 +9,32 @@ export function normalizeTurmaToken(str: string): string {
     .trim();
 }
 
+export function extractCohortKey(str: string): string | null {
+  const cleaned = str
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[º°ª\-_.\s]+/g, '')
+    .replace(/ano|serie|grau/g, '');
+  
+  const match = cleaned.match(/([0-9]+[a-z]?)/i);
+  return match ? match[1].toLowerCase() : null;
+}
+
 export function areTurmasMatching(t1: string | null | undefined, t2: string | null | undefined): boolean {
   if (!t1 || !t2) return false;
   const n1 = normalizeTurmaToken(t1);
   const n2 = normalizeTurmaToken(t2);
   if (!n1 || !n2) return false;
   if (n1 === n2) return true;
-  if (n1.includes(n2) || n2.includes(n1)) return true;
 
-  const extractCohort = (str: string) => {
-    const match = str.match(/([0-9]+[a-z]?)/i);
-    return match ? match[1].toLowerCase() : null;
-  };
-  const c1 = extractCohort(n1);
-  const c2 = extractCohort(n2);
+  const c1 = extractCohortKey(t1);
+  const c2 = extractCohortKey(t2);
+
+  // If both define a cohort letter/number (e.g. 9a vs 9b) and they don't match, they CANNOT match!
+  if (c1 && c2 && c1 !== c2) return false;
+
+  if (n1.includes(n2) || n2.includes(n1)) return true;
   if (c1 && c2 && c1 === c2) return true;
 
   return false;

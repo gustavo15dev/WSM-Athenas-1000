@@ -1128,7 +1128,7 @@ export default function WsmChat({
         <div 
           id="wsm-chat-input-container"
           className={`p-4 ${
-            isMusicMiniPlayerActive ? 'pb-24 sm:pb-28' : 'pb-6'
+            isMusicMiniPlayerActive ? 'pb-28 sm:pb-32' : 'pb-6'
           } bg-gradient-to-t from-neutral-950 to-transparent border-t border-neutral-900/60 flex flex-col items-center shrink-0 relative z-50 transition-all duration-300`}
         >
           

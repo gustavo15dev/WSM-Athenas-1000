@@ -420,7 +420,7 @@ export default function StudyMusicPlayer({ isOpen, onClose }: StudyMusicPlayerPr
       {!isOpen && isPlaying && (
         <div 
           id="study-music-mini-player"
-          className="fixed bottom-20 right-4 sm:right-6 z-40 bg-neutral-950/95 border border-emerald-500/30 rounded-2xl p-2.5 shadow-2xl backdrop-blur-md flex items-center gap-3 text-white animate-fadeIn transition-all"
+          className="fixed bottom-4 right-4 sm:right-6 z-30 bg-neutral-950/95 border border-emerald-500/30 rounded-2xl p-2.5 shadow-2xl backdrop-blur-md flex items-center gap-3 text-white animate-fadeIn transition-all pointer-events-auto"
         >
           <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center animate-spin" style={{ animationDuration: '6s' }}>
             <Disc className="w-4 h-4" />

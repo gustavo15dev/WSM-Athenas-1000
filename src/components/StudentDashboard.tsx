@@ -2887,6 +2887,7 @@ export default function StudentDashboard({
             email={email}
             studentName={profile?.nome_completo || 'Aluno'}
             studentClass={activeTurma || profile?.turma || ''}
+            initialExams={mockExams}
             onExamActiveChange={setIsExamActive}
             onStudyForExam={(theme, content) => {
               setStudyExamTheme(theme);

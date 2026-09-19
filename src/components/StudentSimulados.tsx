@@ -15,7 +15,8 @@ import {
   EyeOff,
   Lock,
   ShieldAlert,
-  Monitor
+  Monitor,
+  Loader2
 } from 'lucide-react';
 import { supabase } from '../supabase';
 import { MockExam, MockExamQuestion, MockSubmission } from '../types';
@@ -27,6 +28,7 @@ interface StudentSimuladosProps {
   email: string;
   studentName: string;
   studentClass: string;
+  initialExams?: MockExam[];
   isRoomContext?: boolean;
   onExamActiveChange?: (active: boolean) => void;
   onStudyForExam?: (theme: string, content: string) => void;
@@ -211,14 +213,34 @@ export default function StudentSimulados({
   email, 
   studentName, 
   studentClass,
+  initialExams,
   isRoomContext = false,
   onExamActiveChange,
   onStudyForExam
 }: StudentSimuladosProps) {
   // Simulados states
-  const [availableExams, setAvailableExams] = useState<MockExam[]>([]);
+  const [availableExams, setAvailableExams] = useState<MockExam[]>(initialExams || []);
   const [mySubmissions, setMySubmissions] = useState<MockSubmission[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(!initialExams || initialExams.length === 0);
   const [simuladosSubTab, setSimuladosSubTab] = useState<'pendentes' | 'realizados'>('pendentes');
+
+  // Shared pure predicates guaranteeing 100% synchronization between counters and lists
+  const isExamPending = (exam: MockExam) => {
+    const sub = mySubmissions.find(s => s.mock_exam_id === exam.id);
+    const isFinished = sub && sub.telemetry?.is_unfinished !== true;
+    const isDeadlinePassed = exam.deadline ? new Date(exam.deadline).getTime() < new Date().getTime() : false;
+
+    if (isFinished) return false;
+    // If deadline has passed and student is not resuming an active unfinished attempt, exclude from pending
+    if (isDeadlinePassed && !sub?.telemetry?.is_unfinished) return false;
+
+    return true;
+  };
+
+  const isExamCompleted = (exam: MockExam) => {
+    const sub = mySubmissions.find(s => s.mock_exam_id === exam.id);
+    return Boolean(sub && sub.telemetry?.is_unfinished !== true);
+  };
 
   // Simulation states
   const [activeExam, setActiveExam] = useState<MockExam | null>(null);
@@ -516,6 +538,21 @@ export default function StudentSimulados({
     try {
       const cleanEmail = (email || '').toLowerCase().trim();
 
+      // Resolve student cohort if studentClass is not passed or empty
+      let effectiveClass = studentClass || '';
+      if (!effectiveClass && cleanEmail) {
+        try {
+          const { data: prof } = await supabase
+            .from('wsm_user_profiles')
+            .select('turma')
+            .eq('email', cleanEmail)
+            .maybeSingle();
+          if (prof?.turma) effectiveClass = prof.turma;
+        } catch {
+          // ignore
+        }
+      }
+
       // 1. Fetch virtual classes the student is enrolled in
       let studentVirtualClasses: any[] = [];
       try {
@@ -604,7 +641,7 @@ export default function StudentSimulados({
             return matchesStudentTarget(
               target,
               cleanEmail,
-              studentClass,
+              effectiveClass,
               [selectedVC.id, selectedVC.name, selectedVC.access_code]
             );
           }
@@ -616,7 +653,7 @@ export default function StudentSimulados({
             if (vc.access_code) studentVCIdentifiers.push(vc.access_code);
           });
 
-          return matchesStudentTarget(target, cleanEmail, studentClass, studentVCIdentifiers);
+          return matchesStudentTarget(target, cleanEmail, effectiveClass, studentVCIdentifiers);
         });
 
         filteredExamsList = [...filteredExams];
@@ -664,6 +701,8 @@ export default function StudentSimulados({
       });
     } catch (err) {
       console.error("Erro ao carregar simulados para o aluno:", err);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -1621,13 +1660,14 @@ export default function StudentSimulados({
                   }`}
                 >
                   <span>Disponíveis para Realizar</span>
-                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-bold min-w-[20px] text-center ${
                     simuladosSubTab === 'pendentes' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-neutral-900 text-neutral-500'
                   }`}>
-                    {availableExams.filter(exam => {
-                      const sub = mySubmissions.find(s => s.mock_exam_id === exam.id);
-                      return !sub || sub.telemetry?.is_unfinished === true;
-                    }).length}
+                    {isLoading && availableExams.length === 0 ? (
+                      <Loader2 className="w-2.5 h-2.5 animate-spin inline-block" />
+                    ) : (
+                      availableExams.filter(isExamPending).length
+                    )}
                   </span>
                   {simuladosSubTab === 'pendentes' && (
                     <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-500 rounded-full animate-fadeIn" />
@@ -1642,13 +1682,14 @@ export default function StudentSimulados({
                   }`}
                 >
                   <span>Meus Simulados Concluídos</span>
-                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-bold min-w-[20px] text-center ${
                     simuladosSubTab === 'realizados' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-neutral-900 text-neutral-500'
                   }`}>
-                    {availableExams.filter(exam => {
-                      const sub = mySubmissions.find(s => s.mock_exam_id === exam.id);
-                      return sub && sub.telemetry?.is_unfinished !== true;
-                    }).length}
+                    {isLoading && availableExams.length === 0 ? (
+                      <Loader2 className="w-2.5 h-2.5 animate-spin inline-block" />
+                    ) : (
+                      availableExams.filter(isExamCompleted).length
+                    )}
                   </span>
                   {simuladosSubTab === 'realizados' && (
                     <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-500 rounded-full animate-fadeIn" />
@@ -1658,17 +1699,22 @@ export default function StudentSimulados({
 
               {simuladosSubTab === 'pendentes' ? (
                 (() => {
-                  const pendingExams = availableExams.filter(exam => {
-                    const sub = mySubmissions.find(s => s.mock_exam_id === exam.id);
-                    const isFinished = sub && sub.telemetry?.is_unfinished !== true;
-                    const isDeadlinePassed = exam.deadline ? new Date(exam.deadline).getTime() < new Date().getTime() : false;
+                  if (isLoading && availableExams.length === 0) {
+                    return (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {[1, 2].map(n => (
+                          <div key={n} className="p-5 rounded-2xl bg-neutral-950/40 border border-neutral-900 animate-pulse space-y-4">
+                            <div className="h-4 bg-neutral-900 rounded w-1/3" />
+                            <div className="h-5 bg-neutral-850 rounded w-3/4" />
+                            <div className="h-3 bg-neutral-900 rounded w-1/2" />
+                            <div className="h-9 bg-neutral-900/60 rounded-xl mt-4" />
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  }
 
-                    if (isFinished) return false;
-                    // If deadline has passed and student is not resuming an active unfinished attempt, exclude from pending!
-                    if (isDeadlinePassed && !sub?.telemetry?.is_unfinished) return false;
-
-                    return true;
-                  });
+                  const pendingExams = availableExams.filter(isExamPending);
                   if (pendingExams.length === 0) {
                     return (
                       <div className="py-16 text-center border border-dashed border-neutral-900 rounded-3xl bg-neutral-950/20">
@@ -1797,10 +1843,22 @@ export default function StudentSimulados({
                 })()
               ) : (
                 (() => {
-                  const completedExams = availableExams.filter(exam => {
-                    const sub = mySubmissions.find(s => s.mock_exam_id === exam.id);
-                    return sub && sub.telemetry?.is_unfinished !== true;
-                  });
+                  if (isLoading && availableExams.length === 0) {
+                    return (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {[1, 2].map(n => (
+                          <div key={n} className="p-5 rounded-2xl bg-neutral-950/40 border border-neutral-900 animate-pulse space-y-4">
+                            <div className="h-4 bg-neutral-900 rounded w-1/3" />
+                            <div className="h-5 bg-neutral-850 rounded w-3/4" />
+                            <div className="h-3 bg-neutral-900 rounded w-1/2" />
+                            <div className="h-9 bg-neutral-900/60 rounded-xl mt-4" />
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  }
+
+                  const completedExams = availableExams.filter(isExamCompleted);
                   if (completedExams.length === 0) {
                     return (
                       <div className="py-16 text-center border border-dashed border-neutral-900 rounded-3xl bg-neutral-950/20">
