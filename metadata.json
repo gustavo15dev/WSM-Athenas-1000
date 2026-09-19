@@ -1,0 +1,6 @@
+{
+  "name": "Athenas",
+  "description": "Portal acadêmico moderno e minimalista com acessos para alunos e professores em tons de preto e verde esmeralda.",
+  "requestFramePermissions": ["notifications"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
