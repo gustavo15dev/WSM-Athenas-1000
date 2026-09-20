@@ -39,9 +39,10 @@ import {
   RefreshCw,
   ClipboardList,
   Plus,
+  Trash2,
 } from "lucide-react";
 import { supabase } from "../supabase";
-import { areTurmasMatching } from "../utils/profileDb";
+import { areTurmasMatching, areClassNamesDuplicate } from "../utils/profileDb";
 import { sendBrowserNotification } from "../utils/browserNotifications";
 import PublishSuccessModal from "./PublishSuccessModal";
 import { getUniqueRA } from "../types";
@@ -368,6 +369,9 @@ export default function TeacherVirtualClasses({
   }, [parentVirtualClasses]);
   const [isCreatingClass, setIsCreatingClass] = useState(false);
   const [newClassName, setNewClassName] = useState("");
+  const [createClassError, setCreateClassError] = useState<string | null>(null);
+  const [isSubmittingCreate, setIsSubmittingCreate] = useState(false);
+  const [deletingClassId, setDeletingClassId] = useState<string | null>(null);
   const [isJoiningClass, setIsJoiningClass] = useState(false);
   const [teacherJoinCode, setTeacherJoinCode] = useState("");
   const [teacherJoining, setTeacherJoining] = useState(false);
@@ -601,30 +605,71 @@ export default function TeacherVirtualClasses({
   };
 
   const handleCreateVirtualClass = async () => {
-    if (!newClassName.trim()) return;
-    
-    // Generate 4-digit code
-    let code = Math.floor(1000 + Math.random() * 9000).toString();
-    
-    // Ensure uniqueness
-    let isUnique = false;
-    while (!isUnique) {
-      const { data } = await supabase.from("wsm_virtual_classes").select("id").eq("access_code", code).single();
-      if (!data) {
-        isUnique = true;
-      } else {
-        code = Math.floor(1000 + Math.random() * 9000).toString();
-      }
+    const trimmedName = newClassName.trim();
+    if (!trimmedName) {
+      setCreateClassError("Por favor, digite o nome da sala.");
+      return;
     }
 
+    setCreateClassError(null);
+    setIsSubmittingCreate(true);
+
     try {
+      // 1. Check local virtual classes for this teacher
+      const dupInVirtual = virtualClasses.some(
+        (vc: any) => vc.name && areClassNamesDuplicate(vc.name, trimmedName)
+      );
+
+      // 2. Check local anosLecionados for this teacher
+      const dupInAnos = (anosLecionados || []).some(
+        (cls: string) => cls && areClassNamesDuplicate(cls, trimmedName)
+      );
+
+      // 3. Check database wsm_virtual_classes for this teacher
+      let dupInDb = false;
+      try {
+        const { data: dbClasses } = await supabase
+          .from("wsm_virtual_classes")
+          .select("id, name, teacher_email, teacher_id")
+          .or(`teacher_email.ilike.${email.toLowerCase().trim()}${teacherId ? `,teacher_id.eq.${teacherId}` : ""}`);
+
+        if (dbClasses && dbClasses.length > 0) {
+          dupInDb = dbClasses.some(
+            (c: any) => c.name && areClassNamesDuplicate(c.name, trimmedName)
+          );
+        }
+      } catch (dbErr) {
+        console.warn("Error checking duplicate virtual classes in DB:", dbErr);
+      }
+
+      if (dupInVirtual || dupInAnos || dupInDb) {
+        setCreateClassError("Já existe uma sala com este nome.");
+        setIsSubmittingCreate(false);
+        return;
+      }
+
+      // Generate 4-digit code
+      let code = Math.floor(1000 + Math.random() * 9000).toString();
+      
+      // Ensure uniqueness
+      let isUnique = false;
+      while (!isUnique) {
+        const { data } = await supabase.from("wsm_virtual_classes").select("id").eq("access_code", code).single();
+        if (!data) {
+          isUnique = true;
+        } else {
+          code = Math.floor(1000 + Math.random() * 9000).toString();
+        }
+      }
+
       const { data, error } = await supabase
         .from("wsm_virtual_classes")
         .insert({
-          name: newClassName.trim(),
+          name: trimmedName,
           teacher_email: email.toLowerCase().trim(),
           teacher_id: teacherId,
-          access_code: code
+          access_code: code,
+          student_emails: []
         })
         .select()
         .single();
@@ -643,7 +688,7 @@ export default function TeacherVirtualClasses({
           ? profData.anos_lecionados
           : (anosLecionados || []);
 
-        const updatedAnos = Array.from(new Set([...existingAnos, newClassName.trim()]));
+        const updatedAnos = Array.from(new Set([...existingAnos, trimmedName]));
 
         await supabase
           .from("wsm_user_profiles")
@@ -655,6 +700,7 @@ export default function TeacherVirtualClasses({
 
       setVirtualClasses([data, ...virtualClasses]);
       setNewClassName("");
+      setCreateClassError(null);
       setIsCreatingClass(false);
 
       if (onRefreshData) {
@@ -662,7 +708,41 @@ export default function TeacherVirtualClasses({
       }
     } catch (error) {
       console.error("Error creating virtual class:", error);
-      alert("Erro ao criar turma. Tente novamente.");
+      setCreateClassError("Erro ao criar turma. Tente novamente.");
+    } finally {
+      setIsSubmittingCreate(false);
+    }
+  };
+
+  const handleDeleteVirtualClass = async (classId: string, className: string) => {
+    if (!classId) return;
+    const confirmDelete = window.confirm(
+      `Tem certeza que deseja excluir a sala virtual "${className}"?\n\nEsta ação removerá o código de acesso e desvinculará a sala virtual.`
+    );
+    if (!confirmDelete) return;
+
+    setDeletingClassId(classId);
+    try {
+      const { error } = await supabase
+        .from("wsm_virtual_classes")
+        .delete()
+        .eq("id", classId);
+
+      if (error) throw error;
+
+      setVirtualClasses((prev) => prev.filter((c) => c.id !== classId));
+      if (selectedClass === className) {
+        setSelectedClass(null);
+      }
+
+      if (onRefreshData) {
+        await onRefreshData();
+      }
+    } catch (err) {
+      console.error("Error deleting virtual class:", err);
+      alert("Erro ao excluir a sala virtual. Tente novamente.");
+    } finally {
+      setDeletingClassId(null);
     }
   };
 
@@ -2258,14 +2338,34 @@ export default function TeacherVirtualClasses({
                     </p>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setSelectedClassForAnnouncement(selectedClass)}
-                    className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-neutral-950 rounded-xl text-xs font-extrabold transition-all shadow cursor-pointer sm:ml-auto"
-                  >
-                    <Megaphone className="w-4 h-4" />
-                    <span>Criar Aviso para esta Turma</span>
-                  </button>
+                  <div className="flex items-center gap-2 sm:ml-auto">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedClassForAnnouncement(selectedClass)}
+                      className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-neutral-950 rounded-xl text-xs font-extrabold transition-all shadow cursor-pointer"
+                    >
+                      <Megaphone className="w-4 h-4" />
+                      <span>Criar Aviso para esta Turma</span>
+                    </button>
+
+                    {virtualClasses.find(vc => vc.name === selectedClass) && (
+                      <button
+                        type="button"
+                        disabled={deletingClassId !== null}
+                        onClick={() => {
+                          const targetVC = virtualClasses.find(vc => vc.name === selectedClass);
+                          if (targetVC) {
+                            handleDeleteVirtualClass(targetVC.id, selectedClass);
+                          }
+                        }}
+                        className="flex items-center gap-1.5 px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 rounded-xl text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
+                        title="Excluir esta sala virtual"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        <span>Excluir Sala</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Search in selected class */}
@@ -3133,16 +3233,39 @@ export default function TeacherVirtualClasses({
                     type="text"
                     placeholder="Ex: Matemática - 9º Ano A"
                     value={newClassName}
-                    onChange={(e) => setNewClassName(e.target.value)}
-                    className="w-full px-4 py-3 bg-neutral-950 border border-neutral-800 rounded-xl text-sm text-neutral-100 placeholder-neutral-600 outline-none focus:border-emerald-500 transition-colors"
+                    onChange={(e) => {
+                      setNewClassName(e.target.value);
+                      if (createClassError) setCreateClassError(null);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && newClassName.trim() && !isSubmittingCreate) {
+                        e.preventDefault();
+                        handleCreateVirtualClass();
+                      }
+                    }}
+                    className={`w-full px-4 py-3 bg-neutral-950 border rounded-xl text-sm text-neutral-100 placeholder-neutral-600 outline-none transition-colors ${
+                      createClassError
+                        ? "border-red-500/60 focus:border-red-500"
+                        : "border-neutral-800 focus:border-emerald-500"
+                    }`}
                     autoFocus
                   />
                 </div>
 
+                {createClassError && (
+                  <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-center gap-2 font-medium animate-fadeIn">
+                    <AlertTriangle className="w-4 h-4 shrink-0 text-red-400" />
+                    <span>{createClassError}</span>
+                  </div>
+                )}
+
                 <div className="flex items-center justify-end gap-3 pt-2">
                   <button
                     type="button"
-                    onClick={() => setIsCreatingClass(false)}
+                    onClick={() => {
+                      setIsCreatingClass(false);
+                      setCreateClassError(null);
+                    }}
                     className="px-4 py-2.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-semibold text-xs rounded-xl transition-colors cursor-pointer"
                   >
                     Cancelar
@@ -3150,10 +3273,17 @@ export default function TeacherVirtualClasses({
                   <button
                     type="button"
                     onClick={handleCreateVirtualClass}
-                    disabled={!newClassName.trim()}
-                    className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-neutral-950 font-bold text-xs rounded-xl transition-all cursor-pointer shadow-lg shadow-emerald-500/20"
+                    disabled={!newClassName.trim() || isSubmittingCreate}
+                    className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-neutral-950 font-bold text-xs rounded-xl transition-all cursor-pointer shadow-lg shadow-emerald-500/20 flex items-center gap-2"
                   >
-                    Criar Sala
+                    {isSubmittingCreate ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>Criando...</span>
+                      </>
+                    ) : (
+                      <span>Criar Sala</span>
+                    )}
                   </button>
                 </div>
               </div>

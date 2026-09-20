@@ -5,6 +5,7 @@ export function normalizeTurmaToken(str: string): string {
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
+    .replace(/([0-9]+)\s*[oº°ª](?=\s|ano|serie|grau|$)/gi, '$1')
     .replace(/[º°ª\-_.\s]+/g, '')
     .trim();
 }
@@ -19,6 +20,14 @@ export function extractCohortKey(str: string): string | null {
   
   const match = cleaned.match(/([0-9]+[a-z]?)/i);
   return match ? match[1].toLowerCase() : null;
+}
+
+export function areClassNamesDuplicate(name1: string | null | undefined, name2: string | null | undefined): boolean {
+  if (!name1 || !name2) return false;
+  const n1 = normalizeTurmaToken(name1);
+  const n2 = normalizeTurmaToken(name2);
+  if (!n1 || !n2) return false;
+  return n1 === n2;
 }
 
 export function areTurmasMatching(t1: string | null | undefined, t2: string | null | undefined): boolean {
