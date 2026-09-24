@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   X, Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, 
   Music, Repeat, Plus, Trash2, Headphones, Sparkles, Check, Disc, Volume1, RefreshCw
@@ -134,6 +135,26 @@ export default function StudyMusicPlayer({ isOpen, onClose }: StudyMusicPlayerPr
       document.body.classList.toggle('study-music-mini-player-active', isMiniPlayerActive);
     }
   }, [isOpen, isPlaying]);
+
+  // Track sidebar music slot for embedding the mini-player in sidebar
+  const [sidebarSlot, setSidebarSlot] = useState<HTMLElement | null>(null);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
+
+  useEffect(() => {
+    const updateSlot = () => {
+      const el = document.getElementById('sidebar-music-slot');
+      setSidebarSlot(el);
+      if (el) {
+        const aside = el.closest('aside#dashboard-sidebar');
+        const isCollapsed = el.getAttribute('data-collapsed') === 'true' || (aside && aside.getAttribute('data-collapsed') === 'true');
+        setIsSidebarCollapsed(Boolean(isCollapsed));
+      }
+    };
+
+    updateSlot();
+    const interval = setInterval(updateSlot, 600);
+    return () => clearInterval(interval);
+  }, []);
 
   // Load YouTube IFrame API script ONLY when activated
   useEffect(() => {
@@ -416,43 +437,140 @@ export default function StudyMusicPlayer({ isOpen, onClose }: StudyMusicPlayerPr
         />
       </div>
 
-      {/* FLOATING MINI-PLAYER PILL WHEN PLAYING IN BACKGROUND */}
+      {/* SIDEBAR EMBEDDED MINI-PLAYER OR MOBILE PILL */}
       {!isOpen && isPlaying && (
-        <div 
-          id="study-music-mini-player"
-          className="fixed bottom-4 right-4 sm:right-6 z-30 bg-neutral-950/95 border border-emerald-500/30 rounded-2xl p-2.5 shadow-2xl backdrop-blur-md flex items-center gap-3 text-white animate-fadeIn transition-all pointer-events-auto"
-        >
-          <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center animate-spin" style={{ animationDuration: '6s' }}>
-            <Disc className="w-4 h-4" />
-          </div>
-          <div className="max-w-[150px] truncate">
-            <p className="text-xs font-bold text-neutral-100 truncate">{activeTrack.title}</p>
-            <p className="text-[9.5px] text-emerald-400 font-mono">Tocando em 2º plano</p>
-          </div>
-          <div className="flex items-center gap-1">
-            <button 
-              onClick={togglePlay} 
-              className="p-1.5 bg-neutral-900 hover:bg-neutral-800 text-white rounded-lg cursor-pointer transition-colors"
-              title="Pausar áudio"
+        sidebarSlot ? (
+          createPortal(
+            !isSidebarCollapsed ? (
+              <div 
+                id="study-music-mini-player"
+                className="w-full bg-gradient-to-r from-neutral-900/95 via-emerald-950/25 to-neutral-900/95 border border-emerald-500/30 hover:border-emerald-500/50 rounded-2xl p-2.5 shadow-lg shadow-emerald-950/20 backdrop-blur-md flex items-center justify-between gap-2 text-white animate-fadeIn transition-all group"
+              >
+                <div 
+                  onClick={() => window.dispatchEvent(new CustomEvent('open-study-music-player'))}
+                  className="flex items-center gap-2.5 min-w-0 flex-1 cursor-pointer"
+                  title="Clique para abrir reprodutor completo de música"
+                >
+                  <div 
+                    className="w-8 h-8 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center shrink-0 animate-spin group-hover:scale-105 transition-transform" 
+                    style={{ animationDuration: '6s' }}
+                  >
+                    <Disc className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[11px] font-bold text-neutral-100 truncate group-hover:text-emerald-300 transition-colors leading-tight">
+                      {activeTrack.title}
+                    </p>
+                    <p className="text-[9px] text-emerald-400 font-mono flex items-center gap-1 mt-0.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse inline-block shrink-0" />
+                      <span className="truncate">Música em 2º plano</span>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1 shrink-0">
+                  <button 
+                    type="button"
+                    onClick={togglePlay} 
+                    className="p-1.5 bg-neutral-850 hover:bg-neutral-800 text-neutral-200 hover:text-white rounded-lg cursor-pointer transition-colors border border-neutral-750"
+                    title={isPlaying ? "Pausar áudio" : "Continuar áudio"}
+                  >
+                    {isPlaying ? <Pause className="w-3 h-3 text-emerald-400" /> : <Play className="w-3 h-3 text-emerald-400" />}
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => window.dispatchEvent(new CustomEvent('open-study-music-player'))} 
+                    className="p-1.5 bg-neutral-850 hover:bg-neutral-800 text-neutral-300 hover:text-emerald-300 rounded-lg cursor-pointer transition-colors border border-neutral-750" 
+                    title="Abrir reprodutor completo"
+                  >
+                    <Headphones className="w-3 h-3" />
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={handleStopAndClose} 
+                    className="p-1.5 hover:bg-neutral-850 text-neutral-400 hover:text-red-400 rounded-lg cursor-pointer transition-colors" 
+                    title="Desligar e fechar música"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div 
+                id="study-music-mini-player"
+                className="w-full bg-gradient-to-b from-neutral-900/95 to-neutral-950/95 border border-emerald-500/30 rounded-2xl p-2 shadow-lg flex flex-col items-center gap-1.5 text-white animate-fadeIn"
+              >
+                <button 
+                  type="button"
+                  onClick={() => window.dispatchEvent(new CustomEvent('open-study-music-player'))}
+                  className="w-8 h-8 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center shrink-0 cursor-pointer animate-spin" 
+                  style={{ animationDuration: '6s' }}
+                  title={`Música: ${activeTrack.title}`}
+                >
+                  <Disc className="w-4 h-4" />
+                </button>
+                <div className="flex items-center gap-1">
+                  <button 
+                    type="button"
+                    onClick={togglePlay} 
+                    className="p-1 bg-neutral-850 hover:bg-neutral-800 text-neutral-200 rounded-lg cursor-pointer border border-neutral-750"
+                    title={isPlaying ? "Pausar áudio" : "Tocar áudio"}
+                  >
+                    {isPlaying ? <Pause className="w-3 h-3 text-emerald-400" /> : <Play className="w-3 h-3 text-emerald-400" />}
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={handleStopAndClose} 
+                    className="p-1 hover:bg-neutral-850 text-neutral-400 hover:text-red-400 rounded-lg cursor-pointer" 
+                    title="Fechar música"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
+            ),
+            sidebarSlot
+          )
+        ) : (
+          /* Fallback for mobile view when sidebar is hidden */
+          <div 
+            id="study-music-mini-player"
+            className="fixed bottom-16 right-3 md:hidden z-40 bg-neutral-950/95 border border-emerald-500/30 rounded-2xl p-2.5 shadow-2xl backdrop-blur-md flex items-center gap-2.5 text-white animate-fadeIn pointer-events-auto"
+          >
+            <div 
+              onClick={() => window.dispatchEvent(new CustomEvent('open-study-music-player'))}
+              className="w-7 h-7 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center animate-spin cursor-pointer" 
+              style={{ animationDuration: '6s' }}
             >
-              <Pause className="w-3.5 h-3.5" />
-            </button>
-            <button 
-              onClick={() => window.dispatchEvent(new CustomEvent('open-study-music-player'))} 
-              className="p-1.5 bg-neutral-900 hover:bg-neutral-800 text-neutral-300 rounded-lg cursor-pointer transition-colors" 
-              title="Abrir reprodutor completo"
+              <Disc className="w-3.5 h-3.5" />
+            </div>
+            <div 
+              className="max-w-[120px] truncate cursor-pointer"
+              onClick={() => window.dispatchEvent(new CustomEvent('open-study-music-player'))}
             >
-              <Headphones className="w-3.5 h-3.5" />
-            </button>
-            <button 
-              onClick={handleStopAndClose} 
-              className="p-1.5 hover:bg-neutral-900 text-neutral-400 hover:text-red-400 rounded-lg cursor-pointer transition-colors" 
-              title="Desligar e fechar música"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
+              <p className="text-[11px] font-bold text-neutral-100 truncate">{activeTrack.title}</p>
+              <p className="text-[9px] text-emerald-400 font-mono">2º plano</p>
+            </div>
+            <div className="flex items-center gap-1">
+              <button 
+                type="button"
+                onClick={togglePlay} 
+                className="p-1 bg-neutral-900 hover:bg-neutral-800 text-white rounded-lg cursor-pointer"
+                title="Pausar áudio"
+              >
+                {isPlaying ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
+              </button>
+              <button 
+                type="button"
+                onClick={handleStopAndClose} 
+                className="p-1 hover:bg-neutral-900 text-neutral-400 hover:text-red-400 rounded-lg cursor-pointer" 
+                title="Fechar"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
           </div>
-        </div>
+        )
       )}
 
       <AnimatePresence>

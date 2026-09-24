@@ -56,11 +56,6 @@ html, body {
   background: #22c55e;
 }
 
-/* Ensure chat prompt rises above the floating music mini-player */
-body.study-music-mini-player-active #wsm-chat-input-container {
-  padding-bottom: 6rem !important;
-}
-
 /* Custom styling for markdown elements inside the chat bot */
 .markdown-body {
   font-family: var(--font-sans), sans-serif;

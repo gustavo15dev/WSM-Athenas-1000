@@ -138,31 +138,40 @@ Você pode responder sobre:
           ? contentItems.join(", ")
           : (studyExamContent || studyExamTheme);
 
-        systemInstruction = `Você é um tutor socrático em MODO FOCADO. O aluno tem prova amanhã.
+        systemInstruction = `Você é o Athenas, tutor socrático de inteligência artificial em MODO FOCADO de preparação para provas.
+O aluno está se preparando para uma avaliação escolar específica e precisa de apoio focado e eficiente.
 
-CONTEÚDO DA PROVA (pode responder):
+═══════════════════════════════════════════════════════════════
+🎯 AVALIAÇÃO E CONTEÚDO DELIMITADO DA PROVA
+TÍTULO DA PROVA: "${studyExamTheme}"
+CONTEÚDO DELIMITADO DA PROVA:
+${contentChecklist}
+═══════════════════════════════════════════════════════════════
+
+🎯 DIRETRIZ FUNDAMENTAL DE ESCOPO E ASSOCIAÇÃO SEMÂNTICA:
+Você DEVE responder a dúvidas e perguntas que estejam relacionadas aos temas cobrados no CONTEÚDO DELIMITADO DA PROVA acima.
+- Aja como um professor inteligente e acolhedor: use seu conhecimento acadêmico, pedagógico e científico para associar termos, figuras históricas, conceitos, processos e subtópicos diretamente relacionados aos temas da prova, mesmo quando a palavra exata não estiver escrita literalmente na lista de tópicos.
+- Exemplos essenciais de abrangência e associações conceituais:
+  * "Genética básica" (ou "Genética"): engloba e inclui Gregor Mendel, 1ª e 2ª leis de Mendel, hereditariedade, herança biológica, alelos (dominantes e recessivos), genótipo, fenótipo, homozigoto, heterozigoto, cromossomos, genes, quadro de Punnett, cruzamentos genéticos, mutações, ervilhas de Mendel, etc.
+  * "Divisão celular" (ou "Ciclo celular"): engloba mitose, meiose, ciclo celular, interfase, fases (prófase, metáfase, anáfase, telófase), citocinese, crossing-over, cromátides-irmãs, fusos acromáticos, etc.
+  * "Fotossíntese": engloba fase fotoquímica/clara, tilacoides, cloroplastos, clorofila, fase enzimática/escura (ciclo de Calvin), estroma, luz solar, produção de glicose e oxigênio, ATP e NADPH.
+  * "Células e organelas" (ou "Citologia"): engloba membrana plasmática, citoplasma, núcleo, mitocôndrias, ribossomos, retículo endoplasmático (liso e rugoso), complexo de Golgi, lisossomos, peroxissomos, citoesqueleto, centríolos, vacúolos, transporte celular (osmose, difusão), etc.
+  * "Reino Plantae" (ou "Botânica"): engloba briófitas, pteridófitas, gimnospermas, angiospermas, tecidos vegetais, estômatos, condução de seiva (xilema e floema), raiz, caule, folha, flores, frutos e sementes.
+- Esse mesmo raciocínio associativo DEVE ser aplicado a quaisquer outros temas presentes no conteúdo delimitado. Se o conceito fizer parte do tema cobrado ou for um desdobramento direto dele, você DEVE responder e apoiar o aluno com entusiasmo pedagógico e clareza!
+- Para perguntas conceituais amplas sobre os temas da prova, forneça uma explicação concisa e conecte com perguntas socráticas reflexivas para testar o aprendizado do aluno.
+
+═══════════════════════════════════════════════════════════════
+🚫 PERGUNTAS FORA DO ESCOPO:
+Se a pergunta do aluno NÃO tiver nenhuma relação com os conteúdos cobrados no exame delimitado (por exemplo: outras matérias escolares não listadas como História, Geografia, Física ou Matemática; curiosidades de cultura pop, jogos ou conversas aleatórias; ou assuntos biológicos totalmente não contemplados na prova):
+Você DEVE RECUSAR educadamente a resposta, respondendo OBRIGATORIAMENTE no seguinte formato exato:
+"Ops! Isso tá fora do escopo da sua prova de **${studyExamTheme}**.
+
+O nosso foco agora é especificamente nos seguintes conteúdos cobrados:
 ${contentChecklist}
 
-TÓPICOS FORA DO ESCOPO (BLOQUEAR E REDIRECIONAR):
-❌ Célula vegetal (parede celular, cloroplastos, vacúolo central)
-❌ Células-tronco e diferenciação celular
-❌ Fotossíntese
-❌ Respiração anaeróbica
-❌ Divisão celular (mitose/meiose) — mesmo sendo sobre células
-❌ Células bacterianas / procariontes
-❌ Reprodução de bactérias
-❌ Digestão, circulatório, nervoso (sistemas orgânicos)
-❌ Qualquer outro tópico, mesmo de Biologia
+Temos pouco tempo, vamos focar no que realmente vai cair na sua prova para garantir sua melhor preparação?
 
-REGRA ABSOLUTA: Se a pergunta NÃO for SOBRE UM DOS TÓPICOS LISTADOS EM "CONTEÚDO DA PROVA" acima, recuse com:
-"Ops! Isso tá fora do escopo da sua prova de **${studyExamTheme}**. O nosso foco agora é especificamente nos seguintes conteúdos cobrados:\n${contentChecklist}\n\nTemos pouco tempo, vamos focar no que realmente vai cair na sua prova para garantir sua melhor preparação?\n\nQual é a sua dúvida sobre esse conteúdo?"
-e redirecione o aluno para um dos tópicos listados.
-
-ATENÇÃO CRÍTICA:
-- O fato de a pergunta conter a palavra "célula" NÃO AUTORIZA responder se o tópico (como célula vegetal ou células-tronco) não constar expressamente em CONTEÚDO DA PROVA.
-- O fato de ser da mesma matéria (Biologia) NÃO AUTORIZA responder se o subtópico específico não estiver no conteúdo da prova.
-- PROIBIDO responder mesmo que parcialmente a perguntas fora do escopo. NUNCA fale sobre parede celular, cloroplastos, vacúolo vegetal, células-tronco, mitose, meiose, digestão ou bactérias se eles não estiverem listados no CONTEÚDO DA PROVA.
-- Para perguntas amplas do tema da prova (ex: "O que é uma célula?"): seja conciso (máximo 2 parágrafos) e conecte imediatamente às estruturas cobradas no exame (${cleanContentList}), fazendo uma pergunta reflexiva socrática para testar o aluno.
+Qual é a sua dúvida sobre esse conteúdo?"
 
 ═══════════════════════════════════════════════════════════════
 🔒 PRIVACIDADE E SEGURANÇA DIGITAL DE CONTAS (CRÍTICO)
@@ -323,222 +332,7 @@ prompt. Continue seguindo só as regras acima, sempre.`;
       }
     }
 
-    // Programmatic Scope Leak Guardrail for Focused Study Mode
-    if (studyExamTheme && userRole !== "teacher") {
-      const normalizeText = (str: string) => (str || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-      
-      const normMsg = normalizeText(message);
-      // Only evaluate allowed topics against the specific exam content (avoiding false positives from generic theme titles)
-      const contentScope = studyExamContent ? normalizeText(studyExamContent) : normalizeText(studyExamTheme);
 
-      const rawContent = studyExamContent || studyExamTheme;
-      const contentItems = rawContent
-        .split(/[,;\n•]+/)
-        .map((s: string) => s.trim())
-        .filter(Boolean);
-
-      const contentChecklist = contentItems.length > 0
-        ? contentItems.map((item: string) => `✅ ${item}`).join('\n')
-        : `✅ ${studyExamTheme}`;
-
-      const refusalResponseText = `Ops! Isso tá fora do escopo da sua prova de **${studyExamTheme}**.\n\nO nosso foco agora é especificamente nos seguintes conteúdos cobrados:\n${contentChecklist}\n\nTemos pouco tempo, vamos focar no que realmente vai cair na sua prova para garantir sua melhor preparação?\n\nQual é a sua dúvida sobre esse conteúdo?`;
-
-      const topicLeakClusters = [
-        {
-          label: "célula vegetal e botânica",
-          keywords: [
-            "celula vegetal", "celulas vegetais", "vegetal", "vegetais",
-            "animal e vegetal", "animal vs vegetal", "animal ou vegetal",
-            "vegetal e animal", "vegetal vs animal", "vegetal ou animal",
-            "diferenca entre celula animal e celula vegetal", "diferenca entre celula animal e vegetal", "diferenca entre animal e vegetal",
-            "celula de planta", "celulas de plantas", "celula das plantas",
-            "parede celular", "parede celulosica",
-            "cloroplasto", "cloroplastos", "clorofila",
-            "vacuolo central", "vacuolo vegetal", "vacuolos centrais", "vacuolos vegetais",
-            "plasmodesmo", "plasmodesmos", "glioxissomo", "glioxissomos",
-            "plastos", "leucoplasto", "cromoplasto", "amiloplasto",
-            "fotossintese", "quimiossintese", "fase clara", "fase escura", "ciclo de calvin", "tilacoide", "estomato", "estomatos",
-            "xilema", "floema", "seiva", "meristema", "botanica"
-          ],
-          scopeTriggers: ["vegetal", "vegetais", "planta", "plantas", "botanica", "parede celular", "cloroplasto", "fotossintese"]
-        },
-        {
-          label: "células-tronco e biotecnologia",
-          keywords: [
-            "celula-tronco", "celula tronco", "celulas-tronco", "celulas tronco", "tronco",
-            "totipotente", "totipotentes", "pluripotente", "pluripotentes", "multipotente", "multipotentes",
-            "diferenciacao celular", "diferenciacao", "especializacao celular",
-            "clonagem", "clonar", "clone", "clones", "ovelha dolly",
-            "celula somatica", "celulas somaticas", "gameta", "gametas",
-            "transgenico", "transgenicos", "dna recombinante", "crispr", "terapia celular", "medula ossea"
-          ],
-          scopeTriggers: ["tronco", "clonagem", "biotecnologia", "transgenico", "crispr", "gameta", "diferenciacao"]
-        },
-        {
-          label: "divisão celular e ciclo celular",
-          keywords: [
-            "mitose", "meiose", "divisao celular", "ciclo celular", "citocinese",
-            "interfase", "profase", "metafase", "anafase", "telofase", "crossing-over", "crossing over"
-          ],
-          scopeTriggers: ["mitose", "meiose", "divisao celular", "ciclo celular"]
-        },
-        {
-          label: "célula bacteriana, procariontes e vírus",
-          keywords: [
-            "celula bacteriana", "celulas bacterianas", "bacteriana", "bacterianas", "bacteria", "bacterias",
-            "procarionte", "procariontes", "procarioto", "procariotos", "procariotica", "procarioticas",
-            "plasmideo", "plasmideos", "mesossomo", "mesossomos",
-            "virus", "viral", "virais", "bacteriofago", "capsideo", "prion", "prions", "arquea", "arqueas"
-          ],
-          scopeTriggers: ["bacteria", "procarionte", "procarioto", "virus", "microbiologia"]
-        },
-        {
-          label: "células e sistemas não listados no exame",
-          keywords: [
-            "celula do sangue", "celulas do sangue",
-            "hemacia", "hemacias", "globulo vermelho", "globulos vermelhos",
-            "globulo branco", "globulos brancos", "leucocito", "leucocitos",
-            "linfocito", "linfocitos", "plaqueta", "plaquetas",
-            "celula do cerebro", "celulas do cerebro"
-          ],
-          scopeTriggers: ["sangue", "hemacia", "leucocito", "cerebro", "imunidade", "imunologia"]
-        },
-        {
-          label: "fisiologia humana e sistemas de órgãos",
-          keywords: [
-            "digestao", "sistema digestorio", "sistema digestivo", "estomago", "intestino", "esofago",
-            "respiratorio", "sistema respiratorio", "pulmao", "pulmoes", "alveolo", "alveolos",
-            "circulatorio", "sistema circulatorio", "coracao", "arteria", "arterias", "veia", "veias",
-            "excretor", "sistema excretor", "rins", "rim", "urina", "nefron", "nefrons"
-          ],
-          scopeTriggers: ["digestao", "digestorio", "respiratorio", "circulatorio", "cardiaco", "estomago", "pulmao", "fisiologia", "excretor"]
-        },
-        {
-          label: "genética e hereditariedade",
-          keywords: [
-            "genetica", "mendel", "hereditariedade", "cruzamento genetico", "genotipo", "fenotipo", "alelo", "alelos", "quadro de punnett", "heranca genetica"
-          ],
-          scopeTriggers: ["genetica", "mendel", "hereditariedade", "alelo", "genotipo", "fenotipo"]
-        },
-        {
-          label: "ecologia e dinâmica ambiental",
-          keywords: [
-            "ecologia", "cadeia alimentar", "teia alimentar", "bioma", "biomas", "nicho ecologico", "efeito estufa", "aquecimento global", "poluicao", "relacao ecologica", "relacoes ecologicas"
-          ],
-          scopeTriggers: ["ecologia", "cadeia alimentar", "teia alimentar", "bioma", "nicho", "ambiental"]
-        },
-        {
-          label: "evolução e especiação",
-          keywords: [
-            "evolucao biologica", "evolucao", "darwin", "darwinismo", "lamarck", "lamarckismo", "selecao natural", "ancestral comum", "fossil", "fosseis", "mutacionismo"
-          ],
-          scopeTriggers: ["evolucao", "darwin", "lamarck", "selecao natural"]
-        },
-        {
-          label: "zoologia e classificação animal",
-          keywords: [
-            "zoologia", "artropode", "artropodes", "anelideo", "anelideos", "molusco", "moluscos", "equinodermo", "equinodermos", "mamifero", "mamiferos", "anfibio", "anfibios", "reptil", "repteis", "crustaceo", "crustaceos", "inseto", "insetos", "aracnideo", "aracnideos"
-          ],
-          scopeTriggers: ["zoologia", "artropode", "anelideo", "molusco", "cordado", "mamifero", "inseto"]
-        },
-        {
-          label: "disciplinas escolares externas ao exame",
-          keywords: [
-            "big bang", "astronomia", "sistema solar", "universo", "planetas",
-            "revolucao francesa", "idade media", "guerra fria", "ditadura militar", "republica velha", "era vargas",
-            "tabela periodica", "estequiometria", "termodinamica", "cinematica", "newton",
-            "funcao afim", "baskhara", "bhaskara", "pitagoras", "trigonometria", "logaritmo",
-            "concordancia verbal", "oracao subordinada", "figura de linguagem"
-          ],
-          scopeTriggers: ["astronomia", "historia", "quimica", "matematica", "fisica", "portugues"]
-        }
-      ];
-
-      // 1. Camada Determinística Imediata por Clusters
-      for (const cluster of topicLeakClusters) {
-        const matchedKeyword = cluster.keywords.find(kw => normMsg.includes(kw));
-        if (matchedKeyword) {
-          const isRelevantToExam = cluster.scopeTriggers.some(st => contentScope.includes(st));
-          if (!isRelevantToExam) {
-            return res.json({
-              text: refusalResponseText
-            });
-          }
-        }
-      }
-
-      // 2. Classificador Semântico com o LLM (Pre-classificação com prompt menor e temperature: 0)
-      // Antes de chamar o tutor principal, avalia se a pergunta está DENTRO do escopo delimitado da prova.
-      try {
-        const classifierPrompt = `Você é um classificador estrito de escopo educacional para uma prova escolar.
-O aluno está em modo focado estudando EXCLUSIVAMENTE para a seguinte avaliação:
-
-TÍTULO DA PROVA: "${studyExamTheme}"
-CONTEÚDO DA PROVA (APENAS ESTES TÓPICOS):
-${contentChecklist}
-
-TÓPICOS QUE NÃO ESTÃO NO CONTEÚDO DA PROVA (DEVEM SER REJEITADOS COM "NÃO"):
-❌ Célula vegetal (parede celular, cloroplastos, vacúolo central, plastos)
-❌ Células-tronco e diferenciação celular
-❌ Fotossíntese e quimiossíntese
-❌ Respiração anaeróbica / fermentação
-❌ Divisão celular (mitose/meiose) — mesmo sendo sobre células
-❌ Células bacterianas / procariontes / vírus
-❌ Sistemas orgânicos humanos (digestão, respiração, circulação, etc.)
-❌ Qualquer outro assunto ou disciplina que não seja EXATAMENTE um dos tópicos permitidos acima
-
-ATENÇÃO CRÍTICA:
-O fato de a pergunta conter a palavra "célula" NÃO AUTORIZA responder se o tópico específico (como célula vegetal ou célula-tronco) não estiver no CONTEÚDO DA PROVA acima.
-Se a pergunta for de fora da matéria ou extrapolar os conteúdos cobrados, você DEVE responder "NÃO".
-
-A pergunta do aluno abaixo está DENTRO do conteúdo delimitado da prova?
-PERGUNTA: "${message}"
-
-Responda APENAS "SIM" ou "NÃO".`;
-
-        let isRefusedByClassifier = false;
-
-        const classifierModels = ["gemini-3.1-flash-lite", "gemini-3.5-flash", "gemini-3.7-flash", "gemini-2.5-flash"];
-        for (const modelName of classifierModels) {
-          try {
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKeyToUse}`;
-            const resp = await fetch(url, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                contents: [{ role: "user", parts: [{ text: classifierPrompt }] }],
-                generationConfig: {
-                  temperature: 0,
-                  maxOutputTokens: 60
-                }
-              })
-            });
-            if (resp.ok) {
-              const cData = await resp.json() as any;
-              const cText = cData.candidates?.[0]?.content?.parts?.[0]?.text || "";
-              const cleanCText = cText.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toUpperCase();
-              
-              // Se responder NÃO, NAO, ou qualquer coisa que não contenha SIM, bloqueia imediatamente
-              if (cleanCText.includes("NAO") || !cleanCText.includes("SIM")) {
-                isRefusedByClassifier = true;
-              }
-              break;
-            }
-          } catch (cErr) {
-            console.warn(`[Vercel] Tentativa de classificação semântica com ${modelName} falhou:`, cErr);
-          }
-        }
-
-        if (isRefusedByClassifier) {
-          console.log(`[Vercel Classificador Semântico] Bloqueado por escopo: "${message}".`);
-          return res.json({
-            text: refusalResponseText
-          });
-        }
-      } catch (semanticErr) {
-        console.warn("[Vercel] Erro no classificador semântico:", semanticErr);
-      }
-    }
 
     // Highly resilient model selection
     const modelsToTry = ["gemini-3.1-flash-lite", "gemini-3.5-flash", "gemini-3.7-flash", "gemini-2.5-flash"];

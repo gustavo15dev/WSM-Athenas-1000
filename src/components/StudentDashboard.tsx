@@ -38,7 +38,8 @@ import {
   MessageSquare,
   Info,
   Moon,
-  Sun
+  Sun,
+  X
 } from 'lucide-react';
 import { matchesStudentTarget, formatTargetDisplayName } from '../utils/targetMatcher';
 import { parseExamSettings, cleanExamContent, cleanNotificationMessage, formatExamDateDisplay, cleanExamObservations, extractExamTime } from '../utils/examSettings';
@@ -145,6 +146,30 @@ export default function StudentDashboard({
   const [gmailStatus, setGmailStatus] = useState<{ type: 'success' | 'error', msg: string } | null>(null);
   const [isEditingGmail, setIsEditingGmail] = useState(false);
   const [activeSettingsTab, setActiveSettingsTab] = useState<'profile' | 'notifications'>('profile');
+  const [isGmailCardDismissed, setIsGmailCardDismissed] = useState(() => {
+    try {
+      const clean = (email || '').toLowerCase().trim();
+      return (
+        (clean && localStorage.getItem(`wsm_dismissed_gmail_card_${clean}`) === 'true') ||
+        localStorage.getItem('wsm_dismissed_gmail_card') === 'true'
+      );
+    } catch {
+      return false;
+    }
+  });
+
+  const handleDismissGmailCard = () => {
+    setIsGmailCardDismissed(true);
+    try {
+      const clean = (email || '').toLowerCase().trim();
+      if (clean) {
+        localStorage.setItem(`wsm_dismissed_gmail_card_${clean}`, 'true');
+      }
+      localStorage.setItem('wsm_dismissed_gmail_card', 'true');
+    } catch (e) {
+      console.error('Failed to save Gmail notification card dismissal:', e);
+    }
+  };
 
   // Student analytics states
   const [analyticsData, setAnalyticsData] = useState<any>(null);
@@ -2327,6 +2352,7 @@ export default function StudentDashboard({
       {!isExamActive && (
         <aside 
           id="dashboard-sidebar" 
+          data-collapsed={isSidebarCollapsed}
           className={`${
             isSidebarCollapsed ? 'w-24 px-2.5 py-6' : 'w-64 p-6'
           } h-full border-r border-emerald-950/20 bg-neutral-950/60 hidden md:flex flex-col shrink-0 justify-between z-30 overflow-y-auto scrollbar-none transition-all duration-300`}
@@ -2542,6 +2568,9 @@ export default function StudentDashboard({
             </button>
           </div>
         </div>
+
+        {/* Music Player Mini Card in Sidebar (above footer) */}
+        <div id="sidebar-music-slot" data-collapsed={isSidebarCollapsed} className="w-full mt-auto mb-3 empty:hidden transition-all duration-300"></div>
 
         <div className="border-t border-neutral-900 pt-5 space-y-3">
           {!isSidebarCollapsed ? (
@@ -2811,9 +2840,11 @@ export default function StudentDashboard({
         )}
 
         {/* Browser Push Notification Prompt Banner if not granted */}
-        <div className="mb-4">
-          <BrowserNotificationPrompt userRole="student" />
-        </div>
+        {activeTab !== 'wsm_athenas' && (
+          <div className="mb-4">
+            <BrowserNotificationPrompt userRole="student" />
+          </div>
+        )}
 
         {isTabTransitioning ? (
           <TabLoadingSkeleton
@@ -3170,13 +3201,23 @@ export default function StudentDashboard({
             })()}
 
             {/* Card de Cadastro de Gmail para Notificações */}
-            {profile && !profile.notification_gmail && (
+            {profile && !profile.notification_gmail && !isGmailCardDismissed && (
               <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="p-6 rounded-3xl bg-neutral-950/40 border border-emerald-500/20 backdrop-blur-md relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-6"
               >
                 <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-2xl pointer-events-none" />
+
+                {/* Dismiss Button (X) */}
+                <button
+                  type="button"
+                  onClick={handleDismissGmailCard}
+                  className="absolute top-3.5 right-3.5 p-2 rounded-xl bg-neutral-900/80 hover:bg-neutral-850 border border-neutral-800 text-neutral-400 hover:text-white transition-colors cursor-pointer z-20"
+                  title="Fechar aviso de Gmail"
+                >
+                  <X className="w-4 h-4" />
+                </button>
                 <div className="flex gap-4 items-start w-full md:w-2/3">
                   <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-2xl shrink-0 mt-1">
                     <Mail className="w-6 h-6" />

@@ -30,7 +30,22 @@ export default function BrowserNotificationPrompt({
   const [permission, setPermission] = useState<NotificationPermission>('default');
   const [isSupported, setIsSupported] = useState(true);
   const [testSent, setTestSent] = useState(false);
-  const [isBannerDismissed, setIsBannerDismissed] = useState(false);
+  const [isBannerDismissed, setIsBannerDismissed] = useState(() => {
+    try {
+      return typeof window !== 'undefined' && localStorage.getItem('wsm_dismissed_browser_push_banner') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const handleDismissBanner = () => {
+    setIsBannerDismissed(true);
+    try {
+      localStorage.setItem('wsm_dismissed_browser_push_banner', 'true');
+    } catch (e) {
+      console.error('Failed to save notification banner dismissal:', e);
+    }
+  };
 
   useEffect(() => {
     const supported = isNotificationSupported();
@@ -149,9 +164,9 @@ export default function BrowserNotificationPrompt({
 
           <button
             type="button"
-            onClick={() => setIsBannerDismissed(true)}
+            onClick={handleDismissBanner}
             className="p-2.5 rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-400 hover:text-white transition-colors cursor-pointer"
-            title="Agora não"
+            title="Fechar aviso de notificações"
           >
             <X className="w-4 h-4" />
           </button>

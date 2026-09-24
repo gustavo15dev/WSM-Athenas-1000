@@ -2065,7 +2065,7 @@ export default function ClassChat({
           {/* Chat Input Bar */}
           <form
             onSubmit={handleSendMessage}
-            className={`p-3.5 px-4 ${isMusicMiniPlayerActive ? 'pb-24 sm:pb-28' : 'pb-3.5'} bg-neutral-950 border-t border-neutral-900 flex items-center gap-2 shrink-0 relative z-50 transition-all duration-300`}
+            className="p-3.5 px-4 pb-3.5 bg-neutral-950 border-t border-neutral-900 flex items-center gap-2 shrink-0 relative z-50 transition-all duration-300"
           >
             {/* Hidden File Input */}
             <input

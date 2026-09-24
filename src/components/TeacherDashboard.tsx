@@ -1484,6 +1484,7 @@ export default function TeacherDashboard({
       {/* Modern Sidebar for desktop */}
       <aside 
         id="dashboard-sidebar" 
+        data-collapsed={isSidebarCollapsed}
         className={`${
           isSidebarCollapsed ? 'w-24 px-2.5 py-6' : 'w-64 p-6'
         } h-full border-r border-emerald-950/20 bg-neutral-950/60 hidden md:flex flex-col shrink-0 justify-between z-30 overflow-y-auto scrollbar-none transition-all duration-300`}
@@ -1770,6 +1771,9 @@ export default function TeacherDashboard({
           </div>
         </div>
 
+        {/* Music Player Mini Card in Sidebar (above footer) */}
+        <div id="sidebar-music-slot" data-collapsed={isSidebarCollapsed} className="w-full mt-auto mb-3 empty:hidden transition-all duration-300"></div>
+
         <div className="border-t border-neutral-900 pt-5 space-y-3">
           {!isSidebarCollapsed ? (
             <div className="animate-fadeIn space-y-3">
@@ -2019,9 +2023,11 @@ export default function TeacherDashboard({
         </header>
 
         {/* Browser Push Notification Banner */}
-        <div className="mb-4">
-          <BrowserNotificationPrompt userRole="teacher" />
-        </div>
+        {activeTab !== 'wsm_athenas' && (
+          <div className="mb-4">
+            <BrowserNotificationPrompt userRole="teacher" />
+          </div>
+        )}
 
         {activeTab === 'conversas' ? (
           <ClassChat

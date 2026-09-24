@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { 
   Send, Sparkles, Bot, User, Trash2, HelpCircle, Loader2, 
   History, Plus, MessageSquare, Mic, ArrowUp, X, MicOff, 
-  Paperclip, PanelLeftClose, PanelLeft, Search, Pin, Copy, Check, Headphones 
+  Paperclip, PanelLeftClose, PanelLeft, Search, Pin, Copy, Check, Headphones
 } from 'lucide-react';
 import { supabase } from '../supabase';
 import Markdown from 'react-markdown';
@@ -71,116 +71,128 @@ const sanitizeAndNormalizeContent = (text: string) => {
 };
 
 const ChatMessageItem = React.memo(({ msg }: { msg: ChatMessage }) => {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(sanitizeAndNormalizeContent(msg.content));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.warn("Failed to copy text", err);
+    }
+  };
+
+  const isAssistant = msg.role === 'assistant';
+
   return (
     <motion.div
-      initial={{ opacity: 0, y: 12 }}
+      initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.2, ease: "easeOut" }}
-      className={`py-6 px-4 md:px-6 w-full ${
-        msg.role === 'assistant' 
-          ? 'bg-neutral-950/20 border-y border-neutral-950/10' 
-          : 'bg-transparent'
-      }`}
+      transition={{ duration: 0.18, ease: "easeOut" }}
+      className="w-full py-2 px-4 flex justify-center"
     >
-      <div className="max-w-3xl mx-auto flex items-start gap-4 md:gap-6">
-        {/* Avatar badge */}
-        {msg.role === 'assistant' ? (
-          <div className="w-8 h-8 md:w-9 md:h-9 shrink-0 bg-emerald-500/10 border border-emerald-500/20 rounded-full flex items-center justify-center overflow-hidden shadow-inner shadow-emerald-500/10">
-            <img
-              src="https://i.ibb.co/JW6tx1k6/Chat-GPT-Image-21-de-jun-de-2026-17-21-07-removebg-preview.png"
-              alt="Athenas"
-              referrerPolicy="no-referrer"
-              className="w-12 h-12 max-w-none object-contain select-none scale-110"
-            />
-          </div>
-        ) : (
-          <div className="w-8 h-8 md:w-9 md:h-9 shrink-0 bg-neutral-900 border border-neutral-800 text-neutral-400 rounded-full flex items-center justify-center">
-            <User className="w-4 h-4 md:w-4.5 md:h-4.5 text-emerald-400/80" />
-          </div>
-        )}
+      <div className={`w-full max-w-3xl flex ${isAssistant ? 'justify-start' : 'justify-end'}`}>
+        {!isAssistant ? (
+          /* USER MESSAGE: Aligned Right inside centered max-w-3xl container */
+          <div className="flex flex-col items-end max-w-[85%] sm:max-w-[75%] md:max-w-xl group">
+            <div className="bg-[#1b4332]/90 hover:bg-[#1b4332] text-emerald-50 border border-emerald-500/25 px-4.5 py-2.5 rounded-[22px] rounded-tr-md shadow-md transition-colors select-text">
+              {(() => {
+                const cleaned = (msg.content || '')
+                  .replace(/\n\n---\n\*Arquivos Enviados:\*[\s\S]*/gi, '')
+                  .replace(/\*Arquivos Enviados:\*[\s\S]*/gi, '')
+                  .trim();
+                const displayText = cleaned === "Análise de arquivos anexados." ? "" : cleaned;
+                return displayText ? (
+                  <p className="whitespace-pre-wrap text-[14px] md:text-[14.5px] leading-relaxed break-words font-medium">
+                    {displayText}
+                  </p>
+                ) : null;
+              })()}
 
-        {/* Message Bubble/Text */}
-        <div className="flex-1 min-w-0 space-y-2">
-          <div className="flex items-center justify-between gap-4">
-            <span className="text-[11px] font-bold tracking-wide uppercase text-neutral-500 font-mono">
-              {msg.role === 'assistant' ? 'WSM Athenas' : 'Você'}
-            </span>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] text-neutral-600 font-mono">
-                {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </span>
-              <CopyButton text={sanitizeAndNormalizeContent(msg.content)} />
+              {/* Attachments */}
+              {msg.attachments && msg.attachments.length > 0 && (
+                <div className="flex flex-wrap gap-2 pt-2 mt-2 border-t border-emerald-500/20">
+                  {msg.attachments.map((file, fIdx) => {
+                    const isImg = file.type?.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(file.name);
+                    if (isImg) {
+                      return (
+                        <div 
+                          key={fIdx} 
+                          className="overflow-hidden rounded-xl border border-emerald-500/30 shadow bg-black/40 max-w-[240px] cursor-zoom-in group/img relative"
+                          onClick={() => window.dispatchEvent(new CustomEvent('wsm-open-image-fullscreen', { detail: file.data }))}
+                          title="Ver em tela cheia"
+                        >
+                          <img 
+                            src={file.data} 
+                            alt={file.name} 
+                            className="w-full max-h-[200px] object-cover group-hover/img:scale-105 transition-transform duration-300"
+                            referrerPolicy="no-referrer"
+                          />
+                        </div>
+                      );
+                    }
+                    const parts = file.name.split('.');
+                    const ext = parts.length > 1 ? parts[parts.length - 1].toUpperCase() : 'DOC';
+                    return (
+                      <div key={fIdx} className="px-3 py-1.5 bg-black/30 border border-emerald-500/20 rounded-xl text-[11px] font-mono text-emerald-200 flex items-center gap-2">
+                        <span>📎 {file.name}</span>
+                        <span className="text-[9px] opacity-70">({formatFileSize(file.size)})</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
+        ) : (
+          /* ASSISTANT (AI) MESSAGE: Aligned Left inside centered max-w-3xl container, Transparent Dark Background, Only Copy Button */
+          <div className="flex flex-col items-start max-w-full md:max-w-2xl w-full space-y-2">
+            
+            {/* Header: borderless mascot image and name */}
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 flex items-center justify-center shrink-0 overflow-hidden">
+                <img
+                  src="https://i.ibb.co/JW6tx1k6/Chat-GPT-Image-21-de-jun-de-2026-17-21-07-removebg-preview.png"
+                  alt="Athenas"
+                  referrerPolicy="no-referrer"
+                  className="w-7 h-7 max-w-none object-contain select-none"
+                />
+              </div>
+              <span className="text-[11px] font-bold tracking-wide uppercase text-neutral-400 font-mono">
+                WSM Athenas
+              </span>
+            </div>
 
-          <div className="text-neutral-200 text-[13.5px] md:text-sm leading-relaxed antialiased select-text">
-            {msg.role === 'assistant' ? (
-              <div className="markdown-body text-neutral-300">
+            {/* Message Body (Transparent background, no card borders) */}
+            <div className="text-neutral-200 text-[14px] md:text-[14.5px] leading-relaxed antialiased select-text pl-0.5 w-full">
+              <div className="markdown-body text-neutral-200">
                 <Markdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>
                   {sanitizeAndNormalizeContent(msg.content)}
                 </Markdown>
               </div>
-            ) : (
-              <div className="space-y-3">
-                {(() => {
-                  const cleaned = (msg.content || '')
-                    .replace(/\n\n---\n\*Arquivos Enviados:\*[\s\S]*/gi, '')
-                    .replace(/\*Arquivos Enviados:\*[\s\S]*/gi, '')
-                    .trim();
-                  const displayText = cleaned === "Análise de arquivos anexados." ? "" : cleaned;
-                  return displayText ? <p className="whitespace-pre-wrap text-neutral-200">{displayText}</p> : null;
-                })()}
-                
-                {/* File attachment preview inside message */}
-                {msg.attachments && msg.attachments.length > 0 && (
-                  <div className="flex flex-wrap gap-2.5 pt-2.5 border-t border-neutral-900">
-                    {msg.attachments.map((file, fIdx) => {
-                      const isImg = file.type?.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(file.name);
-                      if (isImg) {
-                        return (
-                          <div 
-                            key={fIdx} 
-                            className="overflow-hidden rounded-xl border border-neutral-850 shadow-lg bg-neutral-950/60 max-w-[280px] cursor-zoom-in group relative"
-                            onClick={() => window.dispatchEvent(new CustomEvent('wsm-open-image-fullscreen', { detail: file.data }))}
-                            title="Ver em tela cheia"
-                          >
-                            <img 
-                              src={file.data} 
-                              alt={file.name} 
-                              className="w-full max-h-[220px] object-cover group-hover:scale-105 transition-transform duration-300"
-                              referrerPolicy="no-referrer"
-                            />
-                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                              <span className="text-[10px] font-bold text-white bg-black/60 px-2 py-1 rounded">Ver Tela Cheia 🔍</span>
-                            </div>
-                          </div>
-                        );
-                      } else {
-                        const parts = file.name.split('.');
-                        const ext = parts.length > 1 ? parts[parts.length - 1].toUpperCase() : 'DOC';
-                        return (
-                          <div key={fIdx} className="w-[120px] h-[100px] flex flex-col justify-between bg-neutral-900/60 border border-neutral-850 p-2.5 rounded-xl shadow-md transition-all select-none">
-                            <span className="text-[10px] text-neutral-300 font-semibold line-clamp-2 leading-tight break-all" title={file.name}>
-                              {file.name}
-                            </span>
-                            <div className="flex items-center justify-between pt-1 border-t border-neutral-800/40">
-                              <span className="text-[8px] font-extrabold px-1 py-0.5 rounded border border-neutral-800 text-neutral-400 bg-neutral-950 uppercase">
-                                {ext}
-                              </span>
-                              <span className="text-neutral-500 text-[8px] font-mono">
-                                {formatFileSize(file.size)}
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      }
-                    })}
-                  </div>
+            </div>
+
+            {/* Action Bar Beneath AI Message: ONLY Copy button */}
+            <div className="flex items-center pt-1 text-neutral-500 pl-0.5">
+              <button
+                type="button"
+                onClick={handleCopy}
+                className="p-1.5 rounded-lg hover:bg-neutral-900/80 hover:text-neutral-200 transition-colors cursor-pointer flex items-center gap-1.5 text-xs text-neutral-400 hover:text-neutral-200"
+                title={copied ? "Copiado!" : "Copiar resposta"}
+              >
+                {copied ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                    <span className="text-[10px] text-emerald-400 font-mono">Copiado!</span>
+                  </>
+                ) : (
+                  <Copy className="w-3.5 h-3.5" />
                 )}
-              </div>
-            )}
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </motion.div>
   );
@@ -1154,39 +1166,41 @@ export default function WsmChat({
             </div>
           ) : (
             /* MESSAGES LIST */
-            <div className="divide-y divide-neutral-900/55 pb-12">
+            <div className="flex flex-col space-y-4 py-4 pb-12">
               {messages.map((msg) => (
                 <ChatMessageItem key={msg.id} msg={msg} />
               ))}
 
               {/* Typing indicator */}
               {isLoading && (
-                <div className="py-6 px-4 md:px-6 w-full bg-neutral-950/10 border-y border-neutral-950/5">
-                  <div className="max-w-3xl mx-auto flex items-start gap-4 md:gap-6">
-                    <div className="w-8 h-8 md:w-9 md:h-9 shrink-0 bg-emerald-500/10 border border-emerald-500/20 rounded-full flex items-center justify-center overflow-hidden">
-                      <img
-                        src="https://i.ibb.co/JW6tx1k6/Chat-GPT-Image-21-de-jun-de-2026-17-21-07-removebg-preview.png"
-                        alt="Athenas"
-                        referrerPolicy="no-referrer"
-                        className="w-12 h-12 max-w-none object-contain select-none"
-                      />
-                    </div>
-                    <div className="flex-1 min-w-0 space-y-2 pt-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[11px] font-bold tracking-wide uppercase text-neutral-500 font-mono">WSM Athenas</span>
-                        <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-400" />
+                <div className="w-full py-2 px-4 flex justify-center">
+                  <div className="w-full max-w-3xl flex flex-col items-start gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 flex items-center justify-center shrink-0 overflow-hidden">
+                        <img
+                          src="https://i.ibb.co/JW6tx1k6/Chat-GPT-Image-21-de-jun-de-2026-17-21-07-removebg-preview.png"
+                          alt="Athenas"
+                          referrerPolicy="no-referrer"
+                          className="w-7 h-7 max-w-none object-contain select-none"
+                        />
                       </div>
-                      <p className="text-xs text-neutral-500 italic animate-pulse">Pensando e consultando banco acadêmico...</p>
+                      <span className="text-[11px] font-bold tracking-wide uppercase text-neutral-400 font-mono">WSM Athenas</span>
+                    </div>
+                    <div className="flex items-center gap-2 pl-0.5 text-xs text-neutral-400">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-400" />
+                      <span className="italic animate-pulse">Pensando...</span>
                     </div>
                   </div>
                 </div>
               )}
 
               {errorMessage && (
-                <div className="py-4 px-4 max-w-2xl mx-auto">
-                  <div className="p-3 bg-red-950/20 border border-red-500/25 text-red-400 text-xs rounded-xl flex items-center gap-2 animate-fadeIn">
-                    <HelpCircle className="w-4.5 h-4.5 shrink-0" />
-                    <span>{errorMessage}</span>
+                <div className="w-full py-2 px-4 flex justify-center">
+                  <div className="w-full max-w-3xl">
+                    <div className="p-3 bg-red-950/20 border border-red-500/25 text-red-400 text-xs rounded-xl flex items-center gap-2 animate-fadeIn">
+                      <HelpCircle className="w-4.5 h-4.5 shrink-0" />
+                      <span>{errorMessage}</span>
+                    </div>
                   </div>
                 </div>
               )}
@@ -1198,8 +1212,8 @@ export default function WsmChat({
         <div 
           id="wsm-chat-input-container"
           className={`p-4 ${
-            isMusicMiniPlayerActive ? 'pb-28 sm:pb-32' : 'pb-6'
-          } bg-gradient-to-t from-neutral-950 to-transparent border-t border-neutral-900/60 flex flex-col items-center shrink-0 relative z-50 transition-all duration-300`}
+            messages.length === 0 ? 'pb-6' : 'pb-2 sm:pb-3'
+          } bg-gradient-to-t from-neutral-950 to-transparent border-t border-neutral-900/60 flex flex-col items-center shrink-0 relative z-50 transition-all duration-300 ease-out`}
         >
           
           <input
@@ -1212,7 +1226,7 @@ export default function WsmChat({
           />
 
           {/* Centered chat wrapper */}
-          <div className="w-full max-w-3xl space-y-2 relative z-50">
+          <div className="w-full max-w-3xl space-y-2 relative z-50 transition-all duration-300">
             
             <div className={`bg-[#212121] border border-neutral-800 focus-within:border-neutral-700 rounded-[26px] p-1.5 pr-2 flex flex-col transition-all duration-300 shadow-xl overflow-hidden relative z-50`}>
               
@@ -1280,9 +1294,18 @@ export default function WsmChat({
               </div>
             </div>
 
-            <p className="text-[10px] text-neutral-550 text-center select-none">
-              O Athenas AI pode cometer erros de interpretação. Verifique informações importantes.
-            </p>
+            {/* Disclaimer text: visible only when chat has not started (messages.length === 0) */}
+            <div
+              className={`transition-all duration-300 ease-out overflow-hidden ${
+                messages.length === 0
+                  ? 'max-h-12 opacity-100 mt-2'
+                  : 'max-h-0 opacity-0 mt-0 pointer-events-none'
+              }`}
+            >
+              <p className="text-[10px] text-neutral-550 text-center select-none">
+                O Athenas AI pode cometer erros de interpretação. Verifique informações importantes.
+              </p>
+            </div>
           </div>
         </div>
       </div>
