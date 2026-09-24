@@ -2,14 +2,15 @@ import React, { useState, useRef, useEffect } from 'react';
 import { 
   Send, Sparkles, Bot, User, Trash2, HelpCircle, Loader2, 
   History, Plus, MessageSquare, Mic, ArrowUp, X, MicOff, 
-  Paperclip, PanelLeftClose, PanelLeft, Search, Pin, Copy, Check, Headphones
+  Paperclip, PanelLeftClose, PanelLeft, Search, Pin, Copy, Check, Headphones,
+  Globe
 } from 'lucide-react';
 import { supabase } from '../supabase';
-import Markdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import rehypeHighlight from 'rehype-highlight';
+import AthenasMarkdownRenderer from './AthenasMarkdownRenderer';
 import { motion, AnimatePresence } from 'motion/react';
 import { checkFastSafetyViolation } from '../utils/safetyCheck';
+import { WebSource, extractSourcesFromContent } from '../utils/tavilyAgent';
+import SourcesDrawer from './SourcesDrawer';
 
 declare global {
   interface Window {
@@ -27,6 +28,9 @@ interface ChatMessage {
   content: string;
   timestamp: Date;
   attachments?: Array<{ name: string; type: string; data: string; size: number }>;
+  sources?: WebSource[];
+  isGenerating?: boolean;
+  isDelayed?: boolean;
 }
 
 interface ChatSession {
@@ -70,7 +74,13 @@ const sanitizeAndNormalizeContent = (text: string) => {
     .replace(/[\uFFFD]/g, '');
 };
 
-const ChatMessageItem = React.memo(({ msg }: { msg: ChatMessage }) => {
+const ChatMessageItem = React.memo(({ 
+  msg,
+  onOpenSources
+}: { 
+  msg: ChatMessage;
+  onOpenSources?: (sources: WebSource[], targetUrl?: string) => void;
+}) => {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -146,7 +156,7 @@ const ChatMessageItem = React.memo(({ msg }: { msg: ChatMessage }) => {
             </div>
           </div>
         ) : (
-          /* ASSISTANT (AI) MESSAGE: Aligned Left inside centered max-w-3xl container, Transparent Dark Background, Only Copy Button */
+          /* ASSISTANT (AI) MESSAGE: Aligned Left inside centered max-w-3xl container, Transparent Dark Background, Sources Button + Copy Button */
           <div className="flex flex-col items-start max-w-full md:max-w-2xl w-full space-y-2">
             
             {/* Header: borderless mascot image and name */}
@@ -160,37 +170,69 @@ const ChatMessageItem = React.memo(({ msg }: { msg: ChatMessage }) => {
                 />
               </div>
               <span className="text-[11px] font-bold tracking-wide uppercase text-neutral-400 font-mono">
-                WSM Athenas
+                Athenas AI
               </span>
             </div>
 
             {/* Message Body (Transparent background, no card borders) */}
             <div className="text-neutral-200 text-[14px] md:text-[14.5px] leading-relaxed antialiased select-text pl-0.5 w-full">
-              <div className="markdown-body text-neutral-200">
-                <Markdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>
-                  {sanitizeAndNormalizeContent(msg.content)}
-                </Markdown>
-              </div>
+              {msg.content ? (
+                <AthenasMarkdownRenderer 
+                  content={sanitizeAndNormalizeContent(msg.content)} 
+                  sources={msg.sources}
+                  onSelectSource={(source) => {
+                    if (onOpenSources) {
+                      onOpenSources(msg.sources || [source], source.url);
+                    }
+                  }}
+                />
+              ) : null}
+
+              {/* Real-time generating indicator beneath content while AI is still responding */}
+              {msg.isGenerating && (
+                <div className={`flex items-center gap-2 ${msg.content ? 'mt-3 pt-1' : 'py-1'} text-xs text-neutral-400 select-none animate-fadeIn`}>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-400 shrink-0" />
+                  <span className="italic animate-pulse text-neutral-300">
+                    {msg.isDelayed 
+                      ? "Isso está demorando mais do que o esperado. Sua resposta está sendo gerada." 
+                      : "Gerando resposta..."}
+                  </span>
+                </div>
+              )}
             </div>
 
-            {/* Action Bar Beneath AI Message: ONLY Copy button */}
-            <div className="flex items-center pt-1 text-neutral-500 pl-0.5">
-              <button
-                type="button"
-                onClick={handleCopy}
-                className="p-1.5 rounded-lg hover:bg-neutral-900/80 hover:text-neutral-200 transition-colors cursor-pointer flex items-center gap-1.5 text-xs text-neutral-400 hover:text-neutral-200"
-                title={copied ? "Copiado!" : "Copiar resposta"}
-              >
-                {copied ? (
-                  <>
-                    <Check className="w-3.5 h-3.5 text-emerald-400" />
-                    <span className="text-[10px] text-emerald-400 font-mono">Copiado!</span>
-                  </>
-                ) : (
-                  <Copy className="w-3.5 h-3.5" />
+            {/* Action Bar Beneath AI Message: Sources Button (if available) + Copy Button (Only shown when generation completed) */}
+            {!msg.isGenerating && msg.content && (
+              <div className="flex items-center gap-2 pt-1 text-neutral-500 pl-0.5">
+                {msg.sources && msg.sources.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => onOpenSources && onOpenSources(msg.sources!)}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-neutral-900 border border-neutral-800 hover:border-emerald-500/40 text-neutral-300 hover:text-emerald-300 text-xs font-medium transition-all cursor-pointer shadow-xs group"
+                    title="Ver todas as fontes consultadas pela IA"
+                  >
+                    <Globe className="w-3.5 h-3.5 text-emerald-400 group-hover:rotate-12 transition-transform" />
+                    <span>{msg.sources.length} {msg.sources.length === 1 ? 'fonte' : 'fontes'}</span>
+                  </button>
                 )}
-              </button>
-            </div>
+
+                <button
+                  type="button"
+                  onClick={handleCopy}
+                  className="p-1.5 rounded-lg hover:bg-neutral-900/80 hover:text-neutral-200 transition-colors cursor-pointer flex items-center gap-1.5 text-xs text-neutral-400 hover:text-neutral-200"
+                  title={copied ? "Copiado!" : "Copiar resposta"}
+                >
+                  {copied ? (
+                    <>
+                      <Check className="w-3.5 h-3.5 text-emerald-400" />
+                      <span className="text-[10px] text-emerald-400 font-mono">Copiado!</span>
+                    </>
+                  ) : (
+                    <Copy className="w-3.5 h-3.5" />
+                  )}
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -251,6 +293,17 @@ export default function WsmChat({
 
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const activeIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Lateral Drawer for consulted web sources
+  const [drawerSources, setDrawerSources] = useState<WebSource[]>([]);
+  const [isSourcesDrawerOpen, setIsSourcesDrawerOpen] = useState(false);
+  const [activeSourceUrl, setActiveSourceUrl] = useState<string | undefined>();
+
+  const handleOpenSources = (sources: WebSource[], targetUrl?: string) => {
+    setDrawerSources(sources);
+    setActiveSourceUrl(targetUrl);
+    setIsSourcesDrawerOpen(true);
+  };
 
   // Dynamic layout compensation when the music mini-player is active in background
   const [isMusicMiniPlayerActive, setIsMusicMiniPlayerActive] = useState<boolean>(() => {
@@ -527,13 +580,17 @@ export default function WsmChat({
 
       if (error) throw error;
 
-      const formatted: ChatMessage[] = (data || []).map(msg => ({
-        id: msg.id,
-        role: msg.role as 'user' | 'assistant',
-        content: msg.content,
-        timestamp: new Date(msg.created_at),
-        attachments: msg.attachments || []
-      }));
+      const formatted: ChatMessage[] = (data || []).map(msg => {
+        const { cleanContent, sources } = extractSourcesFromContent(msg.content || '');
+        return {
+          id: msg.id,
+          role: msg.role as 'user' | 'assistant',
+          content: cleanContent,
+          timestamp: new Date(msg.created_at),
+          attachments: msg.attachments || [],
+          sources: sources.length > 0 ? sources : undefined
+        };
+      });
 
       setMessages(formatted);
       setCurrentSessionId(sessionId);
@@ -750,6 +807,8 @@ export default function WsmChat({
       return;
     }
 
+    const assistantMsgId = `msg-${Date.now() + 1}`;
+
     try {
       let sessionId = currentSessionId;
       if (!sessionId) {
@@ -792,8 +851,20 @@ export default function WsmChat({
         attachments: msg.attachments
       }));
 
+      // Immediately add the real-time assistant placeholder with isGenerating = true
+      const initialAssistantMessage: ChatMessage = {
+        id: assistantMsgId,
+        role: 'assistant',
+        content: '',
+        isGenerating: true,
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, initialAssistantMessage]);
+      setIsLoading(true);
+      setIsTyping(true);
+
       const fetchController = new AbortController();
-      const fetchTimeoutId = setTimeout(() => fetchController.abort(), 25000);
+      const fetchTimeoutId = setTimeout(() => fetchController.abort(), 90000);
 
       let res: Response;
       try {
@@ -801,7 +872,8 @@ export default function WsmChat({
           method: "POST",
           signal: fetchController.signal,
           headers: {
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            "Accept": "text/event-stream, application/json"
           },
           body: JSON.stringify({
             message: rawText || "Análise de arquivos anexados.",
@@ -820,37 +892,208 @@ export default function WsmChat({
         let errorMsg = "Não foi possível obter resposta do Athenas.";
         try {
           const errData = await res.json();
-          if (errData && errData.error) errorMsg = errData.error;
+          if (errData && errData.error) errorMsg = typeof errData.error === 'string' ? errData.error : JSON.stringify(errData.error);
         } catch (e) {}
+
+        const is503 = res.status === 503 || 
+          errorMsg.includes("503") || 
+          errorMsg.includes("UNAVAILABLE") || 
+          errorMsg.includes("high demand") || 
+          errorMsg.includes("Spikes in demand") ||
+          errorMsg.includes("429");
+
+        if (is503) {
+          // Silently wait 5s and retry without alerting the user
+          setMessages(prev => prev.map(m => m.id === assistantMsgId ? {
+            ...m,
+            isDelayed: true
+          } : m));
+          await new Promise(r => setTimeout(r, 5000));
+          return handleSendMessage(rawText);
+        }
+
         throw new Error(errorMsg);
       }
 
-      const data = await res.json();
-      const fullText = data.text || "Sem resposta no momento.";
-      
-      if (sessionId) {
+      const contentType = res.headers.get("content-type") || "";
+      let finalFullText = "";
+      let finalSources: WebSource[] = [];
+      const searchStepsState: Array<{ thought: string; count?: number; isSearching: boolean }> = [];
+
+      const buildLiveContent = (steps: typeof searchStepsState, suffix: string = '') => {
+        const blocks: string[] = [];
+        for (const s of steps) {
+          if (s.thought) {
+            blocks.push(s.thought.trim());
+          }
+          if (s.isSearching) {
+            blocks.push(`[[PESQUISANDO]]`);
+          } else {
+            blocks.push(`[[PESQUISOU:${s.count || 10}]]`);
+          }
+        }
+        if (suffix && suffix.trim()) {
+          blocks.push(suffix.trim());
+        }
+        return blocks.join('\n\n');
+      };
+
+      if (contentType.includes("text/event-stream") && res.body) {
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        let buffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed.startsWith("data:")) continue;
+            const jsonStr = trimmed.replace(/^data:\s*/, "");
+            if (!jsonStr) continue;
+
+            try {
+              const eventData = JSON.parse(jsonStr);
+
+              if (eventData.type === "status_delayed" || eventData.status === "high_demand" || eventData.type === "high_demand") {
+                // Temporary high demand on Google Gemini: silently show delayed status
+                setMessages(prev => prev.map(m => m.id === assistantMsgId ? {
+                  ...m,
+                  isDelayed: true
+                } : m));
+              } else if (eventData.type === "step_start") {
+                // A search step began: show paragraph + "Pesquisando na web" badge
+                const stepIdx = eventData.stepIndex ?? searchStepsState.length;
+                searchStepsState[stepIdx] = {
+                  thought: eventData.thought || "",
+                  isSearching: true
+                };
+                const liveText = buildLiveContent(searchStepsState);
+                setMessages(prev => prev.map(m => m.id === assistantMsgId ? {
+                  ...m,
+                  content: liveText,
+                  isGenerating: true
+                } : m));
+              } else if (eventData.type === "step_done") {
+                // Search step finished: replace badge with "Pesquisou em N sites"
+                const stepIdx = eventData.stepIndex ?? (searchStepsState.length - 1);
+                if (searchStepsState[stepIdx]) {
+                  searchStepsState[stepIdx] = {
+                    thought: eventData.thought || searchStepsState[stepIdx].thought || "",
+                    count: eventData.resultsCount || 10,
+                    isSearching: false
+                  };
+                } else {
+                  searchStepsState.push({
+                    thought: eventData.thought || "",
+                    count: eventData.resultsCount || 10,
+                    isSearching: false
+                  });
+                }
+                if (eventData.sources && Array.isArray(eventData.sources)) {
+                  finalSources = eventData.sources;
+                }
+                const liveText = buildLiveContent(searchStepsState);
+                setMessages(prev => prev.map(m => m.id === assistantMsgId ? {
+                  ...m,
+                  content: liveText,
+                  sources: finalSources.length > 0 ? finalSources : undefined,
+                  isGenerating: true
+                } : m));
+              } else if (eventData.type === "final") {
+                finalFullText = eventData.text || "";
+                const cleanContent = eventData.cleanContent || eventData.text || "";
+                finalSources = (eventData.sources && Array.isArray(eventData.sources) && eventData.sources.length > 0)
+                  ? eventData.sources
+                  : finalSources;
+
+                setMessages(prev => prev.map(m => m.id === assistantMsgId ? {
+                  ...m,
+                  content: cleanContent,
+                  sources: finalSources.length > 0 ? finalSources : undefined,
+                  isGenerating: false,
+                  isDelayed: false
+                } : m));
+              } else if (eventData.type === "error") {
+                const errStr = String(eventData.error || "");
+                if (
+                  errStr.includes("503") || 
+                  errStr.includes("UNAVAILABLE") || 
+                  errStr.includes("high demand") || 
+                  errStr.includes("Spikes in demand") || 
+                  errStr.includes("429")
+                ) {
+                  // Silently mark as delayed without throwing raw error
+                  setMessages(prev => prev.map(m => m.id === assistantMsgId ? {
+                    ...m,
+                    isDelayed: true
+                  } : m));
+                } else {
+                  throw new Error(eventData.error || "Erro ao gerar resposta com a IA.");
+                }
+              }
+            } catch (e: any) {
+              if (e?.message && !e.message.includes("JSON")) {
+                throw e;
+              }
+            }
+          }
+        }
+      } else {
+        // Fallback for regular JSON responses
+        const data = await res.json();
+        finalFullText = data.text || "Sem resposta no momento.";
+        const { cleanContent, sources: parsedSources } = extractSourcesFromContent(finalFullText);
+        finalSources = (data.sources && Array.isArray(data.sources) && data.sources.length > 0)
+          ? data.sources
+          : parsedSources;
+
+        setMessages(prev => prev.map(m => m.id === assistantMsgId ? {
+          ...m,
+          content: cleanContent,
+          sources: finalSources.length > 0 ? finalSources : undefined,
+          isGenerating: false
+        } : m));
+      }
+
+      if (sessionId && finalFullText) {
         await supabase.from('wsm_chat_messages').insert([{
           session_id: sessionId,
           role: 'assistant',
-          content: fullText
+          content: finalFullText
         }]);
       }
 
       setIsLoading(false);
       setIsTyping(false);
 
-      const botResponse: ChatMessage = {
-        id: `msg-${Date.now() + 1}`,
-        role: 'assistant',
-        content: fullText,
-        timestamp: new Date()
-      };
-
-      setMessages(prev => [...prev, botResponse]);
-
     } catch (err: any) {
       console.error(err);
-      setErrorMessage(err.message || "Erro ao conectar com o Athenas AI.");
+      const errMsg = String(err?.message || err || "");
+      const is503 = 
+        errMsg.includes("503") || 
+        errMsg.includes("UNAVAILABLE") || 
+        errMsg.includes("high demand") || 
+        errMsg.includes("Spikes in demand") ||
+        errMsg.includes("429");
+
+      if (is503) {
+        setMessages(prev => prev.map(m => m.id === assistantMsgId ? {
+          ...m,
+          isDelayed: true
+        } : m));
+        await new Promise(r => setTimeout(r, 5000));
+        return handleSendMessage(rawText);
+      }
+
+      setErrorMessage(errMsg || "Erro ao conectar com o Athenas AI.");
+      // If the message was left completely empty, clean it up
+      setMessages(prev => prev.filter(m => !(m.id === assistantMsgId && !m.content)));
       setIsLoading(false);
       setIsTyping(false);
     }
@@ -1085,18 +1328,9 @@ export default function WsmChat({
 
             <div className="flex items-center gap-2 md:gap-3 flex-wrap">
               <span className="text-sm font-extrabold text-neutral-100 font-display flex items-center gap-1.5">
-                WSM Athenas AI
+                Athenas AI
                 <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">v3.5</span>
               </span>
-
-              <button
-                onClick={() => window.dispatchEvent(new CustomEvent('open-study-music-player'))}
-                className="px-3 py-1 bg-emerald-500 hover:bg-emerald-400 text-neutral-950 font-extrabold rounded-full text-xs transition-all shadow-md shadow-emerald-500/10 flex items-center gap-1.5 cursor-pointer hover:scale-105 active:scale-95 border border-emerald-300"
-                title="Ouvir música para estudar"
-              >
-                <Headphones className="w-3.5 h-3.5 stroke-[2.5]" />
-                <span className="truncate">Ouvir música para estudar</span>
-              </button>
             </div>
           </div>
 
@@ -1168,11 +1402,15 @@ export default function WsmChat({
             /* MESSAGES LIST */
             <div className="flex flex-col space-y-4 py-4 pb-12">
               {messages.map((msg) => (
-                <ChatMessageItem key={msg.id} msg={msg} />
+                <ChatMessageItem 
+                  key={msg.id} 
+                  msg={msg} 
+                  onOpenSources={handleOpenSources}
+                />
               ))}
 
               {/* Typing indicator */}
-              {isLoading && (
+              {isLoading && !messages.some(m => m.isGenerating) && (
                 <div className="w-full py-2 px-4 flex justify-center">
                   <div className="w-full max-w-3xl flex flex-col items-start gap-2">
                     <div className="flex items-center gap-2">
@@ -1309,6 +1547,14 @@ export default function WsmChat({
           </div>
         </div>
       </div>
+
+      {/* 4. LATERAL DRAWER FOR WEB SOURCES */}
+      <SourcesDrawer
+        isOpen={isSourcesDrawerOpen}
+        onClose={() => setIsSourcesDrawerOpen(false)}
+        sources={drawerSources}
+        activeSourceUrl={activeSourceUrl}
+      />
     </div>
   );
 }

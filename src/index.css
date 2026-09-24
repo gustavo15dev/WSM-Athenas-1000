@@ -156,6 +156,137 @@ html, body {
   color: #6ee7b7;
 }
 
+/* KaTeX mathematics presentation */
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.75rem 0;
+  margin: 0.75rem 0 !important;
+  text-align: center;
+}
+.katex {
+  font-size: 1.1em;
+  color: #f3f4f6;
+}
+
+/* Highlight mark tag */
+mark.athenas-mark {
+  background-color: rgba(245, 158, 11, 0.25);
+  color: #fef08a;
+  border-radius: 0.35rem;
+  padding: 0.1rem 0.4rem;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  font-weight: 600;
+}
+
+/* ========================================================
+   HIGHLIGHT.JS / SYNTAX HIGHLIGHTING (MODERN DARK THEME)
+   ======================================================== */
+.hljs {
+  color: #c9d1d9;
+  background: transparent;
+}
+.hljs-doctag,
+.hljs-keyword,
+.hljs-meta .hljs-keyword,
+.hljs-template-tag,
+.hljs-template-variable,
+.hljs-type,
+.hljs-variable.language_ {
+  color: #ff7b72;
+  font-weight: 600;
+}
+.hljs-title,
+.hljs-title.class_,
+.hljs-title.class_.inherited__,
+.hljs-title.function_ {
+  color: #d2a8ff;
+  font-weight: 600;
+}
+.hljs-attr,
+.hljs-attribute,
+.hljs-literal,
+.hljs-meta,
+.hljs-number,
+.hljs-operator,
+.hljs-variable,
+.hljs-selector-attr,
+.hljs-selector-class,
+.hljs-selector-id {
+  color: #79c0ff;
+}
+.hljs-regexp,
+.hljs-string,
+.hljs-meta .hljs-string {
+  color: #a5d6ff;
+}
+.hljs-built_in,
+.hljs-symbol {
+  color: #ffa657;
+}
+.hljs-comment,
+.hljs-code,
+.hljs-formula {
+  color: #8b949e;
+  font-style: italic;
+}
+.hljs-name,
+.hljs-quote,
+.hljs-selector-tag,
+.hljs-selector-pseudo {
+  color: #7ee787;
+  font-weight: 600;
+}
+.hljs-subst {
+  color: #c9d1d9;
+}
+.hljs-section {
+  color: #1f6feb;
+  font-weight: bold;
+}
+.hljs-bullet {
+  color: #f2cc60;
+}
+.hljs-emphasis {
+  color: #c9d1d9;
+  font-style: italic;
+}
+.hljs-strong {
+  color: #c9d1d9;
+  font-weight: bold;
+}
+.hljs-addition {
+  color: #aff5b4;
+  background-color: #033a16;
+}
+.hljs-deletion {
+  color: #ffdcd7;
+  background-color: #67060c;
+}
+
+/* Custom list items and task badges */
+.athenas-custom-bullet {
+  color: #34d399;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-weight: 700;
+  user-select: none;
+  display: inline-block;
+  min-width: 1.5rem;
+}
+
+.athenas-markdown-content li.has-custom-bullet {
+  list-style: none !important;
+  margin-left: -1.25rem !important;
+}
+
+.athenas-markdown-content li.task-list-item {
+  list-style: none !important;
+  margin-left: -1.25rem !important;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
 /* ========================================================
    MATHJAX: PREVENT DUPLICATE FORMULAS & ASSISTIVE MML LEAK
    (BUG #1: Fixes secondary assistive-mml mjx-container exposure)
@@ -296,5 +427,22 @@ mjx-assistive-mml mjx-container {
     align-items: center;
     justify-content: center;
     box-shadow: inset 0 0 0 2px currentColor;
+  }
+
+  /* Web search step pill inside messages */
+  .athenas-search-step-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.35rem 0.85rem;
+    margin: 0.75rem 0;
+    border-radius: 9999px;
+    background-color: #171717;
+    border: 1px solid #262626;
+    color: #d4d4d4;
+    font-size: 0.75rem;
+    font-weight: 500;
+    user-select: none;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
   }
 }

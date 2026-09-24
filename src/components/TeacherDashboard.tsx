@@ -46,7 +46,8 @@ import {
   Award,
   Info,
   Moon,
-  Sun
+  Sun,
+  Headphones
 } from 'lucide-react';
 import { SubjectGrade, Announcement, PortalRole, MockExam, MockExamQuestion, MockSubmission } from '../types';
 import WsmChat from './WsmChat';
@@ -1528,6 +1529,41 @@ export default function TeacherDashboard({
               <div className="border-b border-emerald-950/25 my-3 mx-2" />
             )}
             
+            {/* Athenas AI Tab (1st place with green border emphasis) */}
+            <button
+              id="teacher-tab-chat"
+              onClick={() => setActiveTab('wsm_athenas')}
+              className={`${
+                isSidebarCollapsed 
+                  ? 'w-full flex flex-col items-center justify-center py-2 px-1 text-[10px] text-center gap-1 relative' 
+                  : 'w-full flex items-center justify-between px-3.5 py-2.5 text-xs'
+              } rounded-xl font-semibold transition-all border cursor-pointer ${
+                activeTab === 'wsm_athenas'
+                  ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/60 font-bold shadow-[0_0_14px_rgba(16,185,129,0.12)]'
+                  : 'bg-emerald-500/[0.04] text-neutral-300 border-emerald-500/40 hover:bg-emerald-500/10 hover:border-emerald-500/70 hover:text-white shadow-[0_0_10px_rgba(16,185,129,0.04)]'
+              }`}
+            >
+              <div className={`${isSidebarCollapsed ? 'flex flex-col items-center gap-1' : 'flex items-center gap-3'}`}>
+                <div className={`${isSidebarCollapsed ? 'w-6 h-6' : 'w-5 h-5'} flex items-center justify-center shrink-0 overflow-hidden relative`}>
+                  <img
+                    src="https://i.ibb.co/JW6tx1k6/Chat-GPT-Image-21-de-jun-de-2026-17-21-07-removebg-preview.png"
+                    alt="Mascote"
+                    referrerPolicy="no-referrer"
+                    className="w-7 h-7 max-w-none object-contain select-none opacity-90"
+                  />
+                  {isSidebarCollapsed && (
+                    <span className="absolute top-0 right-0 w-1.5 h-1.5 rounded-full bg-emerald-450 animate-pulse border border-neutral-950" />
+                  )}
+                </div>
+                <span className={isSidebarCollapsed ? 'text-[9.5px] font-medium leading-normal tracking-wide block truncate w-full text-center' : 'truncate'}>
+                  Athenas AI
+                </span>
+              </div>
+              {!isSidebarCollapsed && (
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-450 animate-pulse" />
+              )}
+            </button>
+
             {/* Início Tab */}
             <button
               id="teacher-tab-inicio"
@@ -1694,7 +1730,7 @@ export default function TeacherDashboard({
               } rounded-xl font-semibold transition-all border cursor-pointer ${
                 activeTab === 'criar_aviso'
                   ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/15 font-bold shadow-[0_0_12px_rgba(16,185,129,0.03)]'
-                  : 'bg-transparent text-neutral-450 border-transparent hover:bg-neutral-900/40 hover:text-neutral-200'
+                  : 'bg-transparent text-neutral-400 border-transparent hover:bg-neutral-900/40 hover:text-neutral-200'
               }`}
             >
               <div className={`flex ${isSidebarCollapsed ? 'flex-col items-center gap-1' : 'items-center gap-3'}`}>
@@ -1735,38 +1771,20 @@ export default function TeacherDashboard({
               {!isSidebarCollapsed && renderSidebarBadge(tabNotificationCounts.vistos, false)}
             </button>
 
+            {/* Ouvir música ambiente Tab */}
             <button
-              id="teacher-tab-chat"
-              onClick={() => setActiveTab('wsm_athenas')}
+              id="teacher-tab-musica"
+              onClick={() => {
+                window.dispatchEvent(new CustomEvent('open-study-music-player'));
+              }}
               className={`${
                 isSidebarCollapsed 
-                  ? 'w-full flex flex-col items-center justify-center py-2 px-1 text-[10px] text-center gap-1 relative' 
-                  : 'w-full flex items-center justify-between px-3.5 py-2.5 text-xs'
-              } rounded-xl font-semibold transition-all border cursor-pointer ${
-                activeTab === 'wsm_athenas'
-                  ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/15 font-bold shadow-[0_0_12px_rgba(16,185,129,0.03)]'
-                  : 'bg-transparent text-neutral-450 border-transparent hover:bg-neutral-900/40 hover:text-neutral-200'
-              }`}
+                  ? 'w-full flex flex-col items-center justify-center py-2 px-1 text-[10px] text-center gap-1' 
+                  : 'w-full flex items-center gap-3 px-3.5 py-2.5 text-xs'
+              } rounded-xl font-semibold transition-all border cursor-pointer bg-transparent text-neutral-450 border-transparent hover:bg-neutral-900/40 hover:text-neutral-200`}
             >
-              <div className={`${isSidebarCollapsed ? 'flex flex-col items-center gap-1' : 'flex items-center gap-3'}`}>
-                <div className={`${isSidebarCollapsed ? 'w-6 h-6' : 'w-5 h-5'} flex items-center justify-center shrink-0 overflow-hidden relative`}>
-                  <img
-                    src="https://i.ibb.co/JW6tx1k6/Chat-GPT-Image-21-de-jun-de-2026-17-21-07-removebg-preview.png"
-                    alt="Mascote"
-                    referrerPolicy="no-referrer"
-                    className="w-7 h-7 max-w-none object-contain select-none opacity-80"
-                  />
-                  {isSidebarCollapsed && (
-                    <span className="absolute top-0 right-0 w-1.5 h-1.5 rounded-full bg-emerald-450 animate-pulse border border-neutral-950" />
-                  )}
-                </div>
-                <span className={isSidebarCollapsed ? 'text-[9.5px] font-medium leading-normal tracking-wide block truncate w-full text-center' : 'truncate'}>
-                  {isSidebarCollapsed ? 'WSM Chat' : 'WSM Athenas'}
-                </span>
-              </div>
-              {!isSidebarCollapsed && (
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-450 animate-pulse" />
-              )}
+              <Headphones className={`${isSidebarCollapsed ? 'w-5 h-5' : 'w-4 h-4'} text-emerald-400`} />
+              <span className={isSidebarCollapsed ? 'text-[9.5px] font-medium leading-normal tracking-wide block truncate w-full' : 'truncate'}>Ouvir música ambiente</span>
             </button>
           </div>
         </div>

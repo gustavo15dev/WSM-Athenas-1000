@@ -39,7 +39,8 @@ import {
   Info,
   Moon,
   Sun,
-  X
+  X,
+  Headphones
 } from 'lucide-react';
 import { matchesStudentTarget, formatTargetDisplayName } from '../utils/targetMatcher';
 import { parseExamSettings, cleanExamContent, cleanNotificationMessage, formatExamDateDisplay, cleanExamObservations, extractExamTime } from '../utils/examSettings';
@@ -2396,6 +2397,49 @@ export default function StudentDashboard({
               <div className="border-b border-emerald-950/25 my-3 mx-2" />
             )}
             
+            {/* Athenas AI Tab (1st place with green border emphasis) */}
+            <button
+              id="student-tab-chat"
+              onClick={() => {
+                if (isExamActive) {
+                  alert("⚠️ PROVA EM ANDAMENTO!\n\nVocê está realizando um simulado. Para navegar pelo site, você deve primeiro concluir e enviar a sua prova utilizando o botão 'Finalizar e Entregar Prova'.");
+                  return;
+                }
+                setStudyExamTheme(undefined);
+                setStudyExamContent(undefined);
+                setActiveTab('wsm_athenas');
+              }}
+              className={`${
+                isSidebarCollapsed 
+                  ? 'w-full flex flex-col items-center justify-center py-2 px-1 text-[10px] text-center gap-1 relative' 
+                  : 'w-full flex items-center justify-between px-3.5 py-2.5 text-xs'
+              } rounded-xl font-semibold transition-all border cursor-pointer ${
+                activeTab === 'wsm_athenas'
+                  ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/60 font-bold shadow-[0_0_14px_rgba(16,185,129,0.12)]'
+                  : 'bg-emerald-500/[0.04] text-neutral-300 border-emerald-500/40 hover:bg-emerald-500/10 hover:border-emerald-500/70 hover:text-white shadow-[0_0_10px_rgba(16,185,129,0.04)]'
+              }`}
+            >
+              <div className={`${isSidebarCollapsed ? 'flex flex-col items-center gap-1' : 'flex items-center gap-3'}`}>
+                <div className={`${isSidebarCollapsed ? 'w-6 h-6' : 'w-5 h-5'} flex items-center justify-center shrink-0 overflow-hidden relative`}>
+                  <img
+                    src="https://i.ibb.co/JW6tx1k6/Chat-GPT-Image-21-de-jun-de-2026-17-21-07-removebg-preview.png"
+                    alt="Mascote"
+                    referrerPolicy="no-referrer"
+                    className="w-7 h-7 max-w-none object-contain select-none opacity-90"
+                  />
+                  {isSidebarCollapsed && (
+                    <span className="absolute top-0 right-0 w-1.5 h-1.5 rounded-full bg-emerald-450 animate-pulse border border-neutral-950" />
+                  )}
+                </div>
+                <span className={isSidebarCollapsed ? 'text-[9.5px] font-medium leading-normal tracking-wide block truncate w-full text-center' : 'truncate'}>
+                  Athenas AI
+                </span>
+              </div>
+              {!isSidebarCollapsed && (
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-450 animate-pulse" />
+              )}
+            </button>
+
             <button
               id="student-tab-inicio"
               onClick={() => handleTabClick('inicio')}
@@ -2520,51 +2564,24 @@ export default function StudentDashboard({
                   : 'bg-transparent text-neutral-400 border-transparent hover:bg-neutral-900/40 hover:text-neutral-200'
               }`}
             >
-              <ClipboardList className={`${isSidebarCollapsed ? 'w-5 h-5' : 'w-4 h-4'} text-emerald-450`} />
+              <ClipboardList className={`${isSidebarCollapsed ? 'w-5 h-5' : 'w-4 h-4'} text-emerald-400`} />
               <span className={isSidebarCollapsed ? 'text-[9.5px] font-medium leading-normal tracking-wide block truncate w-full' : 'truncate'}>Simulados</span>
             </button>
 
-
+            {/* Ouvir música ambiente Tab */}
             <button
-              id="student-tab-chat"
+              id="student-tab-musica"
               onClick={() => {
-                if (isExamActive) {
-                  alert("⚠️ PROVA EM ANDAMENTO!\n\nVocê está realizando um simulado. Para navegar pelo site, você deve primeiro concluir e enviar a sua prova utilizando o botão 'Finalizar e Entregar Prova'.");
-                  return;
-                }
-                setStudyExamTheme(undefined);
-                setStudyExamContent(undefined);
-                setActiveTab('wsm_athenas');
+                window.dispatchEvent(new CustomEvent('open-study-music-player'));
               }}
               className={`${
                 isSidebarCollapsed 
-                  ? 'w-full flex flex-col items-center justify-center py-2 px-1 text-[10px] text-center gap-1 relative' 
-                  : 'w-full flex items-center justify-between px-3.5 py-2.5 text-xs'
-              } rounded-xl font-semibold transition-all border cursor-pointer ${
-                activeTab === 'wsm_athenas'
-                  ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/15 font-bold shadow-[0_0_12px_rgba(16,185,129,0.03)]'
-                  : 'bg-transparent text-neutral-400 border-transparent hover:bg-neutral-900/40 hover:text-neutral-200'
-              }`}
+                  ? 'w-full flex flex-col items-center justify-center py-2 px-1 text-[10px] text-center gap-1' 
+                  : 'w-full flex items-center gap-3 px-3.5 py-2.5 text-xs'
+              } rounded-xl font-semibold transition-all border cursor-pointer bg-transparent text-neutral-400 border-transparent hover:bg-neutral-900/40 hover:text-neutral-200`}
             >
-              <div className={`${isSidebarCollapsed ? 'flex flex-col items-center gap-1' : 'flex items-center gap-3'}`}>
-                <div className={`${isSidebarCollapsed ? 'w-6 h-6' : 'w-5 h-5'} flex items-center justify-center shrink-0 overflow-hidden relative`}>
-                  <img
-                    src="https://i.ibb.co/JW6tx1k6/Chat-GPT-Image-21-de-jun-de-2026-17-21-07-removebg-preview.png"
-                    alt="Mascote"
-                    referrerPolicy="no-referrer"
-                    className="w-7 h-7 max-w-none object-contain select-none opacity-80"
-                  />
-                  {isSidebarCollapsed && (
-                    <span className="absolute top-0 right-0 w-1.5 h-1.5 rounded-full bg-emerald-450 animate-pulse border border-neutral-950" />
-                  )}
-                </div>
-                <span className={isSidebarCollapsed ? 'text-[9.5px] font-medium leading-normal tracking-wide block truncate w-full text-center' : 'truncate'}>
-                  {isSidebarCollapsed ? 'Copilot' : 'WSM Athenas'}
-                </span>
-              </div>
-              {!isSidebarCollapsed && (
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-450 animate-pulse" />
-              )}
+              <Headphones className={`${isSidebarCollapsed ? 'w-5 h-5' : 'w-4 h-4'} text-emerald-400`} />
+              <span className={isSidebarCollapsed ? 'text-[9.5px] font-medium leading-normal tracking-wide block truncate w-full' : 'truncate'}>Ouvir música ambiente</span>
             </button>
           </div>
         </div>
