@@ -361,8 +361,8 @@ export default function VirtualNotebook({
     }
   }, [targetEmail, userName, userTurma, notebookStatus, lastStamp, isReadOnly]);
 
-  // Debounced Autosave Trigger on Content Change
-  const triggerDebouncedAutosave = useCallback((updatedPages: NotebookPage[]) => {
+  // Manual-only Draft Trigger on Content/Title Change (No auto-server saving)
+  const triggerContentChange = useCallback((updatedPages: NotebookPage[]) => {
     if (isReadOnly || !targetEmail) return;
     setHasUnsavedChanges(true);
     setSaveStatus('unsaved');
@@ -385,23 +385,14 @@ export default function VirtualNotebook({
       version: versionTs
     };
 
-    // Instantly persist locally to avoid loss if user closes tab or changes route
+    // Instantly persist draft locally in case user reloads before clicking Salvar
     try {
       localStorage.setItem(primaryKey, JSON.stringify(localPayload));
       localStorage.setItem(draftKey, JSON.stringify({ ...localPayload, hasDraft: true }));
     } catch {}
+  }, [isReadOnly, targetEmail, userName, userTurma, notebookStatus, lastStamp]);
 
-    // Debounce server sync
-    if (autosaveTimerRef.current) {
-      clearTimeout(autosaveTimerRef.current);
-    }
-
-    autosaveTimerRef.current = setTimeout(async () => {
-      await persistNotebook(updatedPages, { syncServer: true, markSaved: true });
-    }, 1200);
-  }, [isReadOnly, targetEmail, userName, userTurma, notebookStatus, lastStamp, persistNotebook]);
-
-  // Window beforeunload & pagehide listener to guarantee zero data loss on browser close / reload
+  // Window beforeunload & pagehide listener to preserve local draft on close/reload
   useEffect(() => {
     const handleBeforeUnload = () => {
       if (hasUnsavedRef.current && !isReadOnly && targetEmail) {
@@ -434,12 +425,9 @@ export default function VirtualNotebook({
     };
   }, [targetEmail, userName, userTurma, notebookStatus, lastStamp, isReadOnly]);
 
-  // Component unmount flush: guarantees no data loss when user navigates to another tab
+  // Component unmount cleanup (preserves local draft without auto-saving to server)
   useEffect(() => {
     return () => {
-      if (autosaveTimerRef.current) {
-        clearTimeout(autosaveTimerRef.current);
-      }
       if (hasUnsavedRef.current && !isReadOnly && targetEmail) {
         const primaryKey = `athenas_notebook_bio_${targetEmail}`;
         const draftKey = `athenas_notebook_bio_draft_${targetEmail}`;
@@ -460,26 +448,6 @@ export default function VirtualNotebook({
           localStorage.setItem(primaryKey, JSON.stringify(localPayload));
           localStorage.setItem(draftKey, JSON.stringify({ ...localPayload, hasDraft: true }));
         } catch {}
-
-        const dbPayload = {
-          student_email: targetEmail,
-          student_name: userName || 'Estudante',
-          student_class: userTurma || '',
-          subject: SUBJECT,
-          title: `Caderno de ${SUBJECT}`,
-          pages: pagesRef.current,
-          status: notebookStatus,
-          last_stamp: lastStamp,
-          updated_at: nowIso
-        };
-        // Clean fire-and-forget sync to Supabase without invalid columns
-        Promise.resolve(
-          supabase.from('student_notebooks').upsert(dbPayload, {
-            onConflict: 'student_email,subject'
-          })
-        ).catch((unmountErr) => {
-          console.warn('[VirtualNotebook] Unmount sync notice:', unmountErr);
-        });
       }
     };
   }, [targetEmail, userName, userTurma, notebookStatus, lastStamp, isReadOnly]);
@@ -742,7 +710,7 @@ export default function VirtualNotebook({
       updated[index] = { ...updated[index], title: value };
     }
     setPages(updated);
-    triggerDebouncedAutosave(updated);
+    triggerContentChange(updated);
   };
 
   // Handle Page Content Change with Auto-Overflow to the next A4 sheet below
@@ -776,7 +744,7 @@ export default function VirtualNotebook({
       }
 
       setPages(updated);
-      triggerDebouncedAutosave(updated);
+      triggerContentChange(updated);
 
       // Focus the next page textarea smoothly
       setTimeout(() => {
@@ -795,7 +763,7 @@ export default function VirtualNotebook({
       updated[index] = { ...updated[index], content: value };
     }
     setPages(updated);
-    triggerDebouncedAutosave(updated);
+    triggerContentChange(updated);
   };
 
   // Add a new A4 page below
@@ -809,7 +777,7 @@ export default function VirtualNotebook({
     const newIdx = updated.length - 1;
     setPages(updated);
     setActivePageIndex(newIdx);
-    triggerDebouncedAutosave(updated);
+    triggerContentChange(updated);
 
     setTimeout(() => {
       const newIdx = updated.length - 1;
@@ -1374,8 +1342,8 @@ export default function VirtualNotebook({
               {inspectStudentEmail
                 ? `Inspecionando caderno do aluno: ${inspectStudentEmail}`
                 : userTurma
-                ? `Contexto: ${userTurma} • Autosave ativo em tempo real`
-                : 'Autosave ativo em tempo real'}
+                ? `Contexto: ${userTurma} • Clique em 'Salvar Caderno' para registrar suas alterações`
+                : "Clique em 'Salvar Caderno' para registrar suas alterações"}
             </p>
           </div>
         </div>

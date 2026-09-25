@@ -1328,8 +1328,7 @@ export default function WsmChat({
 
             <div className="flex items-center gap-2 md:gap-3 flex-wrap">
               <span className="text-sm font-extrabold text-neutral-100 font-display flex items-center gap-1.5">
-                Athenas AI
-                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">v3.5</span>
+                Omnix 2.0 Turbo
               </span>
             </div>
           </div>
