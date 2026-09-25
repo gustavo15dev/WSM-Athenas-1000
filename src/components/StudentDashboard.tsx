@@ -40,7 +40,10 @@ import {
   Moon,
   Sun,
   X,
-  Headphones
+  Headphones,
+  Key,
+  Users,
+  School
 } from 'lucide-react';
 import { matchesStudentTarget, formatTargetDisplayName } from '../utils/targetMatcher';
 import { parseExamSettings, cleanExamContent, cleanNotificationMessage, formatExamDateDisplay, cleanExamObservations, extractExamTime } from '../utils/examSettings';
@@ -1752,6 +1755,94 @@ export default function StudentDashboard({
     }
   };
 
+  // Fullscreen Welcome / No-Room Access Modal state for first-time access / students without a room
+  const [welcomeJoinCode, setWelcomeJoinCode] = useState('');
+  const [welcomeJoinLoading, setWelcomeJoinLoading] = useState(false);
+  const [welcomeJoinError, setWelcomeJoinError] = useState<string | null>(null);
+  const [welcomeJoinSuccess, setWelcomeJoinSuccess] = useState<string | null>(null);
+  const [showNoRoomModal, setShowNoRoomModal] = useState<boolean>(() => {
+    try {
+      const clean = (email || '').toLowerCase().trim();
+      return localStorage.getItem(`wsm_dismissed_welcome_modal_${clean}`) !== 'true';
+    } catch {
+      return true;
+    }
+  });
+
+  const handleDismissWelcomeModal = () => {
+    setShowNoRoomModal(false);
+    const clean = (email || '').toLowerCase().trim();
+    localStorage.setItem(`wsm_dismissed_welcome_modal_${clean}`, 'true');
+  };
+
+  const handleJoinClassFromWelcomeCard = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanCode = welcomeJoinCode.trim();
+    if (!cleanCode) return;
+    if (cleanCode.length !== 4) {
+      setWelcomeJoinError('O código da sala deve conter exatamente 4 dígitos numéricos.');
+      return;
+    }
+    setWelcomeJoinLoading(true);
+    setWelcomeJoinError(null);
+    setWelcomeJoinSuccess(null);
+
+    try {
+      const { data: vClass, error: findError } = await supabase
+        .from('wsm_virtual_classes')
+        .select('*')
+        .eq('access_code', cleanCode)
+        .maybeSingle();
+
+      if (findError || !vClass) {
+        setWelcomeJoinError('Código de sala não encontrado. Verifique os 4 dígitos com o seu professor e tente novamente.');
+        setWelcomeJoinLoading(false);
+        return;
+      }
+
+      const cleanEmail = email.toLowerCase().trim();
+      let currentEmails: string[] = [];
+      if (Array.isArray(vClass.student_emails)) {
+        currentEmails = vClass.student_emails;
+      } else if (typeof vClass.student_emails === 'string') {
+        try { currentEmails = JSON.parse(vClass.student_emails); } catch { currentEmails = vClass.student_emails.split(',').map((s: string) => s.trim()).filter(Boolean); }
+      }
+
+      if (!currentEmails.map((e: string) => e.toLowerCase()).includes(cleanEmail)) {
+        currentEmails.push(cleanEmail);
+        await supabase
+          .from('wsm_virtual_classes')
+          .update({ student_emails: currentEmails })
+          .eq('id', vClass.id);
+      }
+
+      // Update student profile with this turma if empty
+      if (!profile?.turma) {
+        await supabase
+          .from('wsm_user_profiles')
+          .update({ turma: vClass.name })
+          .eq('id', profile?.id || '');
+        setProfile(prev => prev ? { ...prev, turma: vClass.name } : null);
+      }
+
+      setActiveTurma(vClass.name);
+      localStorage.setItem(`wsm_active_student_class_${cleanEmail}`, vClass.name);
+      localStorage.setItem(`wsm_dismissed_welcome_modal_${cleanEmail}`, 'true');
+
+      setWelcomeJoinSuccess(`🎉 Sucesso! Você ingressou na turma "${vClass.name}". Carregando seus conteúdos...`);
+      setWelcomeJoinCode('');
+      setTimeout(async () => {
+        await loadData(vClass.name);
+        setShowNoRoomModal(false);
+      }, 1000);
+    } catch (err: any) {
+      console.error('Error joining virtual class:', err);
+      setWelcomeJoinError(err.message || 'Erro ao entrar na sala. Tente novamente.');
+    } finally {
+      setWelcomeJoinLoading(false);
+    }
+  };
+
   // Poll for changes and subscribe to real-time additions
   useEffect(() => {
     if (profile) {
@@ -2725,6 +2816,16 @@ export default function StudentDashboard({
                         ))}
                       </select>
                     </div>
+                  )}
+                  {allEnrolledClasses.length === 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowNoRoomModal(true)}
+                      className="bg-emerald-500/15 hover:bg-emerald-500/25 px-2.5 py-1 rounded-md border border-emerald-500/40 text-emerald-300 font-bold flex items-center gap-1.5 transition-all cursor-pointer animate-pulse"
+                    >
+                      <Key className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Como entrar na sala do professor</span>
+                    </button>
                   )}
                 </div>
               </div>
@@ -3889,6 +3990,187 @@ export default function StudentDashboard({
                 className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-neutral-950 text-xs font-bold rounded-xl transition cursor-pointer"
               >
                 Sair do Caderno
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Fullscreen No-Room Welcome Modal (Covers EVERYTHING on the site, in fullscreen) */}
+      {showNoRoomModal && allEnrolledClasses.length === 0 && (!profile?.turma || profile.turma.trim() === '') && (
+        <div 
+          id="student-fullscreen-welcome-overlay"
+          className="fixed inset-0 z-[99999] bg-neutral-950/95 backdrop-blur-2xl flex items-center justify-center p-4 md:p-8 overflow-y-auto animate-fadeIn"
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 15 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ duration: 0.3, ease: 'easeOut' }}
+            className="w-full max-w-3xl bg-neutral-900 border-2 border-emerald-500/40 rounded-3xl p-6 md:p-10 shadow-[0_0_80px_rgba(2,195,154,0.18)] relative my-auto space-y-6"
+          >
+            {/* Top decorative glow */}
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-72 h-1 bg-gradient-to-r from-transparent via-emerald-400 to-transparent rounded-full" />
+
+            {/* Header with Welcome badge */}
+            <div className="text-center space-y-3">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold font-mono tracking-wide">
+                <Sparkles className="w-3.5 h-3.5 text-emerald-400 animate-spin-slow" />
+                <span>BOAS-VINDAS AO ATHENAS</span>
+              </div>
+              <h2 className="text-2xl md:text-3xl font-extrabold text-neutral-100 font-display tracking-tight">
+                Olá, {profile?.nome_completo || 'Estudante'}! 🎉
+              </h2>
+              <p className="text-neutral-300 text-sm md:text-base max-w-2xl mx-auto leading-relaxed">
+                Sua conta foi criada com sucesso! Para começar a usar a plataforma e ter acesso às suas matérias, simulados virtuais, provas e avisos pedagógicos, você precisa <strong>pegar o código de acesso da sala com o seu professor</strong>.
+              </p>
+            </div>
+
+            {/* Explanatory callout */}
+            <div className="p-4 bg-emerald-950/30 border border-emerald-500/25 rounded-2xl flex items-start gap-3.5 text-xs text-neutral-200">
+              <div className="p-2 bg-emerald-500/15 rounded-xl text-emerald-400 shrink-0 mt-0.5">
+                <Key className="w-4 h-4" />
+              </div>
+              <div className="space-y-1">
+                <p className="font-bold text-emerald-300">Como funciona o Código de Acesso da Sala?</p>
+                <p className="text-neutral-400 leading-relaxed text-[11.5px]">
+                  Cada professor gera um <strong>código exclusivo de 4 dígitos</strong> (exemplo: <strong>4821</strong>) para sua turma. Assim que você entrar com esse código, seu perfil será conectado instantaneamente a todos os conteúdos da turma!
+                </p>
+              </div>
+            </div>
+
+            {/* Step-by-step Guide (Passo a passo certinho) */}
+            <div className="space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-400 font-mono flex items-center gap-2">
+                <span>Passo a passo certinho de como entrar em uma sala:</span>
+              </h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {/* Passo 1 */}
+                <div className="p-4 bg-neutral-850/80 border border-neutral-800 rounded-2xl flex items-start gap-3">
+                  <div className="w-7 h-7 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-mono font-black text-xs flex items-center justify-center shrink-0">
+                    1
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="text-xs font-bold text-neutral-100 flex items-center gap-1.5">
+                      Peça o código ao seu professor
+                    </h4>
+                    <p className="text-[11px] text-neutral-400 leading-relaxed">
+                      Solicite ao professor da disciplina o <strong>código de acesso de 4 dígitos</strong> da sua turma (ex: 7492).
+                    </p>
+                  </div>
+                </div>
+
+                {/* Passo 2 */}
+                <div className="p-4 bg-neutral-850/80 border border-neutral-800 rounded-2xl flex items-start gap-3">
+                  <div className="w-7 h-7 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-mono font-black text-xs flex items-center justify-center shrink-0">
+                    2
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="text-xs font-bold text-neutral-100 flex items-center gap-1.5">
+                      Acesse a aba "Salas Virtuais"
+                    </h4>
+                    <p className="text-[11px] text-neutral-400 leading-relaxed">
+                      No menu lateral à esquerda da plataforma, clique no botão <strong>Salas Virtuais</strong> (ícone de turmas).
+                    </p>
+                  </div>
+                </div>
+
+                {/* Passo 3 */}
+                <div className="p-4 bg-neutral-850/80 border border-neutral-800 rounded-2xl flex items-start gap-3">
+                  <div className="w-7 h-7 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-mono font-black text-xs flex items-center justify-center shrink-0">
+                    3
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="text-xs font-bold text-neutral-100 flex items-center gap-1.5">
+                      Digite o código de 4 dígitos
+                    </h4>
+                    <p className="text-[11px] text-neutral-400 leading-relaxed">
+                      No campo "Código da Turma", insira os 4 números e clique em <strong>"Entrar na Sala"</strong>.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Passo 4 */}
+                <div className="p-4 bg-neutral-850/80 border border-neutral-800 rounded-2xl flex items-start gap-3">
+                  <div className="w-7 h-7 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-mono font-black text-xs flex items-center justify-center shrink-0">
+                    4
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="text-xs font-bold text-neutral-100 flex items-center gap-1.5">
+                      Pronto! Conteúdo liberado
+                    </h4>
+                    <p className="text-[11px] text-neutral-400 leading-relaxed">
+                      Seus simulados virtuais, calendário de provas e avisos da turma serão desbloqueados na hora!
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick-Join Right Inside this Card */}
+            <div className="p-5 bg-neutral-950/70 border border-emerald-500/30 rounded-2xl space-y-3">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <span className="text-xs font-bold text-neutral-200 flex items-center gap-2">
+                  <Key className="w-4 h-4 text-emerald-400" />
+                  Já está com o código do professor em mãos?
+                </span>
+                <span className="text-[10px] text-neutral-500 font-mono">Entre agora mesmo:</span>
+              </div>
+
+              <form onSubmit={handleJoinClassFromWelcomeCard} className="flex flex-col sm:flex-row items-center gap-2.5">
+                <div className="relative w-full sm:flex-1">
+                  <input
+                    id="welcome-room-code-input"
+                    type="text"
+                    maxLength={4}
+                    placeholder="0000"
+                    value={welcomeJoinCode}
+                    onChange={(e) => {
+                      setWelcomeJoinCode(e.target.value.replace(/\D/g, ''));
+                      if (welcomeJoinError) setWelcomeJoinError(null);
+                    }}
+                    className="w-full px-4 py-3 bg-neutral-900 border border-neutral-700 focus:border-emerald-500 rounded-xl text-center text-xl font-mono font-black tracking-[0.4em] text-neutral-100 placeholder-neutral-600 outline-none"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={welcomeJoinLoading || welcomeJoinCode.length !== 4}
+                  className="w-full sm:w-auto px-6 py-3 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed text-neutral-950 font-extrabold rounded-xl text-xs transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 shrink-0"
+                >
+                  {welcomeJoinLoading ? (
+                    <div className="w-4 h-4 border-2 border-neutral-950 border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <CheckCircle className="w-4 h-4" />
+                      <span>Entrar na Turma Agora</span>
+                    </>
+                  )}
+                </button>
+              </form>
+
+              {welcomeJoinError && (
+                <p className="text-xs text-rose-400 flex items-center gap-1.5 animate-fadeIn">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span>{welcomeJoinError}</span>
+                </p>
+              )}
+
+              {welcomeJoinSuccess && (
+                <p className="text-xs text-emerald-400 font-bold flex items-center gap-1.5 animate-fadeIn">
+                  <CheckCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span>{welcomeJoinSuccess}</span>
+                </p>
+              )}
+            </div>
+
+            {/* Bottom action button */}
+            <div className="flex items-center justify-center pt-2">
+              <button
+                type="button"
+                onClick={handleDismissWelcomeModal}
+                className="text-xs text-neutral-400 hover:text-neutral-200 transition-colors py-2 px-4 rounded-xl hover:bg-neutral-800/60 cursor-pointer font-medium"
+              >
+                Vou pedir o código ao professor mais tarde (Explorar a plataforma)
               </button>
             </div>
           </motion.div>

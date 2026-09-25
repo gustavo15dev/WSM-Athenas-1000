@@ -5,11 +5,45 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowLeft, User, Lock, Sparkles, Key, AlertCircle, CheckCircle, UserPlus, LogIn, Database, CloudLightning, Hash, BookOpen, Building2, RotateCcw, ShieldCheck, Mail, Send } from 'lucide-react';
+import { 
+  ArrowLeft, User, Lock, Sparkles, Key, AlertCircle, CheckCircle, UserPlus, LogIn, 
+  Database, CloudLightning, Hash, BookOpen, Building2, RotateCcw, ShieldCheck, Mail, Send,
+  MapPin, Search, ChevronDown, Check, GraduationCap
+} from 'lucide-react';
 import { PortalRole } from '../types';
 import { supabase } from '../supabase';
 import { safeUpsertUserProfile, safeFetchUserProfile, areTurmasMatching } from '../utils/profileDb';
 import { logSystemAction } from '../utils/auditLogger';
+
+const BRAZILIAN_STATES = [
+  { sigla: 'AC', nome: 'Acre' },
+  { sigla: 'AL', nome: 'Alagoas' },
+  { sigla: 'AP', nome: 'Amapá' },
+  { sigla: 'AM', nome: 'Amazonas' },
+  { sigla: 'BA', nome: 'Bahia' },
+  { sigla: 'CE', nome: 'Ceará' },
+  { sigla: 'DF', nome: 'Distrito Federal' },
+  { sigla: 'ES', nome: 'Espírito Santo' },
+  { sigla: 'GO', nome: 'Goiás' },
+  { sigla: 'MA', nome: 'Maranhão' },
+  { sigla: 'MT', nome: 'Mato Grosso' },
+  { sigla: 'MS', nome: 'Mato Grosso do Sul' },
+  { sigla: 'MG', nome: 'Minas Gerais' },
+  { sigla: 'PA', nome: 'Pará' },
+  { sigla: 'PB', nome: 'Paraíba' },
+  { sigla: 'PR', nome: 'Paraná' },
+  { sigla: 'PE', nome: 'Pernambuco' },
+  { sigla: 'PI', nome: 'Piauí' },
+  { sigla: 'RJ', nome: 'Rio de Janeiro' },
+  { sigla: 'RN', nome: 'Rio Grande do Norte' },
+  { sigla: 'RS', nome: 'Rio Grande do Sul' },
+  { sigla: 'RO', nome: 'Rondônia' },
+  { sigla: 'RR', nome: 'Roraima' },
+  { sigla: 'SC', nome: 'Santa Catarina' },
+  { sigla: 'SP', nome: 'São Paulo' },
+  { sigla: 'SE', nome: 'Sergipe' },
+  { sigla: 'TO', nome: 'Tocantins' }
+];
 
 interface LoginModalProps {
   role: PortalRole;
@@ -54,6 +88,8 @@ export default function LoginModal({ role, onBack, onLoginSuccess }: LoginModalP
   const [touchedTurma, setTouchedTurma] = useState(false);
   const [touchedNomeProf, setTouchedNomeProf] = useState(false);
   const [touchedMateriaProf, setTouchedMateriaProf] = useState(false);
+  const [touchedEstado, setTouchedEstado] = useState(false);
+  const [touchedCidade, setTouchedCidade] = useState(false);
 
   // Reference for auto-scrolling to error banner
   const errorRef = useRef<HTMLDivElement>(null);
@@ -70,8 +106,111 @@ export default function LoginModal({ role, onBack, onLoginSuccess }: LoginModalP
     }
   }, [error]);
 
-  // School state
+  // Location and School state (Estado, Cidade, Escola com API INEP Data)
+  const [estado, setEstado] = useState('');
+  const [cidade, setCidade] = useState('');
+  const [cidadeSearch, setCidadeSearch] = useState('');
+  const [cidadesList, setCidadesList] = useState<string[]>([]);
+  const [loadingCidades, setLoadingCidades] = useState(false);
+  const [isCidadeDropdownOpen, setIsCidadeDropdownOpen] = useState(false);
+
   const [escola, setEscola] = useState('');
+  const [escolaInepCode, setEscolaInepCode] = useState('');
+  const [escolaRede, setEscolaRede] = useState('');
+  const [escolaSearchQuery, setEscolaSearchQuery] = useState('');
+  const [inepSchools, setInepSchools] = useState<any[]>([]);
+  const [loadingInep, setLoadingInep] = useState(false);
+  const [isEscolaDropdownOpen, setIsEscolaDropdownOpen] = useState(false);
+  const [schoolSelected, setSchoolSelected] = useState<any | null>(null);
+
+  // 1. Fetch Brazilian municipalities from official IBGE API when state changes
+  useEffect(() => {
+    if (!estado) {
+      setCidadesList([]);
+      setCidade('');
+      setCidadeSearch('');
+      setEscola('');
+      setSchoolSelected(null);
+      setInepSchools([]);
+      return;
+    }
+
+    let isMounted = true;
+    setLoadingCidades(true);
+    fetch(`https://servicodados.ibge.gov.br/api/v1/localidades/estados/${estado}/municipios?orderBy=nome`)
+      .then(res => res.json())
+      .then((data: any[]) => {
+        if (!isMounted) return;
+        if (Array.isArray(data)) {
+          const names = data.map((m: any) => m.nome).filter(Boolean);
+          setCidadesList(names);
+        }
+      })
+      .catch(err => {
+        console.warn('Erro ao carregar municípios do IBGE:', err);
+      })
+      .finally(() => {
+        if (isMounted) setLoadingCidades(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [estado]);
+
+  // 2. Fetch INEP school catalog when state, city or school query changes
+  useEffect(() => {
+    if (!estado || !cidade) {
+      setInepSchools([]);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setLoadingInep(true);
+      fetch(`/api/inep/schools?uf=${encodeURIComponent(estado)}&cidade=${encodeURIComponent(cidade)}&q=${encodeURIComponent(escolaSearchQuery)}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data && Array.isArray(data.schools)) {
+            setInepSchools(data.schools);
+          } else {
+            setInepSchools([]);
+          }
+        })
+        .catch(err => {
+          console.warn('Erro ao consultar API INEP Data:', err);
+        })
+        .finally(() => {
+          setLoadingInep(false);
+        });
+    }, 280);
+
+    return () => clearTimeout(timer);
+  }, [estado, cidade, escolaSearchQuery]);
+
+  const handleSelectInepSchool = (sch: any) => {
+    setSchoolSelected(sch);
+    const formatted = `${sch.nome} (INEP: ${sch.codigoInep})`;
+    setEscola(formatted);
+    setEscolaInepCode(sch.codigoInep || '');
+    setEscolaRede(sch.rede || '');
+    setEscolaSearchQuery(sch.nome);
+    setIsEscolaDropdownOpen(false);
+    if (error) setError('');
+  };
+
+  const handleUseCustomSchool = () => {
+    if (!escolaSearchQuery.trim()) return;
+    const custom = {
+      id: `custom-${Date.now()}`,
+      nome: escolaSearchQuery.trim(),
+      codigoInep: 'Não informado',
+      rede: 'Escola'
+    };
+    setSchoolSelected(custom);
+    setEscola(escolaSearchQuery.trim());
+    setIsEscolaDropdownOpen(false);
+    if (error) setError('');
+  };
 
   // Student registration specific states
   const [nomeAluno, setNomeAluno] = useState('');
@@ -95,12 +234,14 @@ export default function LoginModal({ role, onBack, onLoginSuccess }: LoginModalP
 
   const isPasswordValid = password.length >= 6;
   const isConfirmValid = activeTab === 'signin' || (password === confirmPassword && confirmPassword.length >= 6);
-  const isEscolaValid = activeTab === 'signin' || escola.trim().length > 0;
+  const isEscolaValid = activeTab === 'signin' || (
+    escola.trim().length > 0 && 
+    (!isStudent || (estado.trim().length > 0 && cidade.trim().length > 0))
+  );
   const isStudentValid = !isStudent || activeTab === 'signin' || (
     nomeAluno.trim().length > 0 &&
     numeroChamada.trim().length > 0 &&
-    parseInt(numeroChamada) > 0 &&
-    turma.trim().length === 4
+    parseInt(numeroChamada) > 0
   );
   const isTeacherValid = isStudent || activeTab === 'signin' || (
     nomeProfessor.trim().length > 0 &&
@@ -116,6 +257,13 @@ export default function LoginModal({ role, onBack, onLoginSuccess }: LoginModalP
     setPassword('');
     setConfirmPassword('');
     setEscola('');
+    setEstado('');
+    setCidade('');
+    setCidadeSearch('');
+    setCidadesList([]);
+    setEscolaSearchQuery('');
+    setSchoolSelected(null);
+    setInepSchools([]);
     setNomeAluno('');
     setTurma('');
     setNumeroChamada('');
@@ -125,6 +273,8 @@ export default function LoginModal({ role, onBack, onLoginSuccess }: LoginModalP
     setTouchedEmail(false);
     setTouchedPassword(false);
     setTouchedConfirm(false);
+    setTouchedEstado(false);
+    setTouchedCidade(false);
   }, [activeTab]);
 
   const handleFillDemo = () => {
@@ -353,43 +503,18 @@ export default function LoginModal({ role, onBack, onLoginSuccess }: LoginModalP
           return;
         }
 
-        if (!turma || turma.length !== 4) {
-          setTouchedTurma(true);
-          setError('O código da sala deve ter 4 dígitos numéricos.');
-          return;
-        }
+        // Room code is optional during registration. If provided, associate it.
+        if (turma && turma.trim().length === 4) {
+          setIsLoading(true);
+          const { data: vClass } = await supabase
+            .from('wsm_virtual_classes')
+            .select('name, access_code, student_emails')
+            .eq('access_code', turma.trim())
+            .maybeSingle();
 
-        setIsLoading(true);
-        const { data: vClass, error: vClassError } = await supabase
-          .from('wsm_virtual_classes')
-          .select('name, access_code, student_emails')
-          .eq('access_code', turma)
-          .maybeSingle();
-
-        if (vClassError || !vClass) {
-          setTouchedTurma(true);
-          setError('Código de sala inválido. Verifique com o seu professor e tente novamente.');
-          setIsLoading(false);
-          return;
-        }
-
-        validClassName = vClass.name;
-
-        // Strict Check: Prevent duplicate calling number in the same class
-        const { data: allSameNumStudents } = await supabase
-          .from('wsm_user_profiles')
-          .select('nome_completo, email, turma, numero_chamada')
-          .eq('role', 'student')
-          .eq('numero_chamada', callingNum);
-
-        const duplicateStudent = (allSameNumStudents || []).find(st => 
-          areTurmasMatching(st.turma, validClassName) || areTurmasMatching(st.turma, turma)
-        );
-
-        if (duplicateStudent) {
-          setError(`O número de chamada ${callingNum} já está em uso na turma "${validClassName}" pelo(a) aluno(a) ${duplicateStudent.nome_completo || duplicateStudent.email}. Por favor, confirme seu número correto de chamada ou consulte a coordenação.`);
-          setIsLoading(false);
-          return;
+          if (vClass) {
+            validClassName = vClass.name;
+          }
         }
       }
 
@@ -423,6 +548,12 @@ export default function LoginModal({ role, onBack, onLoginSuccess }: LoginModalP
           return;
         }
 
+        const fullEscolaData = isStudent && estado && cidade
+          ? (schoolSelected?.codigoInep && schoolSelected.codigoInep !== 'Não informado'
+              ? `${schoolSelected.nome} (INEP: ${schoolSelected.codigoInep}) - ${cidade}/${estado}`
+              : `${escola.trim()} - ${cidade}/${estado}`)
+          : escola.trim();
+
         const { data, error: suError } = await supabase.auth.signUp({
           email: targetEmail,
           password: targetPassword,
@@ -430,7 +561,7 @@ export default function LoginModal({ role, onBack, onLoginSuccess }: LoginModalP
             data: {
               role: role,
               nome_completo: role === 'student' ? nomeAluno.trim() : nomeProfessor.trim(),
-              escola: escola.trim(),
+              escola: fullEscolaData,
               turma: role === 'student' ? validClassName : null,
               numero_chamada: role === 'student' ? parseInt(numeroChamada, 10) : null,
               anos_lecionados: role === 'teacher' ? turmasProfessor : null,
@@ -457,7 +588,7 @@ export default function LoginModal({ role, onBack, onLoginSuccess }: LoginModalP
             email: targetEmail,
             role: role,
             nome_completo: role === 'student' ? nomeAluno.trim() : nomeProfessor.trim(),
-            escola: escola.trim(),
+            escola: fullEscolaData,
             turma: role === 'student' ? validClassName : null,
             numero_chamada: role === 'student' ? parseInt(numeroChamada, 10) : null,
             anos_lecionados: role === 'teacher' ? turmasProfessor : null,
@@ -502,17 +633,38 @@ export default function LoginModal({ role, onBack, onLoginSuccess }: LoginModalP
           }
         }
 
-        setSuccessMsg('Conta criada com sucesso! Acesse agora informando suas credenciais de e-mail e senha.');
-        setActiveTab('signin');
-        setEmail(targetEmail);
-        setPassword('');
-        setConfirmPassword('');
-        setEscola('');
-        setNomeAluno('');
-        setNumeroChamada('');
-        setNomeProfessor('');
-        setMateriaProfessor('');
-        setTurmasProfessor([]);
+        // Direct auto-login! User enters directly without returning to login screen
+        let loginEmail = targetEmail;
+        if (!data.session) {
+          try {
+            const { data: siData } = await supabase.auth.signInWithPassword({
+              email: targetEmail,
+              password: targetPassword
+            });
+            if (siData?.user?.email) {
+              loginEmail = siData.user.email;
+            }
+          } catch (autoSignErr) {
+            console.warn('Auto sign-in notice:', autoSignErr);
+          }
+        }
+
+        // Cache locally for instant access
+        localStorage.setItem('wsm_authenticated_user_email', loginEmail);
+        localStorage.setItem(`wsm_profile_nome_${loginEmail}`, role === 'student' ? nomeAluno.trim() : nomeProfessor.trim());
+        localStorage.setItem(`wsm_profile_escola_${loginEmail}`, fullEscolaData);
+        if (role === 'student') {
+          localStorage.setItem(`wsm_profile_chamada_${loginEmail}`, String(numeroChamada.trim()));
+          if (validClassName) {
+            localStorage.setItem(`wsm_profile_turma_${loginEmail}`, validClassName);
+            localStorage.setItem(`wsm_active_student_class_${loginEmail}`, validClassName);
+          }
+          localStorage.setItem(`wsm_first_access_student_${loginEmail}`, 'true');
+        }
+
+        // Call success handler directly - goes right into the site!
+        onLoginSuccess(loginEmail);
+        return;
       } catch (err: any) {
         console.error('Signup error:', err);
         let msg = err.message || 'Erro ao cadastrar sua conta no sistema.';
@@ -1099,34 +1251,37 @@ export default function LoginModal({ role, onBack, onLoginSuccess }: LoginModalP
                           )}
                         </div>
 
-                        <div className="animate-slideDown">
-                          <label className="block text-xs font-semibold text-neutral-400 tracking-wider uppercase mb-1.5">
-                            Escola / Instituição de Ensino
-                          </label>
-                          <div className="relative">
-                            <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-neutral-500">
-                              <Building2 className="w-4.5 h-4.5" />
-                            </span>
-                            <input
-                              id="signup-escola-input"
-                              type="text"
-                              disabled={isLoading}
-                              placeholder="Ex: Colégio Atenas, E.E. Mário Quintana..."
-                              value={escola}
-                              onChange={(e) => setEscola(e.target.value)}
-                              onBlur={() => setTouchedEscola(true)}
-                              className={`w-full pl-11 pr-4 py-3 bg-neutral-900/60 border ${
-                                touchedEscola && !isEscolaValid ? 'border-amber-500/60 focus:border-amber-500' : 'border-neutral-800 focus:border-[#02c39a]/50'
-                              } disabled:opacity-60 disabled:cursor-not-allowed hover:border-neutral-700 focus:ring-1 focus:ring-[#02c39a]/35 transition-all rounded-xl text-sm text-neutral-100 placeholder-neutral-600 outline-none`}
-                            />
+                        {/* Generic school input only for teachers */}
+                        {!isStudent && (
+                          <div className="animate-slideDown">
+                            <label className="block text-xs font-semibold text-neutral-400 tracking-wider uppercase mb-1.5">
+                              Escola / Instituição de Ensino
+                            </label>
+                            <div className="relative">
+                              <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-neutral-500">
+                                <Building2 className="w-4.5 h-4.5" />
+                              </span>
+                              <input
+                                id="signup-escola-input"
+                                type="text"
+                                disabled={isLoading}
+                                placeholder="Ex: Colégio Athenas, E.E. Mário Quintana..."
+                                value={escola}
+                                onChange={(e) => setEscola(e.target.value)}
+                                onBlur={() => setTouchedEscola(true)}
+                                className={`w-full pl-11 pr-4 py-3 bg-neutral-900/60 border ${
+                                  touchedEscola && !isEscolaValid ? 'border-amber-500/60 focus:border-amber-500' : 'border-neutral-800 focus:border-[#02c39a]/50'
+                                } disabled:opacity-60 disabled:cursor-not-allowed hover:border-neutral-700 focus:ring-1 focus:ring-[#02c39a]/35 transition-all rounded-xl text-sm text-neutral-100 placeholder-neutral-600 outline-none`}
+                              />
+                            </div>
+                            {touchedEscola && !isEscolaValid && (
+                              <p className="text-[11px] text-amber-400 mt-1 flex items-center gap-1 animate-fadeIn">
+                                <AlertCircle className="w-3 h-3 shrink-0" />
+                                <span>Informe o nome da sua escola ou colégio</span>
+                              </p>
+                            )}
                           </div>
-                          {touchedEscola && !isEscolaValid && (
-                            <p className="text-[11px] text-amber-400 mt-1 flex items-center gap-1 animate-fadeIn">
-                              <AlertCircle className="w-3 h-3 shrink-0" />
-                              <span>Informe o nome da sua escola ou colégio</span>
-                            </p>
-                          )}
-                        </div>
+                        )}
                       </>
                     )}
 
@@ -1162,71 +1317,280 @@ export default function LoginModal({ role, onBack, onLoginSuccess }: LoginModalP
                           )}
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-[11px] font-bold text-neutral-400 tracking-wider uppercase mb-1.5 flex items-center justify-between">
-                              <span>Cód. Sala</span>
-                            </label>
+                        <div>
+                          <label className="block text-xs font-semibold text-neutral-400 tracking-wider uppercase mb-1.5">
+                            Nº de Chamada (Lista de Presença)
+                          </label>
+                          <div className="relative">
+                            <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-neutral-500">
+                              <Hash className="w-4.5 h-4.5" />
+                            </span>
                             <input
-                              id="signup-turma-code-input"
-                              type="text"
+                              id="signup-chamada-input"
+                              type="number"
                               disabled={isLoading}
-                              maxLength={4}
-                              placeholder="0000"
-                              value={turma}
-                              onChange={(e) => {
-                                setTurma(e.target.value.replace(/\D/g, ''));
-                                if (error) setError('');
-                              }}
-                              onBlur={() => setTouchedTurma(true)}
-                              className={`w-full px-4 py-3 bg-neutral-900/60 border ${
-                                (touchedTurma && turma.trim().length !== 4) || (error && error.toLowerCase().includes('código de sala'))
-                                  ? 'border-red-500/80 focus:border-red-500 ring-1 ring-red-500/20' 
-                                  : 'border-neutral-800 focus:border-[#02c39a]/50 focus:ring-1 focus:ring-[#02c39a]/35'
-                              } disabled:opacity-60 disabled:cursor-not-allowed transition-all rounded-xl text-sm text-center text-neutral-100 outline-none font-mono tracking-widest placeholder-neutral-600 font-bold`}
+                              placeholder="Ex: 12"
+                              value={numeroChamada}
+                              onChange={(e) => setNumeroChamada(e.target.value)}
+                              onBlur={() => setTouchedChamada(true)}
+                              className={`w-full pl-11 pr-4 py-3 bg-neutral-900/60 border ${
+                                touchedChamada && (!numeroChamada || parseInt(numeroChamada) <= 0) ? 'border-amber-500/60 focus:border-amber-500' : 'border-neutral-800 focus:border-[#02c39a]/50'
+                              } disabled:opacity-60 disabled:cursor-not-allowed hover:border-neutral-700 focus:ring-1 focus:ring-[#02c39a]/35 transition-all rounded-xl text-sm text-neutral-100 placeholder-neutral-600 outline-none`}
                             />
-                            {touchedTurma && turma.trim().length !== 4 && (
+                          </div>
+                          {touchedChamada && (!numeroChamada || parseInt(numeroChamada) <= 0) && (
+                            <p className="text-[10px] text-amber-400 mt-1 flex items-center gap-1 animate-fadeIn">
+                              <AlertCircle className="w-2.5 h-2.5 shrink-0" />
+                              <span>Informe seu número de chamada (maior que 0)</span>
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Localização & Escola do Aluno */}
+                        <div className="pt-2 border-t border-neutral-800/80 space-y-3.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-neutral-200 uppercase tracking-wider flex items-center gap-1.5">
+                              <Building2 className="w-3.5 h-3.5 text-emerald-400" />
+                              Onde você estuda?
+                            </span>
+                          </div>
+
+                          {/* 1. Estado onde estuda (UF) */}
+                          <div>
+                            <label className="block text-xs font-semibold text-neutral-400 tracking-wider uppercase mb-1.5 flex items-center justify-between">
+                              <span className="flex items-center gap-1.5">
+                                <MapPin className="w-3.5 h-3.5 text-emerald-400" />
+                                Estado onde estuda (UF)
+                              </span>
+                              <span className="text-[10px] text-neutral-500 font-mono">27 UFs do Brasil</span>
+                            </label>
+                            <select
+                              id="signup-estado-select"
+                              disabled={isLoading}
+                              value={estado}
+                              onChange={(e) => {
+                                setEstado(e.target.value);
+                                setTouchedEstado(true);
+                              }}
+                              className={`w-full px-4 py-3 bg-neutral-900/80 border ${
+                                touchedEstado && !estado ? 'border-amber-500/60' : 'border-neutral-800 focus:border-[#02c39a]/50'
+                              } focus:ring-1 focus:ring-[#02c39a]/35 rounded-xl text-sm text-neutral-100 outline-none cursor-pointer`}
+                            >
+                              <option value="">Selecione seu Estado (UF)...</option>
+                              {BRAZILIAN_STATES.map((st) => (
+                                <option key={st.sigla} value={st.sigla} className="bg-neutral-900 text-neutral-100">
+                                  {st.nome} ({st.sigla})
+                                </option>
+                              ))}
+                            </select>
+                            {touchedEstado && !estado && (
                               <p className="text-[10px] text-amber-400 mt-1 flex items-center gap-1 animate-fadeIn">
                                 <AlertCircle className="w-2.5 h-2.5 shrink-0" />
-                                <span>Cód. de 4 dígitos</span>
-                              </p>
-                            )}
-                            {error && error.toLowerCase().includes('código de sala') && (
-                              <p className="text-[10px] text-red-400 mt-1 flex items-center gap-1 animate-fadeIn font-semibold">
-                                <AlertCircle className="w-2.5 h-2.5 shrink-0" />
-                                <span>Código de sala não encontrado</span>
+                                <span>Selecione o estado em que estuda</span>
                               </p>
                             )}
                           </div>
 
-                          <div>
-                            <label className="block text-xs font-semibold text-neutral-400 tracking-wider uppercase mb-1.5">
-                              Nº Chamada
-                            </label>
-                            <div className="relative">
-                              <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-neutral-500">
-                                <Hash className="w-4.5 h-4.5" />
-                              </span>
-                              <input
-                                id="signup-chamada-input"
-                                type="number"
-                                disabled={isLoading}
-                                placeholder="Ex: 12"
-                                value={numeroChamada}
-                                onChange={(e) => setNumeroChamada(e.target.value)}
-                                onBlur={() => setTouchedChamada(true)}
-                                className={`w-full pl-11 pr-4 py-3 bg-neutral-900/60 border ${
-                                  touchedChamada && (!numeroChamada || parseInt(numeroChamada) <= 0) ? 'border-amber-500/60 focus:border-amber-500' : 'border-neutral-800 focus:border-[#02c39a]/50'
-                                } disabled:opacity-60 disabled:cursor-not-allowed hover:border-neutral-700 focus:ring-1 focus:ring-[#02c39a]/35 transition-all rounded-xl text-sm text-neutral-100 placeholder-neutral-600 outline-none`}
-                              />
+                          {/* 2. Cidade onde estuda (IBGE) */}
+                          {estado && (
+                            <div className="relative animate-fadeIn">
+                              <label className="block text-xs font-semibold text-neutral-400 tracking-wider uppercase mb-1.5 flex items-center justify-between">
+                                <span className="flex items-center gap-1.5">
+                                  <Building2 className="w-3.5 h-3.5 text-emerald-400" />
+                                  Cidade onde estuda
+                                </span>
+                                {loadingCidades && (
+                                  <span className="text-[10px] text-emerald-400 font-mono animate-pulse">Carregando municípios...</span>
+                                )}
+                              </label>
+                              <div className="relative">
+                                <input
+                                  id="signup-cidade-input"
+                                  type="text"
+                                  disabled={isLoading || loadingCidades}
+                                  placeholder={loadingCidades ? "Carregando municípios..." : "Digite o nome da sua cidade..."}
+                                  value={cidadeSearch || cidade}
+                                  onChange={(e) => {
+                                    setCidadeSearch(e.target.value);
+                                    setCidade('');
+                                    setIsCidadeDropdownOpen(true);
+                                    setTouchedCidade(true);
+                                  }}
+                                  onFocus={() => setIsCidadeDropdownOpen(true)}
+                                  className={`w-full pl-10 pr-4 py-3 bg-neutral-900/80 border ${
+                                    touchedCidade && !cidade ? 'border-amber-500/60' : 'border-neutral-800 focus:border-[#02c39a]/50'
+                                  } focus:ring-1 focus:ring-[#02c39a]/35 rounded-xl text-sm text-neutral-100 placeholder-neutral-600 outline-none`}
+                                />
+                                <Search className="w-4 h-4 text-neutral-500 absolute left-3.5 top-3.5" />
+                              </div>
+
+                              {/* Dropdown with filtered cities from IBGE */}
+                              {isCidadeDropdownOpen && cidadesList.length > 0 && (
+                                <div className="absolute z-30 left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-neutral-900 border border-neutral-700/80 rounded-xl shadow-2xl p-1 space-y-0.5 custom-scrollbar">
+                                  {cidadesList
+                                    .filter(c => !cidadeSearch || c.toLowerCase().includes(cidadeSearch.toLowerCase()))
+                                    .slice(0, 50)
+                                    .map(c => (
+                                      <button
+                                        key={c}
+                                        type="button"
+                                        onClick={() => {
+                                          setCidade(c);
+                                          setCidadeSearch(c);
+                                          setIsCidadeDropdownOpen(false);
+                                          setSchoolSelected(null);
+                                          setEscola('');
+                                          setEscolaSearchQuery('');
+                                        }}
+                                        className={`w-full text-left px-3 py-2 text-xs rounded-lg transition-colors flex items-center justify-between cursor-pointer ${
+                                          cidade === c ? 'bg-emerald-500/20 text-emerald-300 font-bold' : 'text-neutral-200 hover:bg-neutral-800'
+                                        }`}
+                                      >
+                                        <span>{c}</span>
+                                        {cidade === c && <Check className="w-3.5 h-3.5 text-emerald-400" />}
+                                      </button>
+                                    ))}
+                                </div>
+                              )}
+                              {touchedCidade && !cidade && (
+                                <p className="text-[10px] text-amber-400 mt-1 flex items-center gap-1 animate-fadeIn">
+                                  <AlertCircle className="w-2.5 h-2.5 shrink-0" />
+                                  <span>Escolha sua cidade na lista</span>
+                                </p>
+                              )}
                             </div>
-                            {touchedChamada && (!numeroChamada || parseInt(numeroChamada) <= 0) && (
-                              <p className="text-[10px] text-amber-400 mt-1 flex items-center gap-1 animate-fadeIn">
-                                <AlertCircle className="w-2.5 h-2.5 shrink-0" />
-                                <span>Nº válido</span>
-                              </p>
-                            )}
-                          </div>
+                          )}
+
+                          {/* 3. Escola onde estuda */}
+                          {cidade && (
+                            <div className="relative animate-fadeIn space-y-2">
+                              <label className="block text-xs font-semibold text-neutral-400 tracking-wider uppercase flex items-center justify-between">
+                                <span className="flex items-center gap-1.5">
+                                  <GraduationCap className="w-3.5 h-3.5 text-emerald-400" />
+                                  Escola / Colégio
+                                </span>
+                              </label>
+
+                              {schoolSelected ? (
+                                <div className="p-3.5 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl flex items-center justify-between gap-3 animate-fadeIn">
+                                  <div className="flex items-start gap-2.5 min-w-0">
+                                    <div className="p-2 bg-emerald-500/20 rounded-xl text-emerald-400 shrink-0 mt-0.5">
+                                      <CheckCircle className="w-4 h-4" />
+                                    </div>
+                                    <div className="min-w-0">
+                                      <p className="text-xs font-bold text-neutral-100 truncate">{schoolSelected.nome}</p>
+                                      <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                        {schoolSelected.codigoInep && schoolSelected.codigoInep !== 'Não informado' && (
+                                          <span className="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/15 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                                            Cód: {schoolSelected.codigoInep}
+                                          </span>
+                                        )}
+                                        <span className="text-[10px] text-neutral-400">
+                                          Rede {schoolSelected.rede} • {cidade}/{estado}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSchoolSelected(null);
+                                      setEscola('');
+                                      setEscolaSearchQuery('');
+                                      setIsEscolaDropdownOpen(true);
+                                    }}
+                                    className="text-xs text-neutral-400 hover:text-emerald-300 font-semibold px-2 py-1 rounded-lg hover:bg-neutral-800 transition-colors shrink-0 cursor-pointer underline"
+                                  >
+                                    Trocar
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="relative">
+                                  <div className="relative">
+                                    <input
+                                      id="signup-escola-search-input"
+                                      type="text"
+                                      disabled={isLoading}
+                                      placeholder="Digite o nome da sua escola para buscar..."
+                                      value={escolaSearchQuery}
+                                      onChange={(e) => {
+                                        setEscolaSearchQuery(e.target.value);
+                                        setIsEscolaDropdownOpen(true);
+                                      }}
+                                      onFocus={() => setIsEscolaDropdownOpen(true)}
+                                      className="w-full pl-10 pr-10 py-3 bg-neutral-900/80 border border-neutral-800 focus:border-[#02c39a]/50 rounded-xl text-sm text-neutral-100 placeholder-neutral-600 outline-none"
+                                    />
+                                    <Search className="w-4 h-4 text-neutral-500 absolute left-3.5 top-3.5" />
+                                    {loadingInep && (
+                                      <div className="w-4 h-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin absolute right-3.5 top-3.5" />
+                                    )}
+                                  </div>
+
+                                  {/* Dropdown with school options */}
+                                  {isEscolaDropdownOpen && (
+                                    <div className="absolute z-40 left-0 right-0 mt-1 max-h-60 overflow-y-auto bg-neutral-900/95 backdrop-blur-md border border-neutral-700/80 rounded-2xl shadow-2xl p-2 space-y-1.5 custom-scrollbar">
+                                      <div className="px-2 py-1 flex items-center justify-between text-[10px] text-neutral-400 border-b border-neutral-800 pb-1.5 mb-1 font-mono">
+                                        <span>Escolas encontradas ({cidade} - {estado}):</span>
+                                        {inepSchools.length > 0 && <span className="text-emerald-400 font-bold">{inepSchools.length} escolas</span>}
+                                      </div>
+
+                                      {loadingInep ? (
+                                        <div className="py-6 text-center text-xs text-neutral-400 flex flex-col items-center gap-2">
+                                          <div className="w-5 h-5 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
+                                          <span>Buscando escolas disponíveis...</span>
+                                        </div>
+                                      ) : inepSchools.length > 0 ? (
+                                        inepSchools.map((sch) => (
+                                          <button
+                                            key={sch.id || sch.codigoInep}
+                                            type="button"
+                                            onClick={() => handleSelectInepSchool(sch)}
+                                            className="w-full text-left p-2.5 rounded-xl bg-neutral-850/60 hover:bg-neutral-800 border border-neutral-800 hover:border-emerald-500/40 transition-all cursor-pointer group"
+                                          >
+                                            <div className="flex items-start justify-between gap-2">
+                                              <p className="text-xs font-bold text-neutral-100 group-hover:text-emerald-300 transition-colors leading-snug">
+                                                {sch.nome}
+                                              </p>
+                                              {sch.codigoInep && sch.codigoInep !== 'Não informado' && (
+                                                <span className="text-[9.5px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 shrink-0">
+                                                  Cód: {sch.codigoInep}
+                                                </span>
+                                              )}
+                                            </div>
+                                            <div className="flex items-center gap-2 mt-1 text-[10.5px] text-neutral-400">
+                                              <span className="px-1.5 py-0.2 bg-neutral-800 text-neutral-300 rounded text-[9.5px]">
+                                                Rede {sch.rede}
+                                              </span>
+                                              {sch.bairro && <span className="truncate">• {sch.bairro}</span>}
+                                              {sch.etapas && <span className="truncate text-neutral-500">• {sch.etapas}</span>}
+                                            </div>
+                                          </button>
+                                        ))
+                                      ) : (
+                                        <div className="py-4 text-center text-xs text-neutral-400">
+                                          <p>Nenhuma escola com este nome encontrada em {cidade}.</p>
+                                        </div>
+                                      )}
+
+                                      {/* Option to use custom typed school name */}
+                                      {escolaSearchQuery.trim().length > 0 && (
+                                        <div className="pt-1.5 border-t border-neutral-800/80 mt-1">
+                                          <button
+                                            type="button"
+                                            onClick={handleUseCustomSchool}
+                                            className="w-full text-left px-3 py-2 text-xs rounded-xl bg-neutral-800/40 hover:bg-neutral-800 text-emerald-400 hover:text-emerald-300 transition-colors flex items-center justify-between cursor-pointer font-medium"
+                                          >
+                                            <span>Não encontrou? Usar: <strong>"{escolaSearchQuery.trim()}"</strong></span>
+                                            <Check className="w-3.5 h-3.5 text-emerald-400" />
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
 
                         <div className="p-3.5 bg-neutral-900/80 border border-neutral-800 rounded-2xl text-[11px] text-neutral-300 space-y-1 mt-2">
