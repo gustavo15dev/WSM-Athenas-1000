@@ -135,19 +135,19 @@ export function formatTargetDisplayName(rawTarget: string | null | undefined, vi
 
 export function getStudentVirtualClassIdentifiers(studentEmail: string, virtualClasses: any[] = []): string[] {
   if (!studentEmail) return [];
-  const emailLower = studentEmail.toLowerCase();
+  const emailLower = studentEmail.toLowerCase().trim();
   const ids: string[] = [];
   virtualClasses.forEach(vc => {
     if (!vc) return;
     let emails: string[] = [];
     if (Array.isArray(vc.student_emails)) {
-      emails = vc.student_emails.map((e: string) => String(e).toLowerCase());
+      emails = vc.student_emails.map((e: string) => String(e).toLowerCase().trim());
     } else if (typeof vc.student_emails === 'string') {
       try {
         const parsed = JSON.parse(vc.student_emails);
-        if (Array.isArray(parsed)) emails = parsed.map((e: string) => String(e).toLowerCase());
+        if (Array.isArray(parsed)) emails = parsed.map((e: string) => String(e).toLowerCase().trim());
       } catch {
-        emails = [vc.student_emails.toLowerCase()];
+        emails = vc.student_emails.split(',').map((s: string) => s.trim().toLowerCase()).filter(Boolean);
       }
     }
     if (emails.includes(emailLower)) {

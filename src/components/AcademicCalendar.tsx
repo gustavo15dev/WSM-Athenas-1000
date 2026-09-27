@@ -28,6 +28,8 @@ import {
   Undo2
 } from 'lucide-react';
 import { parseExamSettings, cleanExamContent, formatExamDateDisplay, cleanExamObservations, extractExamTime } from '../utils/examSettings';
+import { matchesStudentTarget } from '../utils/targetMatcher';
+import { areTurmasMatching } from '../utils/profileDb';
 
 export interface UserCalendarItem {
   id: string;
@@ -47,6 +49,8 @@ interface AcademicCalendarProps {
   userRole: 'student' | 'teacher';
   userEmail: string;
   userName?: string;
+  userTurma?: string;
+  virtualClasses?: any[];
   exams?: any[]; // Physical/scheduled exams
   mockExams?: any[]; // Virtual simulations
   onStudyForExam?: (title: string, content: string) => void;
@@ -58,6 +62,8 @@ export default function AcademicCalendar({
   userRole,
   userEmail,
   userName = 'Usuário',
+  userTurma = '',
+  virtualClasses = [],
   exams = [],
   mockExams = [],
   onStudyForExam,
@@ -144,11 +150,13 @@ export default function AcademicCalendar({
 
   useEffect(() => {
     let isMounted = true;
+    const cleanEmail = userEmail.toLowerCase().trim();
+
     const fetchExams = async () => {
       try {
         let query = supabase.from('wsm_exams').select('*');
-        if (userRole === 'teacher' && userEmail) {
-          query = query.eq('teacher_email', userEmail.toLowerCase().trim());
+        if (userRole === 'teacher' && cleanEmail) {
+          query = query.eq('teacher_email', cleanEmail);
         }
         const { data, error } = await query;
 
@@ -159,7 +167,7 @@ export default function AcademicCalendar({
             .from('wsm_notifications')
             .select('title, message')
             .order('created_at', { ascending: false })
-            .limit(150);
+            .limit(100);
           if (nData) notifsList = nData;
         } catch {
           // ignore
@@ -170,7 +178,21 @@ export default function AcademicCalendar({
         }
 
         if (!error && data && isMounted) {
-          const enriched = data.map((ex: any) => {
+          let list = data;
+          if (userRole === 'student') {
+            const studentVCIds: string[] = (virtualClasses || []).flatMap((vc: any) =>
+              [vc.id, vc.name, vc.access_code].filter(Boolean)
+            );
+            list = data.filter((ex: any) => {
+              const target = ex.class_name || ex.turma;
+              const matchesTarget = matchesStudentTarget(target, cleanEmail, userTurma, studentVCIds);
+              const matchesCohort = userTurma && target ? areTurmasMatching(target, userTurma) : false;
+              const isGeneral = !target || ['geral', 'todas', 'toda a escola', 'todos'].includes(target.toLowerCase().trim());
+              return matchesTarget || matchesCohort || isGeneral;
+            });
+          }
+
+          const enriched = list.map((ex: any) => {
             const time = extractExamTime(ex, notifsList);
             return {
               ...ex,
@@ -187,12 +209,23 @@ export default function AcademicCalendar({
     const fetchMockExams = async () => {
       try {
         let query = supabase.from('wsm_mock_exams').select('*');
-        if (userRole === 'teacher' && userEmail) {
-          query = query.eq('teacher_email', userEmail.toLowerCase().trim());
+        if (userRole === 'teacher' && cleanEmail) {
+          query = query.eq('teacher_email', cleanEmail);
         }
         const { data, error } = await query;
         if (!error && data && isMounted) {
-          setDbMockExams(data);
+          let list = data;
+          if (userRole === 'student') {
+            const studentVCIds: string[] = (virtualClasses || []).flatMap((vc: any) =>
+              [vc.id, vc.name, vc.access_code].filter(Boolean)
+            );
+            list = data.filter((mock: any) => {
+              const { settings } = parseExamSettings(mock.description || '');
+              if (settings.is_draft || mock.is_draft === true || mock.status === 'draft') return false;
+              return matchesStudentTarget(mock.class_name, cleanEmail, userTurma, studentVCIds);
+            });
+          }
+          setDbMockExams(list);
         }
       } catch {
         // ignore
@@ -203,7 +236,7 @@ export default function AcademicCalendar({
     fetchMockExams();
 
     return () => { isMounted = false; };
-  }, [userRole, userEmail]);
+  }, [userRole, userEmail, userTurma, virtualClasses]);
 
   // Combine passed props and DB fetched items, deduplicating by ID
   const effectiveExams = useMemo(() => {
@@ -826,18 +859,18 @@ export default function AcademicCalendar({
                   if (hasExamIndicator) {
                     cellBaseClass = 'bg-rose-950/70 text-rose-100 border-rose-400 ring-2 ring-rose-400 shadow-[0_0_20px_rgba(244,63,94,0.35)]';
                   } else if (hasMockIndicator) {
-                    cellBaseClass = 'bg-emerald-950/70 text-emerald-100 border-emerald-400 ring-2 ring-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.35)]';
+                    cellBaseClass = 'bg-emerald-950/70 text-emerald-100 border-emerald-400 ring-2 ring-emerald-400 shadow-[0_0_20px_rgba(30, 185, 150,0.35)]';
                   } else if (hasEventIndicator) {
                     cellBaseClass = 'bg-sky-950/70 text-sky-100 border-sky-400 ring-2 ring-sky-400 shadow-[0_0_20px_rgba(56,189,248,0.35)]';
                   } else if (hasTaskIndicator) {
                     cellBaseClass = 'bg-amber-950/70 text-amber-100 border-amber-400 ring-2 ring-amber-400 shadow-[0_0_20px_rgba(251,191,36,0.35)]';
                   } else {
-                    cellBaseClass = 'bg-neutral-850 text-neutral-100 border-neutral-700 ring-2 ring-emerald-400/60 shadow-[0_0_15px_rgba(16,185,129,0.15)]';
+                    cellBaseClass = 'bg-neutral-850 text-neutral-100 border-neutral-700 ring-2 ring-emerald-400/60 shadow-[0_0_15px_rgba(30, 185, 150,0.15)]';
                   }
                 } else if (hasExamIndicator) {
                   cellBaseClass = 'bg-rose-950/30 text-rose-100 border-rose-500/40 hover:bg-rose-900/40 hover:border-rose-400 shadow-[0_0_14px_rgba(244,63,94,0.15)] ring-1 ring-rose-500/20';
                 } else if (hasMockIndicator) {
-                  cellBaseClass = 'bg-emerald-950/30 text-emerald-100 border-emerald-500/40 hover:bg-emerald-900/40 hover:border-emerald-400 shadow-[0_0_14px_rgba(16,185,129,0.15)] ring-1 ring-emerald-500/20';
+                  cellBaseClass = 'bg-emerald-950/30 text-emerald-100 border-emerald-500/40 hover:bg-emerald-900/40 hover:border-emerald-400 shadow-[0_0_14px_rgba(30, 185, 150,0.15)] ring-1 ring-emerald-500/20';
                 } else if (hasEventIndicator) {
                   cellBaseClass = 'bg-sky-950/30 text-sky-100 border-sky-500/40 hover:bg-sky-900/40 hover:border-sky-400 ring-1 ring-sky-500/20';
                 } else if (hasTaskIndicator) {

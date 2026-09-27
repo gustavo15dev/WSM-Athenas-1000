@@ -61,7 +61,7 @@ const AVAILABLE_STAMPS: {
     type: 'visto',
     label: 'VISTO REGULAR',
     subLabel: 'Caderno em dia',
-    color: '#059669'
+    color: '#1eb996'
   },
   {
     type: 'excelente',

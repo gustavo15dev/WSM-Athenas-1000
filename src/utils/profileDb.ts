@@ -60,6 +60,7 @@ export interface UserProfilePayload {
   materia?: string | null;
   escola?: string | null;
   notification_gmail?: string | null;
+  welcome_modal_dismissed?: boolean | null;
 }
 
 export async function safeUpsertUserProfile(payload: UserProfilePayload) {
@@ -107,6 +108,7 @@ export async function safeUpsertUserProfile(payload: UserProfilePayload) {
     numero_chamada: payload.numero_chamada !== undefined && payload.numero_chamada !== null && !isNaN(payload.numero_chamada) ? payload.numero_chamada : null,
     anos_lecionados: payload.anos_lecionados || null,
     materia: payload.materia || null,
+    ...(payload.welcome_modal_dismissed !== undefined ? { welcome_modal_dismissed: payload.welcome_modal_dismissed } : {}),
   };
 
   const localEscola = payload.escola || localStorage.getItem(`wsm_profile_escola_${cleanEmail}`) || '';
@@ -170,11 +172,11 @@ export async function safeFetchUserProfile(email: string) {
 
   let profileData: any = null;
 
-  // 1. Try core select matching DB schema
+  // 1. Try core select matching DB schema with welcome_modal_dismissed
   try {
     const { data, error } = await supabase
       .from('wsm_user_profiles')
-      .select('id, nome_completo, turma, numero_chamada, email, role, anos_lecionados, materia, notification_gmail')
+      .select('id, nome_completo, turma, numero_chamada, email, role, anos_lecionados, materia, notification_gmail, welcome_modal_dismissed')
       .ilike('email', cleanEmail)
       .maybeSingle();
 
@@ -182,10 +184,10 @@ export async function safeFetchUserProfile(email: string) {
       profileData = data;
     }
   } catch (err) {
-    console.warn('[safeFetchUserProfile] Select with notification_gmail failed:', err);
+    console.warn('[safeFetchUserProfile] Select with welcome_modal_dismissed failed:', err);
   }
 
-  // 2. Fallback select if notification_gmail is missing
+  // 2. Fallback select if welcome_modal_dismissed or notification_gmail is missing
   if (!profileData) {
     try {
       const { data, error } = await supabase
@@ -208,20 +210,104 @@ export async function safeFetchUserProfile(email: string) {
     const localGmail = localStorage.getItem(`wsm_gmail_fallback_${cleanEmail}`);
     const localChamadaRaw = localStorage.getItem(`wsm_profile_chamada_${cleanEmail}`);
     const localChamada = localChamadaRaw ? parseInt(localChamadaRaw, 10) : NaN;
+    const localDismissed = localStorage.getItem(`wsm_dismissed_welcome_modal_${cleanEmail}`) === 'true';
 
     const resolvedChamada = (profileData.numero_chamada !== undefined && profileData.numero_chamada !== null)
       ? Number(profileData.numero_chamada)
       : (!isNaN(localChamada) ? localChamada : profileData.numero_chamada);
+
+    const resolvedDismissed = profileData.welcome_modal_dismissed === true || localDismissed;
 
     return {
       ...profileData,
       numero_chamada: resolvedChamada,
       escola: profileData.escola || localEscola || '',
       notification_gmail: profileData.notification_gmail || localGmail || null,
+      welcome_modal_dismissed: resolvedDismissed,
     };
   }
 
   return null;
+}
+
+export async function setWelcomeModalDismissedInDb(email: string, profileId?: string) {
+  const cleanEmail = (email || '').toLowerCase().trim();
+  if (!cleanEmail) return;
+
+  // 1. Cache locally immediately for instant feedback
+  try {
+    localStorage.setItem(`wsm_dismissed_welcome_modal_${cleanEmail}`, 'true');
+  } catch {}
+
+  // 2. Persist to auth user_metadata (works on all devices and requires no DB schema migrations)
+  try {
+    await supabase.auth.updateUser({
+      data: { welcome_modal_dismissed: true }
+    });
+  } catch (err) {
+    console.warn('Notice: Error updating auth metadata for welcome modal:', err);
+  }
+
+  // 3. Persist to wsm_user_profiles table in Supabase
+  try {
+    let query = supabase.from('wsm_user_profiles').update({ welcome_modal_dismissed: true });
+    if (profileId) {
+      query = query.eq('id', profileId);
+    } else {
+      query = query.ilike('email', cleanEmail);
+    }
+    const { error } = await query;
+    if (error) {
+      console.warn('Notice: wsm_user_profiles welcome_modal_dismissed update notice:', error.message);
+    }
+  } catch (err) {
+    console.warn('Notice: Error updating wsm_user_profiles for welcome modal:', err);
+  }
+}
+
+export async function isWelcomeModalDismissedInDb(email: string): Promise<boolean> {
+  const cleanEmail = (email || '').toLowerCase().trim();
+  if (!cleanEmail) return false;
+
+  // 1. Check local cache first
+  try {
+    if (localStorage.getItem(`wsm_dismissed_welcome_modal_${cleanEmail}`) === 'true') {
+      return true;
+    }
+  } catch {}
+
+  // 2. Check auth metadata (persists across all devices)
+  try {
+    const { data: authUserData } = await supabase.auth.getUser();
+    if (authUserData?.user?.user_metadata?.welcome_modal_dismissed === true) {
+      try {
+        localStorage.setItem(`wsm_dismissed_welcome_modal_${cleanEmail}`, 'true');
+      } catch {}
+      return true;
+    }
+  } catch (err) {
+    console.warn('Notice: Error checking auth metadata for welcome modal:', err);
+  }
+
+  // 3. Check wsm_user_profiles in Supabase
+  try {
+    const { data, error } = await supabase
+      .from('wsm_user_profiles')
+      .select('welcome_modal_dismissed')
+      .ilike('email', cleanEmail)
+      .maybeSingle();
+
+    if (!error && data && data.welcome_modal_dismissed === true) {
+      try {
+        localStorage.setItem(`wsm_dismissed_welcome_modal_${cleanEmail}`, 'true');
+      } catch {}
+      return true;
+    }
+  } catch (err) {
+    // Column might not exist yet
+  }
+
+  return false;
 }
 
 export async function getStudentVirtualClasses(studentEmail: string, studentTurma?: string | null) {

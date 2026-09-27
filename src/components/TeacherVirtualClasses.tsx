@@ -1547,8 +1547,8 @@ export default function TeacherVirtualClasses({
                           <AreaChart data={analyticsData.examHistory} margin={{ top: 10, right: 0, left: -25, bottom: 0 }}>
                             <defs>
                               <linearGradient id="colorScoreTeacher" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                                <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                                <stop offset="5%" stopColor="#1eb996" stopOpacity={0.3} />
+                                <stop offset="95%" stopColor="#1eb996" stopOpacity={0} />
                               </linearGradient>
                             </defs>
                             <CartesianGrid strokeDasharray="3 3" stroke="#262626" vertical={false} />
@@ -1568,7 +1568,7 @@ export default function TeacherVirtualClasses({
                                 return null;
                               }}
                             />
-                            <Area type="monotone" dataKey="score" stroke="#10b981" strokeWidth={2} fillOpacity={1} fill="url(#colorScoreTeacher)" />
+                            <Area type="monotone" dataKey="score" stroke="#1eb996" strokeWidth={2} fillOpacity={1} fill="url(#colorScoreTeacher)" />
                           </AreaChart>
                         </ResponsiveContainer>
                       </div>
@@ -1787,12 +1787,12 @@ export default function TeacherVirtualClasses({
                                 >
                                   <stop
                                     offset="5%"
-                                    stopColor="#10b981"
+                                    stopColor="#1eb996"
                                     stopOpacity={0.25}
                                   />
                                   <stop
                                     offset="95%"
-                                    stopColor="#10b981"
+                                    stopColor="#1eb996"
                                     stopOpacity={0}
                                   />
                                 </linearGradient>
@@ -1814,7 +1814,7 @@ export default function TeacherVirtualClasses({
                               <Area
                                 type="monotone"
                                 dataKey="tempo"
-                                stroke="#10b981"
+                                stroke="#1eb996"
                                 fillOpacity={1}
                                 fill="url(#monGrad)"
                                 name="Minutos"
@@ -1887,7 +1887,7 @@ export default function TeacherVirtualClasses({
                               />
                               <Bar
                                 dataKey="tempo"
-                                fill="#059669"
+                                fill="#13997b"
                                 radius={[4, 4, 0, 0]}
                                 name="Minutos"
                               />
@@ -2554,7 +2554,7 @@ export default function TeacherVirtualClasses({
                               <XAxis dataKey="range" stroke="#737373" fontSize={9} tickLine={false} />
                               <YAxis stroke="#737373" fontSize={9} tickLine={false} allowDecimals={false} />
                               <Tooltip
-                                cursor={{ fill: "rgba(16, 185, 129, 0.05)" }}
+                                cursor={{ fill: "rgba(30, 185, 150, 0.05)" }}
                                 contentStyle={{
                                   backgroundColor: "#090b0a",
                                   borderColor: "#262626",
@@ -2562,7 +2562,7 @@ export default function TeacherVirtualClasses({
                                   fontSize: "9px",
                                 }}
                               />
-                              <Bar dataKey="count" fill="#10b981" radius={[3, 3, 0, 0]} name="Alunos" />
+                              <Bar dataKey="count" fill="#1eb996" radius={[3, 3, 0, 0]} name="Alunos" />
                             </BarChart>
                           </ResponsiveContainer>
                         </div>
@@ -2787,7 +2787,7 @@ export default function TeacherVirtualClasses({
               initial={{ scale: 0.95, y: 20 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.95, y: 20 }}
-              className="bg-[#0c0e0d] border border-neutral-850 w-full max-w-4xl rounded-3xl overflow-hidden shadow-[0_0_50px_rgba(16,185,129,0.15)] flex flex-col my-8 cursor-default"
+              className="bg-[#0c0e0d] border border-neutral-850 w-full max-w-4xl rounded-3xl overflow-hidden shadow-[0_0_50px_rgba(30, 185, 150,0.15)] flex flex-col my-8 cursor-default"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Header */}
@@ -2952,12 +2952,12 @@ export default function TeacherVirtualClasses({
                               >
                                 <stop
                                   offset="5%"
-                                  stopColor="#10b981"
+                                  stopColor="#1eb996"
                                   stopOpacity={0.3}
                                 />
                                 <stop
                                   offset="95%"
-                                  stopColor="#10b981"
+                                  stopColor="#1eb996"
                                   stopOpacity={0}
                                 />
                               </linearGradient>
@@ -2978,7 +2978,7 @@ export default function TeacherVirtualClasses({
                             <Area
                               type="monotone"
                               dataKey="tempo"
-                              stroke="#10b981"
+                              stroke="#1eb996"
                               strokeWidth={2}
                               fillOpacity={1}
                               fill="url(#colorTempo)"
@@ -3024,7 +3024,7 @@ export default function TeacherVirtualClasses({
                             />
                             <Bar
                               dataKey="tempo"
-                              fill="#059669"
+                              fill="#13997b"
                               radius={[4, 4, 0, 0]}
                               name="Minutos"
                             />

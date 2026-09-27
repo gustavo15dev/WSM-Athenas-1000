@@ -18,9 +18,9 @@ const CONFETTI_PARTICLES = Array.from({ length: 28 }).map((_, i) => ({
   rotation: Math.random() * 720 - 360,
   scale: Math.random() * 0.6 + 0.5,
   color: [
-    '#10b981', // Emerald
-    '#34d399', // Mint
-    '#02c39a', // Teal
+    '#1eb996', // Verde-água
+    '#33d3b0', // Verde-água claro
+    '#26caa5', // Teal
     '#f59e0b', // Amber/Gold
     '#3b82f6', // Blue
     '#ec4899', // Pink
@@ -86,7 +86,7 @@ export default function PublishSuccessModal({
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.9, opacity: 0, y: -10 }}
             transition={{ type: 'spring', damping: 22, stiffness: 300 }}
-            className="relative w-full max-w-md bg-neutral-950 border border-emerald-500/40 rounded-3xl p-7 text-center shadow-[0_0_50px_rgba(16,185,129,0.25)] space-y-6 overflow-hidden"
+            className="relative w-full max-w-md bg-neutral-950 border border-emerald-500/40 rounded-3xl p-7 text-center shadow-[0_0_50px_rgba(30, 185, 150,0.25)] space-y-6 overflow-hidden"
           >
             {/* Background Ambient Glow */}
             <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-64 h-64 bg-emerald-500/20 rounded-full blur-3xl pointer-events-none" />

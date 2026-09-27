@@ -121,7 +121,7 @@ export default function PersonalQuestionBankModal({
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 10 }}
           transition={{ duration: 0.25, ease: 'easeOut' }}
-          className="relative w-full max-w-6xl bg-neutral-950 border border-emerald-500/30 rounded-3xl shadow-[0_0_80px_rgba(16,185,129,0.22)] flex flex-col max-h-[92vh] overflow-hidden"
+          className="relative w-full max-w-6xl bg-neutral-950 border border-emerald-500/30 rounded-3xl shadow-[0_0_80px_rgba(30, 185, 150,0.22)] flex flex-col max-h-[92vh] overflow-hidden"
         >
           {/* Header Banner */}
           <div className="p-5 sm:p-7 border-b border-neutral-900 bg-neutral-900/40 relative overflow-hidden flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">

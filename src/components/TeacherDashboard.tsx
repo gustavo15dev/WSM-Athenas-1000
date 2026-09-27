@@ -1488,14 +1488,14 @@ export default function TeacherDashboard({
         data-collapsed={isSidebarCollapsed}
         className={`${
           isSidebarCollapsed ? 'w-24 px-2.5 py-6' : 'w-64 p-6'
-        } h-full border-r border-emerald-950/20 bg-neutral-950/60 hidden md:flex flex-col shrink-0 justify-between z-30 overflow-y-auto scrollbar-none transition-all duration-300`}
+        } h-screen max-h-screen border-r border-emerald-950/20 bg-neutral-950/60 hidden md:flex flex-col shrink-0 justify-between z-30 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-neutral-800/70 scrollbar-track-transparent hover:scrollbar-thumb-neutral-700 transition-all duration-300`}
       >
         <div className="space-y-8">
           <div className={`flex ${isSidebarCollapsed ? 'flex-col items-center gap-4' : 'items-center justify-between gap-2 animate-fadeIn'}`}>
             <div className={`flex ${isSidebarCollapsed ? 'flex-col items-center' : 'items-center'} gap-3`}>
               <div className="w-11 h-11 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center justify-center shrink-0 overflow-hidden">
                 <img
-                  src="https://i.ibb.co/JW6tx1k6/Chat-GPT-Image-21-de-jun-de-2026-17-21-07-removebg-preview.png"
+                  src="https://res.cloudinary.com/dqx8p8orf/image/upload/f_auto/q_auto/gallery_image_20260927_114822-sem-mexer-em-mais-nada-nesse-boneco-mantenha-a-con-removebg-preview_3_ewaz6x.png"
                   alt="Logo"
                   referrerPolicy="no-referrer"
                   className="w-14 h-14 max-w-none object-contain select-none"
@@ -1523,9 +1523,7 @@ export default function TeacherDashboard({
           </div>
 
           <div className="space-y-1.5">
-            {!isSidebarCollapsed ? (
-              <p className="text-[9px] text-neutral-500 uppercase tracking-widest font-mono font-bold pl-2 mb-2 animate-fadeIn">Menu Principal</p>
-            ) : (
+            {isSidebarCollapsed && (
               <div className="border-b border-emerald-950/25 my-3 mx-2" />
             )}
             
@@ -1539,14 +1537,14 @@ export default function TeacherDashboard({
                   : 'w-full flex items-center justify-between px-3.5 py-2.5 text-xs'
               } rounded-xl font-semibold transition-all border cursor-pointer ${
                 activeTab === 'wsm_athenas'
-                  ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/60 font-bold shadow-[0_0_14px_rgba(16,185,129,0.12)]'
-                  : 'bg-emerald-500/[0.04] text-neutral-300 border-emerald-500/40 hover:bg-emerald-500/10 hover:border-emerald-500/70 hover:text-white shadow-[0_0_10px_rgba(16,185,129,0.04)]'
+                  ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/60 font-bold shadow-[0_0_14px_rgba(30, 185, 150,0.12)]'
+                  : 'bg-emerald-500/[0.04] text-neutral-300 border-emerald-500/40 hover:bg-emerald-500/10 hover:border-emerald-500/70 hover:text-white shadow-[0_0_10px_rgba(30, 185, 150,0.04)]'
               }`}
             >
               <div className={`${isSidebarCollapsed ? 'flex flex-col items-center gap-1' : 'flex items-center gap-3'}`}>
                 <div className={`${isSidebarCollapsed ? 'w-6 h-6' : 'w-5 h-5'} flex items-center justify-center shrink-0 overflow-hidden relative`}>
                   <img
-                    src="https://i.ibb.co/JW6tx1k6/Chat-GPT-Image-21-de-jun-de-2026-17-21-07-removebg-preview.png"
+                    src="https://res.cloudinary.com/dqx8p8orf/image/upload/f_auto/q_auto/gallery_image_20260927_114822-sem-mexer-em-mais-nada-nesse-boneco-mantenha-a-con-removebg-preview_3_ewaz6x.png"
                     alt="Mascote"
                     referrerPolicy="no-referrer"
                     className="w-7 h-7 max-w-none object-contain select-none opacity-90"
@@ -1574,7 +1572,7 @@ export default function TeacherDashboard({
                   : 'w-full flex items-center justify-between px-3.5 py-2.5 text-xs'
               } rounded-xl font-semibold transition-all border cursor-pointer ${
                 activeTab === 'inicio'
-                  ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/15 font-bold shadow-[0_0_12px_rgba(16,185,129,0.03)]'
+                  ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/15 font-bold shadow-[0_0_12px_rgba(30, 185, 150,0.03)]'
                   : 'bg-transparent text-neutral-450 border-transparent hover:bg-neutral-900/40 hover:text-neutral-200'
               }`}
             >
@@ -1598,7 +1596,7 @@ export default function TeacherDashboard({
                   : 'w-full flex items-center justify-between px-3.5 py-2.5 text-xs'
               } rounded-xl font-semibold transition-all border cursor-pointer ${
                 activeTab === 'salas'
-                  ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/15 font-bold shadow-[0_0_12px_rgba(16,185,129,0.03)]'
+                  ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/15 font-bold shadow-[0_0_12px_rgba(30, 185, 150,0.03)]'
                   : 'bg-transparent text-neutral-450 border-transparent hover:bg-neutral-900/40 hover:text-neutral-200'
               }`}
             >
@@ -1622,7 +1620,7 @@ export default function TeacherDashboard({
                   : 'w-full flex items-center justify-between px-3.5 py-2.5 text-xs'
               } rounded-xl font-semibold transition-all border cursor-pointer ${
                 activeTab === 'calendario'
-                  ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/15 font-bold shadow-[0_0_12px_rgba(16,185,129,0.03)]'
+                  ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/15 font-bold shadow-[0_0_12px_rgba(30, 185, 150,0.03)]'
                   : 'bg-transparent text-neutral-450 border-transparent hover:bg-neutral-900/40 hover:text-neutral-200'
               }`}
             >
@@ -1646,7 +1644,7 @@ export default function TeacherDashboard({
                   : 'w-full flex items-center justify-between px-3.5 py-2.5 text-xs'
               } rounded-xl font-semibold transition-all border cursor-pointer ${
                 activeTab === 'conversas'
-                  ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/15 font-bold shadow-[0_0_12px_rgba(16,185,129,0.03)]'
+                  ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/15 font-bold shadow-[0_0_12px_rgba(30, 185, 150,0.03)]'
                   : 'bg-transparent text-neutral-450 border-transparent hover:bg-neutral-900/40 hover:text-neutral-200'
               }`}
             >
@@ -1670,7 +1668,7 @@ export default function TeacherDashboard({
                   : 'w-full flex items-center justify-between px-3.5 py-2.5 text-xs'
               } rounded-xl font-semibold transition-all border cursor-pointer ${
                 activeTab === 'marcar_prova'
-                  ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/15 font-bold shadow-[0_0_12px_rgba(16,185,129,0.03)]'
+                  ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/15 font-bold shadow-[0_0_12px_rgba(30, 185, 150,0.03)]'
                   : 'bg-transparent text-neutral-450 border-transparent hover:bg-neutral-900/40 hover:text-neutral-200'
               }`}
             >
@@ -1703,7 +1701,7 @@ export default function TeacherDashboard({
                   : 'w-full flex items-center justify-between px-3.5 py-2.5 text-xs'
               } rounded-xl font-semibold transition-all border cursor-pointer ${
                 activeTab === 'criar_simulado' || activeTab === 'resultados_simulado'
-                  ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/15 font-bold shadow-[0_0_12px_rgba(16,185,129,0.03)]'
+                  ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/15 font-bold shadow-[0_0_12px_rgba(30, 185, 150,0.03)]'
                   : 'bg-transparent text-neutral-450 border-transparent hover:bg-neutral-900/40 hover:text-neutral-200'
               }`}
             >
@@ -1729,7 +1727,7 @@ export default function TeacherDashboard({
                   : 'w-full flex items-center justify-between px-3.5 py-2.5 text-xs'
               } rounded-xl font-semibold transition-all border cursor-pointer ${
                 activeTab === 'criar_aviso'
-                  ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/15 font-bold shadow-[0_0_12px_rgba(16,185,129,0.03)]'
+                  ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/15 font-bold shadow-[0_0_12px_rgba(30, 185, 150,0.03)]'
                   : 'bg-transparent text-neutral-400 border-transparent hover:bg-neutral-900/40 hover:text-neutral-200'
               }`}
             >
@@ -1792,13 +1790,9 @@ export default function TeacherDashboard({
         {/* Music Player Mini Card in Sidebar (above footer) */}
         <div id="sidebar-music-slot" data-collapsed={isSidebarCollapsed} className="w-full mt-auto mb-3 empty:hidden transition-all duration-300"></div>
 
-        <div className="border-t border-neutral-900 pt-5 space-y-3">
+        <div className="border-t border-neutral-900 pt-4 space-y-3 shrink-0">
           {!isSidebarCollapsed ? (
-            <div className="animate-fadeIn space-y-3">
-              <div className="pl-2">
-                <p className="text-neutral-300 text-[11px] font-semibold truncate max-w-[195px]">{profile ? profile.nome_completo : email}</p>
-                <p className="text-neutral-550 text-[9px] font-mono">{profile ? profile.materia : 'Biologia'} {profile?.anos_lecionados && profile.anos_lecionados.length > 0 ? `• Turmas: ${profile.anos_lecionados.join(', ')}` : ''}</p>
-              </div>
+            <div className="animate-fadeIn">
               <div className="flex gap-2 w-full">
                 <button
                   type="button"
@@ -2018,7 +2012,7 @@ export default function TeacherDashboard({
             >
               <div className="w-4 h-4 flex items-center justify-center shrink-0 overflow-hidden">
                 <img
-                  src="https://i.ibb.co/JW6tx1k6/Chat-GPT-Image-21-de-jun-de-2026-17-21-07-removebg-preview.png"
+                  src="https://res.cloudinary.com/dqx8p8orf/image/upload/f_auto/q_auto/gallery_image_20260927_114822-sem-mexer-em-mais-nada-nesse-boneco-mantenha-a-con-removebg-preview_3_ewaz6x.png"
                   alt="Mascote"
                   referrerPolicy="no-referrer"
                   className="w-5 h-5 max-w-none object-contain select-none"
@@ -3625,7 +3619,7 @@ export default function TeacherDashboard({
               type="submit"
               onClick={() => handleUpdateSettings()}
               disabled={savingSettings}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-neutral-900 font-bold rounded-xl transition-all text-xs shadow-[0_0_15px_rgba(16,185,129,0.1)] cursor-pointer"
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-neutral-900 font-bold rounded-xl transition-all text-xs shadow-[0_0_15px_rgba(30, 185, 150,0.1)] cursor-pointer"
             >
               {savingSettings ? 'Gravando dados...' : 'Salvar Preferências'}
             </button>

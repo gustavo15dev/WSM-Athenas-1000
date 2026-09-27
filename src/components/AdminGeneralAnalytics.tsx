@@ -280,7 +280,7 @@ export default function AdminGeneralAnalytics({
 
     const list = [];
     if (students > 0) list.push({ name: 'Alunos', value: students, color: '#3b82f6' });
-    if (teachers > 0) list.push({ name: 'Professores', value: teachers, color: '#10b981' });
+    if (teachers > 0) list.push({ name: 'Professores', value: teachers, color: '#1eb996' });
     if (admins > 0) list.push({ name: 'Administração', value: admins, color: '#8b5cf6' });
 
     return list;
@@ -757,8 +757,8 @@ export default function AdminGeneralAnalytics({
                       <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.0} />
                     </linearGradient>
                     <linearGradient id="colorTeachers" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.4} />
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
+                      <stop offset="5%" stopColor="#1eb996" stopOpacity={0.4} />
+                      <stop offset="95%" stopColor="#1eb996" stopOpacity={0.0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
@@ -769,7 +769,7 @@ export default function AdminGeneralAnalytics({
                   />
                   <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
                   <Area type="monotone" dataKey="Alunos" stroke="#3b82f6" fillOpacity={1} fill="url(#colorStudents)" strokeWidth={2} />
-                  <Area type="monotone" dataKey="Professores" stroke="#10b981" fillOpacity={1} fill="url(#colorTeachers)" strokeWidth={2} />
+                  <Area type="monotone" dataKey="Professores" stroke="#1eb996" fillOpacity={1} fill="url(#colorTeachers)" strokeWidth={2} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -862,7 +862,7 @@ export default function AdminGeneralAnalytics({
                   <Tooltip
                     contentStyle={{ backgroundColor: '#171717', borderColor: '#404040', borderRadius: '12px', fontSize: '12px' }}
                   />
-                  <Bar dataKey="Alunos" fill="#10b981" radius={[6, 6, 0, 0]} />
+                  <Bar dataKey="Alunos" fill="#1eb996" radius={[6, 6, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>

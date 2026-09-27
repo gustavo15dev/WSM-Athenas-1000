@@ -23,6 +23,7 @@ import { MockExam, MockExamQuestion, MockSubmission } from '../types';
 import { logSystemAction } from '../utils/auditLogger';
 import { parseExamSettings } from '../utils/examSettings';
 import { matchesStudentTarget } from '../utils/targetMatcher';
+import { areTurmasMatching } from '../utils/profileDb';
 
 interface StudentSimuladosProps {
   email: string;
@@ -555,15 +556,29 @@ export default function StudentSimulados({
 
       // 1. Fetch virtual classes the student is enrolled in
       let studentVirtualClasses: any[] = [];
+      let allDbVClasses: any[] = [];
       try {
         const { data: dbVCls } = await supabase
           .from('wsm_virtual_classes')
           .select('*');
         if (dbVCls) {
-          studentVirtualClasses = dbVCls.filter((vc: any) =>
-            vc.student_emails &&
-            vc.student_emails.map((e: string) => String(e).toLowerCase().trim()).includes(cleanEmail)
-          );
+          allDbVClasses = dbVCls;
+          studentVirtualClasses = dbVCls.filter((vc: any) => {
+            let emails: string[] = [];
+            if (Array.isArray(vc.student_emails)) {
+              emails = vc.student_emails.map((e: any) => String(e).toLowerCase().trim());
+            } else if (typeof vc.student_emails === 'string') {
+              try {
+                const parsed = JSON.parse(vc.student_emails);
+                if (Array.isArray(parsed)) emails = parsed.map((e: any) => String(e).toLowerCase().trim());
+              } catch {
+                emails = vc.student_emails.split(',').map((s: string) => s.trim().toLowerCase()).filter(Boolean);
+              }
+            }
+            const hasEmail = emails.includes(cleanEmail);
+            const matchesCohort = effectiveClass ? areTurmasMatching(vc.name, effectiveClass) || vc.access_code === effectiveClass : false;
+            return hasEmail || matchesCohort;
+          });
         }
       } catch (vcErr) {
         console.warn("Could not load virtual classes in StudentSimulados:", vcErr);
@@ -622,10 +637,20 @@ export default function StudentSimulados({
         .order('created_at', { ascending: false });
 
       if (!exErr && dbExams) {
-        // Find if studentClass matches any virtual class the student is in (by name or ID)
+        // Find if studentClass matches any virtual class the student is in (by name, ID or access code)
         const selectedVC = isRoomContext
-          ? studentVirtualClasses.find((vc: any) => vc.name === studentClass || vc.id === studentClass)
+          ? (allDbVClasses.find((vc: any) => vc.name === studentClass || vc.id === studentClass || vc.access_code === studentClass || areTurmasMatching(vc.name, studentClass)) ||
+             studentVirtualClasses.find((vc: any) => vc.name === studentClass || vc.id === studentClass || vc.access_code === studentClass || areTurmasMatching(vc.name, studentClass)))
           : undefined;
+
+        const studentVCIdentifiers: string[] = [];
+        studentVirtualClasses.forEach((vc: any) => {
+          if (vc.id) studentVCIdentifiers.push(vc.id);
+          if (vc.name) studentVCIdentifiers.push(vc.name);
+          if (vc.access_code) studentVCIdentifiers.push(vc.access_code);
+        });
+        if (effectiveClass) studentVCIdentifiers.push(effectiveClass);
+        if (studentClass) studentVCIdentifiers.push(studentClass);
 
         const filteredExams = dbExams.filter((exam: any) => {
           // ALWAYS include exams that the student has already submitted or started
@@ -637,21 +662,21 @@ export default function StudentSimulados({
           const target = exam.class_name;
           if (!target) return false;
 
-          if (isRoomContext && selectedVC) {
+          if (isRoomContext) {
+            const roomIdentifiers = [
+              studentClass,
+              selectedVC?.id,
+              selectedVC?.name,
+              selectedVC?.access_code
+            ].filter(Boolean) as string[];
+
             return matchesStudentTarget(
               target,
               cleanEmail,
-              effectiveClass,
-              [selectedVC.id, selectedVC.name, selectedVC.access_code]
+              studentClass || effectiveClass,
+              roomIdentifiers
             );
           }
-
-          const studentVCIdentifiers: string[] = [];
-          studentVirtualClasses.forEach((vc: any) => {
-            if (vc.id) studentVCIdentifiers.push(vc.id);
-            if (vc.name) studentVCIdentifiers.push(vc.name);
-            if (vc.access_code) studentVCIdentifiers.push(vc.access_code);
-          });
 
           return matchesStudentTarget(target, cleanEmail, effectiveClass, studentVCIdentifiers);
         });
@@ -1732,7 +1757,7 @@ export default function StudentSimulados({
                         const isResuming = subForExam?.telemetry?.is_unfinished === true;
 
                         return (
-                          <div key={exam.id} className="p-5 rounded-2xl bg-gradient-to-br from-emerald-950/40 via-neutral-950/90 to-neutral-950 border border-emerald-500/50 hover:border-emerald-400 transition-all flex flex-col justify-between space-y-4 shadow-[0_0_25px_rgba(16,185,129,0.18)] hover:shadow-[0_0_35px_rgba(16,185,129,0.3)] relative overflow-hidden group">
+                          <div key={exam.id} className="p-5 rounded-2xl bg-gradient-to-br from-emerald-950/40 via-neutral-950/90 to-neutral-950 border border-emerald-500/50 hover:border-emerald-400 transition-all flex flex-col justify-between space-y-4 shadow-[0_0_25px_rgba(30, 185, 150,0.18)] hover:shadow-[0_0_35px_rgba(30, 185, 150,0.3)] relative overflow-hidden group">
                             {/* Glowing radial background highlight */}
                             <div className="absolute top-0 right-0 w-36 h-36 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none group-hover:bg-emerald-500/25 transition-all" />
 

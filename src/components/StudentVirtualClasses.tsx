@@ -398,7 +398,7 @@ export default function StudentVirtualClasses({
                   key={clsName}
                   className={`p-5 rounded-2xl bg-neutral-900/40 border transition-all flex flex-col justify-between space-y-4 group hover:bg-neutral-900/70 relative ${
                     isActive
-                      ? "border-emerald-500/50 ring-1 ring-emerald-500/30 bg-emerald-950/10 shadow-[0_0_15px_rgba(16,185,129,0.1)]"
+                      ? "border-emerald-500/50 ring-1 ring-emerald-500/30 bg-emerald-950/10 shadow-[0_0_15px_rgba(30, 185, 150,0.1)]"
                       : hasNotif 
                       ? "border-red-500/50 shadow-[0_0_15px_rgba(239,68,68,0.15)]"
                       : "border-neutral-855 hover:border-emerald-500/25"

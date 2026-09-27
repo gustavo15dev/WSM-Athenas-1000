@@ -16,7 +16,7 @@ export default function SleekDashboard({ email, role, onLogout }: SleekDashboard
     <div className="relative min-h-screen bg-[#050505] text-white flex font-sans overflow-hidden">
       
       {/* Decorative Blur Spheres for Aesthetic Depth */}
-      <div className="absolute top-[-10%] right-[-10%] w-[400px] h-[400px] bg-[#10b981]/5 rounded-full blur-[100px] pointer-events-none" />
+      <div className="absolute top-[-10%] right-[-10%] w-[400px] h-[400px] bg-[#1eb996]/5 rounded-full blur-[100px] pointer-events-none" />
       <div className="absolute bottom-[-10%] left-[20%] w-[350px] h-[350px] bg-emerald-950/15 rounded-full blur-[120px] pointer-events-none" />
 
       {/* LEFT SIDEBAR */}
@@ -33,7 +33,7 @@ export default function SleekDashboard({ email, role, onLogout }: SleekDashboard
           <div className="flex items-center space-x-3 pb-6 border-b border-white/5">
             <div className="w-10 h-10 bg-gradient-to-b from-neutral-900 to-neutral-950 border border-emerald-500/20 rounded-xl flex items-center justify-center shrink-0 overflow-hidden">
               <img
-                src="https://i.ibb.co/JW6tx1k6/Chat-GPT-Image-21-de-jun-de-2026-17-21-07-removebg-preview.png"
+                src="https://res.cloudinary.com/dqx8p8orf/image/upload/f_auto/q_auto/gallery_image_20260927_114822-sem-mexer-em-mais-nada-nesse-boneco-mantenha-a-con-removebg-preview_3_ewaz6x.png"
                 alt="Logo"
                 referrerPolicy="no-referrer"
                 className="w-14 h-14 max-w-none object-contain select-none"
@@ -43,7 +43,7 @@ export default function SleekDashboard({ email, role, onLogout }: SleekDashboard
               <span className="text-sm font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-emerald-400">
                 Athenas
               </span>
-              <p className="text-[9px] text-[#10b981]/60 uppercase tracking-[0.2em] font-mono leading-none mt-0.5">
+              <p className="text-[9px] text-[#1eb996]/60 uppercase tracking-[0.2em] font-mono leading-none mt-0.5">
                 Cognitive Portal
               </p>
             </div>
@@ -51,10 +51,6 @@ export default function SleekDashboard({ email, role, onLogout }: SleekDashboard
 
           {/* Empty Sidebar State Indicator with Delicate Dashed Container */}
           <div className="space-y-4 pt-4">
-            <span className="text-[9px] uppercase tracking-[0.25em] text-white/30 font-semibold block px-2">
-              Menu Principal
-            </span>
-            
             <div className="border border-dashed border-white/5 rounded-2xl p-6 text-center space-y-3 bg-white/[0.01]">
               <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center mx-auto text-white/20">
                 <Layout className="w-4 h-4" />
@@ -84,7 +80,7 @@ export default function SleekDashboard({ email, role, onLogout }: SleekDashboard
               
               <div className="flex items-center gap-1.5 mt-0.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                <span className="text-[9px] uppercase tracking-wider text-[#10b981] font-mono font-bold">
+                <span className="text-[9px] uppercase tracking-wider text-[#1eb996] font-mono font-bold">
                   {isStudent ? 'Aluno' : 'Professor'}
                 </span>
               </div>
@@ -133,7 +129,7 @@ export default function SleekDashboard({ email, role, onLogout }: SleekDashboard
               transition={{ duration: 0.6 }}
               className="inline-flex items-center gap-2 px-3 py-1 bg-white/[0.02] border border-white/5 rounded-full"
             >
-              <span className="w-2 h-2 rounded-full bg-[#10b981] animate-ping" />
+              <span className="w-2 h-2 rounded-full bg-[#1eb996] animate-ping" />
               <span className="text-[10px] text-white/60 tracking-wider">Configuração de Credenciais Concluída</span>
             </motion.div>
 
@@ -143,7 +139,7 @@ export default function SleekDashboard({ email, role, onLogout }: SleekDashboard
               transition={{ delay: 0.1, duration: 0.6 }}
               className="text-4xl md:text-5xl lg:text-6xl font-black tracking-tight leading-none"
             >
-              Olá, <span className="text-[#10b981] font-extrabold">{email || 'Estudante'}</span>.
+              Olá, <span className="text-[#1eb996] font-extrabold">{email || 'Estudante'}</span>.
             </motion.h1>
 
             <motion.p 
@@ -164,7 +160,7 @@ export default function SleekDashboard({ email, role, onLogout }: SleekDashboard
             className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4"
           >
             <div className="p-6 rounded-2xl bg-white/[0.01] border border-white/5 space-y-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-[#10b981]">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-[#1eb996]">
                 <BookOpen className="w-5 h-5" />
               </div>
               <h3 className="text-sm font-bold text-white">Cronograma & Diários</h3>
@@ -174,7 +170,7 @@ export default function SleekDashboard({ email, role, onLogout }: SleekDashboard
             </div>
 
             <div className="p-6 rounded-2xl bg-white/[0.01] border border-white/5 space-y-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-[#10b981]">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-[#1eb996]">
                 <Compass className="w-5 h-5" />
               </div>
               <h3 className="text-sm font-bold text-white">Próximo Passo no Athenas</h3>
@@ -189,7 +185,7 @@ export default function SleekDashboard({ email, role, onLogout }: SleekDashboard
         <div className="text-center pt-8 border-t border-white/5 flex flex-col md:flex-row justify-between items-center text-[10px] text-neutral-500 tracking-wider uppercase font-mono">
           <span> ATHENAS COGNITIVE SYSTEMS © 2026.1</span>
           <span className="flex items-center gap-1.5 mt-2 md:mt-0">
-            <Globe className="w-3.5 h-3.5 text-[#10b981]/80" />
+            <Globe className="w-3.5 h-3.5 text-[#1eb996]/80" />
             <span>Região Ativa: Central de Dados</span>
           </span>
         </div>

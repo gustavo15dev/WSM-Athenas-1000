@@ -46,6 +46,7 @@ CREATE TABLE public.wsm_user_profiles (
     materia TEXT DEFAULT 'Computação', -- Disciplina lecionada pelo docente
     senha_plana TEXT DEFAULT '123456', -- Exibe/edita e realiza login facilitado com a senha real da conta
     notification_gmail TEXT,
+    welcome_modal_dismissed BOOLEAN DEFAULT false,
     created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 

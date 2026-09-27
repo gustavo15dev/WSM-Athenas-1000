@@ -2234,7 +2234,7 @@ export default function TeacherSimulados({
                 onClick={() => { setErrorMsg(''); setCurrentStep(1); }}
                 className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
                   currentStep === 1
-                    ? 'bg-emerald-500/10 border-emerald-500 text-emerald-300 shadow-[0_0_20px_rgba(16,185,129,0.15)]'
+                    ? 'bg-emerald-500/10 border-emerald-500 text-emerald-300 shadow-[0_0_20px_rgba(30, 185, 150,0.15)]'
                     : currentStep > 1
                     ? 'bg-neutral-900/60 border-emerald-500/30 text-neutral-300'
                     : 'bg-neutral-950/40 border-neutral-900 text-neutral-500 hover:text-neutral-300'
@@ -2264,7 +2264,7 @@ export default function TeacherSimulados({
                 }}
                 className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
                   currentStep === 2
-                    ? 'bg-emerald-500/10 border-emerald-500 text-emerald-300 shadow-[0_0_20px_rgba(16,185,129,0.15)]'
+                    ? 'bg-emerald-500/10 border-emerald-500 text-emerald-300 shadow-[0_0_20px_rgba(30, 185, 150,0.15)]'
                     : currentStep > 2
                     ? 'bg-neutral-900/60 border-emerald-500/30 text-neutral-300'
                     : 'bg-neutral-950/40 border-neutral-900 text-neutral-500 hover:text-neutral-300'
@@ -2299,7 +2299,7 @@ export default function TeacherSimulados({
                 }}
                 className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
                   currentStep === 3
-                    ? 'bg-emerald-500/10 border-emerald-500 text-emerald-300 shadow-[0_0_20px_rgba(16,185,129,0.15)]'
+                    ? 'bg-emerald-500/10 border-emerald-500 text-emerald-300 shadow-[0_0_20px_rgba(30, 185, 150,0.15)]'
                     : currentStep > 3
                     ? 'bg-neutral-900/60 border-emerald-500/30 text-neutral-300'
                     : 'bg-neutral-950/40 border-neutral-900 text-neutral-500 hover:text-neutral-300'
@@ -2333,7 +2333,7 @@ export default function TeacherSimulados({
                 }}
                 className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
                   currentStep === 4
-                    ? 'bg-emerald-500/10 border-emerald-500 text-emerald-300 shadow-[0_0_20px_rgba(16,185,129,0.15)]'
+                    ? 'bg-emerald-500/10 border-emerald-500 text-emerald-300 shadow-[0_0_20px_rgba(30, 185, 150,0.15)]'
                     : 'bg-neutral-950/40 border-neutral-900 text-neutral-500 hover:text-neutral-300'
                 }`}
               >

@@ -66,6 +66,9 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
+const LOGO_OPEN = "https://res.cloudinary.com/dqx8p8orf/image/upload/f_auto/q_auto/gallery_image_20260927_114822-sem-mexer-em-mais-nada-nesse-boneco-mantenha-a-con-removebg-preview_3_ewaz6x.png";
+const LOGO_CLOSED = "https://res.cloudinary.com/dqx8p8orf/image/upload/f_auto/q_auto/boneco_olhos_fechados_cutout_1_mmguon.png";
+
 const sanitizeAndNormalizeContent = (text: string) => {
   if (!text) return '';
   return text
@@ -76,10 +79,12 @@ const sanitizeAndNormalizeContent = (text: string) => {
 
 const ChatMessageItem = React.memo(({ 
   msg,
-  onOpenSources
+  onOpenSources,
+  isBlinking = false
 }: { 
   msg: ChatMessage;
   onOpenSources?: (sources: WebSource[], targetUrl?: string) => void;
+  isBlinking?: boolean;
 }) => {
   const [copied, setCopied] = useState(false);
 
@@ -163,10 +168,10 @@ const ChatMessageItem = React.memo(({
             <div className="flex items-center gap-2">
               <div className="w-6 h-6 flex items-center justify-center shrink-0 overflow-hidden">
                 <img
-                  src="https://i.ibb.co/JW6tx1k6/Chat-GPT-Image-21-de-jun-de-2026-17-21-07-removebg-preview.png"
+                  src={isBlinking ? LOGO_CLOSED : LOGO_OPEN}
                   alt="Athenas"
                   referrerPolicy="no-referrer"
-                  className="w-7 h-7 max-w-none object-contain select-none"
+                  className="w-7 h-7 max-w-none object-contain select-none transition-all duration-75"
                 />
               </div>
               <span className="text-[11px] font-bold tracking-wide uppercase text-neutral-400 font-mono">
@@ -269,6 +274,48 @@ export default function WsmChat({
   const [isLoading, setIsLoading] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [isBlinking, setIsBlinking] = useState(false);
+
+  // Preload and manage the mascot double-blink cycle:
+  // 1. Imagem 1 (Aberta): 3 segundos
+  // 2. Imagem 2 (Fechada): 0.2 segundos
+  // 3. Imagem 1 (Aberta): 1 segundo
+  // 4. Imagem 2 (Fechada): 0.2 segundos
+  // 5. Retorna à Imagem 1 e reinicia o loop infinito
+  useEffect(() => {
+    const preloadOpen = new Image();
+    preloadOpen.src = LOGO_OPEN;
+    const preloadClosed = new Image();
+    preloadClosed.src = LOGO_CLOSED;
+
+    let timer: NodeJS.Timeout;
+
+    const step1OpenLong = () => {
+      setIsBlinking(false);
+      timer = setTimeout(step2CloseFirst, 3000); // 3s aberta
+    };
+
+    const step2CloseFirst = () => {
+      setIsBlinking(true);
+      timer = setTimeout(step3OpenShort, 200); // 0.2s fechada
+    };
+
+    const step3OpenShort = () => {
+      setIsBlinking(false);
+      timer = setTimeout(step4CloseSecond, 1000); // 1s aberta
+    };
+
+    const step4CloseSecond = () => {
+      setIsBlinking(true);
+      timer = setTimeout(step1OpenLong, 200); // 0.2s fechada -> volta ao início
+    };
+
+    step1OpenLong();
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, []);
 
   // Sidebar Layout controls
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -1381,12 +1428,12 @@ export default function WsmChat({
             /* EMPTY STATE: Welcoming mascot screen */
             <div className="flex flex-col items-center justify-center h-full py-6 px-6 max-w-2xl mx-auto w-full text-center animate-fadeIn space-y-6 select-none overflow-hidden">
               <div className="space-y-4">
-                <div className="w-20 h-20 bg-emerald-500/10 border border-emerald-500/20 rounded-full flex items-center justify-center mx-auto shadow-2xl shadow-emerald-500/10">
+                <div className="w-24 h-24 flex items-center justify-center mx-auto">
                   <img
-                    src="https://i.ibb.co/JW6tx1k6/Chat-GPT-Image-21-de-jun-de-2026-17-21-07-removebg-preview.png"
+                    src={isBlinking ? LOGO_CLOSED : LOGO_OPEN}
                     alt="Athenas"
                     referrerPolicy="no-referrer"
-                    className="w-28 h-28 max-w-none object-contain select-none scale-105"
+                    className="w-24 h-24 object-contain select-none drop-shadow-[0_0_15px_rgba(30,185,150,0.25)] transition-all duration-75"
                   />
                 </div>
                 <div>
@@ -1405,6 +1452,7 @@ export default function WsmChat({
                   key={msg.id} 
                   msg={msg} 
                   onOpenSources={handleOpenSources}
+                  isBlinking={isBlinking}
                 />
               ))}
 
@@ -1415,10 +1463,10 @@ export default function WsmChat({
                     <div className="flex items-center gap-2">
                       <div className="w-6 h-6 flex items-center justify-center shrink-0 overflow-hidden">
                         <img
-                          src="https://i.ibb.co/JW6tx1k6/Chat-GPT-Image-21-de-jun-de-2026-17-21-07-removebg-preview.png"
+                          src={isBlinking ? LOGO_CLOSED : LOGO_OPEN}
                           alt="Athenas"
                           referrerPolicy="no-referrer"
-                          className="w-7 h-7 max-w-none object-contain select-none"
+                          className="w-7 h-7 max-w-none object-contain select-none transition-all duration-75"
                         />
                       </div>
                       <span className="text-[11px] font-bold tracking-wide uppercase text-neutral-400 font-mono">WSM Athenas</span>

@@ -615,10 +615,10 @@ export default function ClassChat({
     async function loadContacts() {
       setLoadingContacts(true);
       try {
-        // Fetch all user profiles from wsm_user_profiles
+        // Fetch all user profiles from wsm_user_profiles including school and role
         const { data: profiles, error } = await supabase
           .from('wsm_user_profiles')
-          .select('id, nome_completo, turma, anos_lecionados, materia, email');
+          .select('id, nome_completo, turma, anos_lecionados, materia, email, escola, role');
 
         let rawList: any[] = profiles || [];
 
@@ -631,6 +631,7 @@ export default function ClassChat({
         const myProfile = rawList.find(
           p => p.email && p.email.toLowerCase().trim() === myEmailLower
         );
+        const mySchool = myProfile?.escola ? myProfile.escola.toLowerCase().trim() : '';
 
         // Filter out current user
         let filteredProfiles = rawList.filter(
@@ -664,17 +665,26 @@ export default function ClassChat({
           filteredProfiles = filteredProfiles.filter(p => {
             const pEmail = (p.email || '').toLowerCase().trim();
             if (pEmail.endsWith('@example.com') || pEmail.endsWith('@atenas.com')) return false;
+            const pSchool = p.escola ? p.escola.toLowerCase().trim() : '';
+
+            // If schools are defined and different, only allow if they are in the same virtual class
+            const isSameSchool = mySchool && pSchool ? mySchool === pSchool : true;
+
             const pTaughtClean = parseAnosLecionados(p.anos_lecionados);
             const isTeacher = pTaughtClean.length > 0 || Boolean(p.materia) || pEmail.includes('prof') || p.role === 'teacher';
 
             if (isTeacher) {
               const teachesMyTurma = myTurma ? pTaughtClean.some(cls => areTurmasMatching(cls, myTurma)) : false;
               const ownsVirtualClass = myVClassTeachers.includes(pEmail);
-              return teachesMyTurma || ownsVirtualClass || !myTurma;
+              const sameSchoolTeacher = isSameSchool && (mySchool.length > 0);
+              return teachesMyTurma || ownsVirtualClass || sameSchoolTeacher;
             } else {
+              // Student peer: must be in the same virtual class OR same official turma
               if (myVClassStudents.has(pEmail)) return true;
-              if (!myTurma || !p.turma) return true; // If turma not set yet, show school peers
-              return areTurmasMatching(p.turma, myTurma);
+              if (myTurma && p.turma && areTurmasMatching(p.turma, myTurma)) {
+                return isSameSchool;
+              }
+              return false;
             }
           });
         } else {
@@ -697,21 +707,23 @@ export default function ClassChat({
           filteredProfiles = filteredProfiles.filter(p => {
             const pEmail = (p.email || '').toLowerCase().trim();
             if (pEmail.endsWith('@example.com') || pEmail.endsWith('@atenas.com')) return false;
+            const pSchool = p.escola ? p.escola.toLowerCase().trim() : '';
+            const isSameSchool = mySchool && pSchool ? mySchool === pSchool : true;
+
             const pTaughtClean = parseAnosLecionados(p.anos_lecionados);
             const isTeacher = pTaughtClean.length > 0 || Boolean(p.materia) || pEmail.includes('prof') || p.role === 'teacher';
 
             if (isTeacher) {
-              // Other teacher shares at least one taught turma with this teacher OR shares a virtual class
-              if (combinedTaughtClasses.length === 0) return true;
+              // Other teacher shares at least one taught turma with this teacher OR shares a virtual class OR same school
               const sharesTaughtClass = pTaughtClean.some(t => combinedTaughtClasses.some(ct => areTurmasMatching(t, ct)));
               const sharesVirtualClass = myCreatedVClasses.some(vc => (vc.teacher_email || '').toLowerCase().trim() === pEmail);
-              return sharesTaughtClass || sharesVirtualClass;
+              const isSameSchoolTeacher = isSameSchool && (mySchool.length > 0);
+              return sharesTaughtClass || sharesVirtualClass || isSameSchoolTeacher;
             } else {
               // Student belongs to teacher's taught classes OR is in teacher's virtual class
-              if (combinedTaughtClasses.length === 0 && myVClassStudents.size === 0) return true;
               const matchesTaughtClass = p.turma && combinedTaughtClasses.some(ct => areTurmasMatching(p.turma, ct));
               const matchesVClassStudent = myVClassStudents.has(pEmail);
-              return matchesTaughtClass || matchesVClassStudent || combinedTaughtClasses.length === 0;
+              return matchesTaughtClass || matchesVClassStudent;
             }
           });
         }

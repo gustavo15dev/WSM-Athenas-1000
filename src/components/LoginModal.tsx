@@ -565,7 +565,8 @@ export default function LoginModal({ role, onBack, onLoginSuccess }: LoginModalP
               turma: role === 'student' ? validClassName : null,
               numero_chamada: role === 'student' ? parseInt(numeroChamada, 10) : null,
               anos_lecionados: role === 'teacher' ? turmasProfessor : null,
-              materia: role === 'teacher' ? (materiaProfessor.trim() || 'Biologia') : null
+              materia: role === 'teacher' ? (materiaProfessor.trim() || 'Biologia') : null,
+              welcome_modal_dismissed: role === 'student' ? Boolean(validClassName) : true
             }
           }
         });
@@ -592,7 +593,8 @@ export default function LoginModal({ role, onBack, onLoginSuccess }: LoginModalP
             turma: role === 'student' ? validClassName : null,
             numero_chamada: role === 'student' ? parseInt(numeroChamada, 10) : null,
             anos_lecionados: role === 'teacher' ? turmasProfessor : null,
-            materia: role === 'teacher' ? (materiaProfessor.trim() || 'Biologia') : null
+            materia: role === 'teacher' ? (materiaProfessor.trim() || 'Biologia') : null,
+            welcome_modal_dismissed: role === 'student' ? Boolean(validClassName) : true
           };
 
           const { error: profileError } = await safeUpsertUserProfile(profilePayload);
@@ -856,7 +858,7 @@ export default function LoginModal({ role, onBack, onLoginSuccess }: LoginModalP
                     initial={{ scale: 0.9, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     transition={{ delay: 0.1, duration: 0.5 }}
-                    src="https://i.ibb.co/JW6tx1k6/Chat-GPT-Image-21-de-jun-de-2026-17-21-07-removebg-preview.png"
+                    src="https://res.cloudinary.com/dqx8p8orf/image/upload/f_auto/q_auto/gallery_image_20260927_114822-sem-mexer-em-mais-nada-nesse-boneco-mantenha-a-con-removebg-preview_3_ewaz6x.png"
                     alt="Mascote WSM Athenas"
                     referrerPolicy="no-referrer"
                     className="w-20 h-20 object-contain select-none drop-shadow-[0_0_15px_rgba(2,195,154,0.25)]"

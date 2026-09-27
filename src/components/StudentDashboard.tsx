@@ -71,7 +71,7 @@ import BrowserNotificationPrompt from './BrowserNotificationPrompt';
 import VirtualNotebook from './VirtualNotebook';
 import { startRealtimeNotificationListener } from '../utils/browserNotifications';
 import { supabase } from '../supabase';
-import { safeUpsertUserProfile, areTurmasMatching } from '../utils/profileDb';
+import { safeUpsertUserProfile, areTurmasMatching, setWelcomeModalDismissedInDb } from '../utils/profileDb';
 
 interface StudentDashboardProps {
   email: string;
@@ -687,6 +687,7 @@ export default function StudentDashboard({
     email?: string;
     escola?: string;
     notification_gmail?: string;
+    welcome_modal_dismissed?: boolean;
   } | null>(null);
 
   // Real-time student presence states
@@ -923,7 +924,7 @@ export default function StudentDashboard({
           try {
             const { data: mExams } = await supabase
               .from("wsm_mock_exams")
-              .select("id, questions, total_points");
+              .select("id, questions");
             if (mExams) dbMockExams = mExams;
           } catch (err) {
             console.warn("Could not load mock exams for student analytics:", err);
@@ -978,7 +979,7 @@ export default function StudentDashboard({
         try {
           const { data, error } = await supabase
             .from('wsm_user_profiles')
-            .select('id, nome_completo, turma, numero_chamada, email, notification_gmail')
+            .select('id, nome_completo, turma, numero_chamada, email, notification_gmail, welcome_modal_dismissed')
             .ilike('email', emailClean)
             .maybeSingle();
           if (error) {
@@ -988,6 +989,22 @@ export default function StudentDashboard({
           }
         } catch (err) {
           dbError = err;
+        }
+
+        if (dbError || !profileData) {
+          try {
+            const { data } = await supabase
+              .from('wsm_user_profiles')
+              .select('id, nome_completo, turma, numero_chamada, email, notification_gmail')
+              .ilike('email', emailClean)
+              .maybeSingle();
+            if (data) {
+              profileData = data;
+              dbError = null;
+            }
+          } catch (fbErr1) {
+            // fallback
+          }
         }
 
         if (dbError || !profileData) {
@@ -1010,10 +1027,12 @@ export default function StudentDashboard({
 
         // 2. Discover enrolled virtual class if not yet bound
         let discoveredTurma = profileData?.turma || authMeta.turma || localTurma || '';
+        let vClasses: any[] | null = null;
         try {
-          const { data: vClasses } = await supabase
+          const { data } = await supabase
             .from('wsm_virtual_classes')
             .select('id, name, access_code, student_emails');
+          vClasses = data;
           if (vClasses && vClasses.length > 0) {
             const foundClass = vClasses.find((vc: any) => {
               let emails: string[] = [];
@@ -1060,6 +1079,44 @@ export default function StudentDashboard({
         const resolvedEscola = profileData?.escola || authMeta.escola || localEscola || '';
         const resolvedNotificationGmail = profileData?.notification_gmail || localGmail || null;
 
+        // Check database / auth metadata / local cache for welcome card dismissal
+        const isDismissedInAuth = authMeta.welcome_modal_dismissed === true;
+        const isDismissedInProfile = profileData?.welcome_modal_dismissed === true;
+        const localDismissed = localStorage.getItem(`wsm_dismissed_welcome_modal_${emailClean}`) === 'true';
+        const isAlreadyDismissed = isDismissedInAuth || isDismissedInProfile || localDismissed;
+
+        let hasEnrolledVClasses = false;
+        try {
+          if (vClasses && vClasses.length > 0) {
+            hasEnrolledVClasses = vClasses.some((vc: any) => {
+              let emails: string[] = [];
+              if (Array.isArray(vc.student_emails)) emails = vc.student_emails;
+              else if (typeof vc.student_emails === 'string') {
+                try { emails = JSON.parse(vc.student_emails); } catch { emails = vc.student_emails.split(',').map((s: string) => s.trim()); }
+              }
+              return emails.some((e: string) => e && e.toLowerCase().trim() === emailClean);
+            });
+          }
+        } catch {}
+
+        const hasAnyClassOrTurma = Boolean(
+          (resolvedTurma && resolvedTurma.trim() !== '') ||
+          (profileData?.turma && profileData.turma.trim() !== '') ||
+          (discoveredTurma && discoveredTurma.trim() !== '') ||
+          hasEnrolledVClasses
+        );
+
+        if (isAlreadyDismissed || hasAnyClassOrTurma) {
+          setShowNoRoomModal(false);
+          // If the user already has a class or was dismissed on another device, persist to DB in background
+          if (!isDismissedInAuth || !isDismissedInProfile) {
+            setWelcomeModalDismissedInDb(emailClean, profileData?.id);
+          }
+        } else {
+          // Genuinely first time access: student has no room and has not seen the modal
+          setShowNoRoomModal(true);
+        }
+
         if (profileData) {
           // Persist back to database if we healed missing turma or calling number
           if (resolvedTurma && (!profileData.turma || profileData.numero_chamada === null || profileData.numero_chamada === undefined)) {
@@ -1080,7 +1137,8 @@ export default function StudentDashboard({
             numero_chamada: resolvedChamada,
             email: profileData.email || emailClean,
             escola: resolvedEscola,
-            notification_gmail: resolvedNotificationGmail
+            notification_gmail: resolvedNotificationGmail,
+            welcome_modal_dismissed: isAlreadyDismissed || hasAnyClassOrTurma
           });
 
           // Sync active turma
@@ -1396,7 +1454,7 @@ export default function StudentDashboard({
           .select('*');
         if (allVCls) {
           const cleanEmail = email.toLowerCase().trim();
-          // First check direct enrollment in virtual classes
+          // 1. Direct enrollment in virtual classes
           const directlyEnrolled = allVCls.filter((vc: any) => {
             let vcEmails: string[] = [];
             if (Array.isArray(vc.student_emails)) vcEmails = vc.student_emails;
@@ -1406,16 +1464,18 @@ export default function StudentDashboard({
             return vcEmails.some((e: any) => e && String(e).toLowerCase().trim() === cleanEmail);
           });
 
-          if (directlyEnrolled.length > 0) {
-            studentVirtualClassesList = directlyEnrolled;
-          } else {
-            // Fallback to turma name / access code match
-            studentVirtualClassesList = allVCls.filter((vc: any) => {
-              const matchesTurma = currentActiveTurma && (vc.name === currentActiveTurma || vc.access_code === currentActiveTurma);
-              const matchesOfficial = profile.turma && (vc.name === profile.turma || vc.access_code === profile.turma);
-              return matchesTurma || matchesOfficial;
-            });
-          }
+          // 2. Turma name / access code match
+          const matchedByTurma = allVCls.filter((vc: any) => {
+            const matchesTurma = currentActiveTurma && (areTurmasMatching(vc.name, currentActiveTurma) || vc.access_code === currentActiveTurma);
+            const matchesOfficial = profile.turma && (areTurmasMatching(vc.name, profile.turma) || vc.access_code === profile.turma);
+            return matchesTurma || matchesOfficial;
+          });
+
+          // Merge without duplicates
+          const combinedMap = new Map<string, any>();
+          directlyEnrolled.forEach(vc => combinedMap.set(vc.id || vc.name, vc));
+          matchedByTurma.forEach(vc => combinedMap.set(vc.id || vc.name, vc));
+          studentVirtualClassesList = Array.from(combinedMap.values());
 
           studentVirtualClassIds = studentVirtualClassesList.flatMap((vc: any) =>
             [vc.id, vc.name, vc.access_code, vc.teacher_email].filter(Boolean)
@@ -1760,19 +1820,13 @@ export default function StudentDashboard({
   const [welcomeJoinLoading, setWelcomeJoinLoading] = useState(false);
   const [welcomeJoinError, setWelcomeJoinError] = useState<string | null>(null);
   const [welcomeJoinSuccess, setWelcomeJoinSuccess] = useState<string | null>(null);
-  const [showNoRoomModal, setShowNoRoomModal] = useState<boolean>(() => {
-    try {
-      const clean = (email || '').toLowerCase().trim();
-      return localStorage.getItem(`wsm_dismissed_welcome_modal_${clean}`) !== 'true';
-    } catch {
-      return true;
-    }
-  });
+  // Default to false! It only appears AFTER verifying in the database that it has NEVER been dismissed
+  const [showNoRoomModal, setShowNoRoomModal] = useState<boolean>(false);
 
   const handleDismissWelcomeModal = () => {
     setShowNoRoomModal(false);
     const clean = (email || '').toLowerCase().trim();
-    localStorage.setItem(`wsm_dismissed_welcome_modal_${clean}`, 'true');
+    setWelcomeModalDismissedInDb(clean, profile?.id);
   };
 
   const handleJoinClassFromWelcomeCard = async (e: React.FormEvent) => {
@@ -1827,7 +1881,7 @@ export default function StudentDashboard({
 
       setActiveTurma(vClass.name);
       localStorage.setItem(`wsm_active_student_class_${cleanEmail}`, vClass.name);
-      localStorage.setItem(`wsm_dismissed_welcome_modal_${cleanEmail}`, 'true');
+      setWelcomeModalDismissedInDb(cleanEmail, profile?.id);
 
       setWelcomeJoinSuccess(`🎉 Sucesso! Você ingressou na turma "${vClass.name}". Carregando seus conteúdos...`);
       setWelcomeJoinCode('');
@@ -2009,7 +2063,7 @@ export default function StudentDashboard({
             </div>
           </div>
 
-          <div className="p-5 rounded-2xl bg-gradient-to-br from-emerald-500/5 to-emerald-500/0 border border-emerald-500/10 shadow-[0_4px_20px_rgba(16,185,129,0.02)] flex items-start gap-4">
+          <div className="p-5 rounded-2xl bg-gradient-to-br from-emerald-500/5 to-emerald-500/0 border border-emerald-500/10 shadow-[0_4px_20px_rgba(30, 185, 150,0.02)] flex items-start gap-4">
             <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl">
               <TrendingUp className="w-5 h-5" />
             </div>
@@ -2058,20 +2112,20 @@ export default function StudentDashboard({
           {analyticsData.examHistory && analyticsData.examHistory.length > 0 && (
             <div className="p-4 rounded-2xl bg-neutral-950/45 border border-neutral-900 mt-4">
               <span className="text-[10px] font-mono text-neutral-500 uppercase block font-bold mb-4">Evolução das Notas</span>
-              <div className="h-48 w-full">
-                <ResponsiveContainer width="100%" height="100%">
+              <div className="h-48 w-full min-w-0">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                   <AreaChart data={analyticsData.examHistory} margin={{ top: 10, right: 0, left: -25, bottom: 0 }}>
                     <defs>
                       <linearGradient id="colorScore" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                        <stop offset="5%" stopColor="#1eb996" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#1eb996" stopOpacity={0} />
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#262626" vertical={false} />
                     <XAxis dataKey="name" stroke="#525252" fontSize={9} tickLine={false} axisLine={false} />
                     <YAxis stroke="#525252" fontSize={9} tickLine={false} axisLine={false} domain={[0, 10]} />
                     <Tooltip content={<ScoreTooltip />} cursor={{ stroke: '#3f3f46', strokeWidth: 1, strokeDasharray: '4 4' }} />
-                    <Area type="monotone" dataKey="score" stroke="#10b981" strokeWidth={2} fillOpacity={1} fill="url(#colorScore)" />
+                    <Area type="monotone" dataKey="score" stroke="#1eb996" strokeWidth={2} fillOpacity={1} fill="url(#colorScore)" />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
@@ -2218,7 +2272,7 @@ export default function StudentDashboard({
                     onClick={() => setAnalyticsChartTab(tab)}
                     className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-xl border cursor-pointer transition-all ${
                       analyticsChartTab === tab
-                        ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-400 font-black shadow-[0_0_15px_rgba(16,185,129,0.05)]'
+                        ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-400 font-black shadow-[0_0_15px_rgba(30, 185, 150,0.05)]'
                         : 'bg-transparent border-transparent text-neutral-550 hover:text-neutral-300 hover:bg-neutral-900/20'
                     }`}
                   >
@@ -2228,35 +2282,35 @@ export default function StudentDashboard({
               </div>
             </div>
 
-            <div className="h-64 w-full">
-              <ResponsiveContainer width="100%" height="100%">
+            <div className="h-64 w-full min-w-0">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                 {analyticsChartTab === 'semanal' ? (
                   <AreaChart data={analyticsData.semanas} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
                     <defs>
                       <linearGradient id="studentColorTempo" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.25} />
-                        <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
+                        <stop offset="5%" stopColor="#1eb996" stopOpacity={0.25} />
+                        <stop offset="95%" stopColor="#1eb996" stopOpacity={0.0} />
                       </linearGradient>
                     </defs>
                     <CartesianGrid stroke="#171717" strokeDasharray="3 3" vertical={false} />
                     <XAxis dataKey="name" stroke="#525252" fontSize={10} fontStyle="italic" dy={8} />
                     <YAxis stroke="#525252" fontSize={10} unit=" min" />
                     <Tooltip content={<CustomTooltip />} />
-                    <Area type="monotone" dataKey="tempo" stroke="#10b981" strokeWidth={2.5} fillOpacity={1} fill="url(#studentColorTempo)" />
+                    <Area type="monotone" dataKey="tempo" stroke="#1eb996" strokeWidth={2.5} fillOpacity={1} fill="url(#studentColorTempo)" />
                   </AreaChart>
                 ) : analyticsChartTab === 'mensal' ? (
                   <AreaChart data={analyticsData.meses} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
                     <defs>
                       <linearGradient id="studentColorTempoMensal" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.25} />
-                        <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
+                        <stop offset="5%" stopColor="#1eb996" stopOpacity={0.25} />
+                        <stop offset="95%" stopColor="#1eb996" stopOpacity={0.0} />
                       </linearGradient>
                     </defs>
                     <CartesianGrid stroke="#171717" strokeDasharray="3 3" vertical={false} />
                     <XAxis dataKey="name" stroke="#525252" fontSize={10} fontStyle="italic" dy={8} />
                     <YAxis stroke="#525252" fontSize={10} unit=" min" />
                     <Tooltip content={<CustomTooltip />} />
-                    <Area type="monotone" dataKey="tempo" stroke="#10b981" strokeWidth={2.5} fillOpacity={1} fill="url(#studentColorTempoMensal)" />
+                    <Area type="monotone" dataKey="tempo" stroke="#1eb996" strokeWidth={2.5} fillOpacity={1} fill="url(#studentColorTempoMensal)" />
                   </AreaChart>
                 ) : analyticsChartTab === 'diario' ? (
                   <BarChart data={analyticsData.dias} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
@@ -2264,7 +2318,7 @@ export default function StudentDashboard({
                     <XAxis dataKey="name" stroke="#525252" fontSize={10} fontStyle="italic" dy={8} />
                     <YAxis stroke="#525252" fontSize={10} unit=" min" />
                     <Tooltip content={<CustomTooltip />} />
-                    <Bar dataKey="tempo" fill="#10b981" radius={[8, 8, 0, 0]} maxBarSize={32} />
+                    <Bar dataKey="tempo" fill="#1eb996" radius={[8, 8, 0, 0]} maxBarSize={32} />
                   </BarChart>
                 ) : (
                   <BarChart data={analyticsData.horarios} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
@@ -2272,7 +2326,7 @@ export default function StudentDashboard({
                     <XAxis dataKey="name" stroke="#525252" fontSize={10} fontStyle="italic" dy={8} />
                     <YAxis stroke="#525252" fontSize={10} unit=" min" />
                     <Tooltip content={<CustomTooltip />} />
-                    <Bar dataKey="tempo" fill="#10b981" radius={[8, 8, 0, 0]} maxBarSize={32} />
+                    <Bar dataKey="tempo" fill="#1eb996" radius={[8, 8, 0, 0]} maxBarSize={32} />
                   </BarChart>
                 )}
               </ResponsiveContainer>
@@ -2417,7 +2471,7 @@ export default function StudentDashboard({
                           </div>
                           <div className="h-2 w-full bg-neutral-950 border border-neutral-900 rounded-full overflow-hidden">
                             <div
-                              className={`h-full rounded-full transition-all duration-500 ${isLast ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.3)]' : 'bg-neutral-800'}`}
+                              className={`h-full rounded-full transition-all duration-500 ${isLast ? 'bg-emerald-500 shadow-[0_0_8px_rgba(30, 185, 150,0.3)]' : 'bg-neutral-800'}`}
                               style={{ width: `${pct}%` }}
                             />
                           </div>
@@ -2447,14 +2501,14 @@ export default function StudentDashboard({
           data-collapsed={isSidebarCollapsed}
           className={`${
             isSidebarCollapsed ? 'w-24 px-2.5 py-6' : 'w-64 p-6'
-          } h-full border-r border-emerald-950/20 bg-neutral-950/60 hidden md:flex flex-col shrink-0 justify-between z-30 overflow-y-auto scrollbar-none transition-all duration-300`}
+          } h-screen max-h-screen border-r border-emerald-950/20 bg-neutral-950/60 hidden md:flex flex-col shrink-0 justify-between z-30 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-neutral-800/70 scrollbar-track-transparent hover:scrollbar-thumb-neutral-700 transition-all duration-300`}
         >
         <div className="space-y-8">
           <div className={`flex ${isSidebarCollapsed ? 'flex-col items-center gap-4' : 'items-center justify-between gap-2 animate-fadeIn'}`}>
             <div className={`flex ${isSidebarCollapsed ? 'flex-col items-center' : 'items-center'} gap-3`}>
               <div className="w-11 h-11 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center justify-center shrink-0 overflow-hidden">
                 <img
-                  src="https://i.ibb.co/JW6tx1k6/Chat-GPT-Image-21-de-jun-de-2026-17-21-07-removebg-preview.png"
+                  src="https://res.cloudinary.com/dqx8p8orf/image/upload/f_auto/q_auto/gallery_image_20260927_114822-sem-mexer-em-mais-nada-nesse-boneco-mantenha-a-con-removebg-preview_3_ewaz6x.png"
                   alt="Logo"
                   referrerPolicy="no-referrer"
                   className="w-14 h-14 max-w-none object-contain select-none"
@@ -2482,9 +2536,7 @@ export default function StudentDashboard({
           </div>
 
           <div className="space-y-1.5">
-            {!isSidebarCollapsed ? (
-              <p className="text-[9px] text-neutral-500 uppercase tracking-widest font-mono font-bold pl-2 mb-2 animate-fadeIn">Menu Principal</p>
-            ) : (
+            {isSidebarCollapsed && (
               <div className="border-b border-emerald-950/25 my-3 mx-2" />
             )}
             
@@ -2506,14 +2558,14 @@ export default function StudentDashboard({
                   : 'w-full flex items-center justify-between px-3.5 py-2.5 text-xs'
               } rounded-xl font-semibold transition-all border cursor-pointer ${
                 activeTab === 'wsm_athenas'
-                  ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/60 font-bold shadow-[0_0_14px_rgba(16,185,129,0.12)]'
-                  : 'bg-emerald-500/[0.04] text-neutral-300 border-emerald-500/40 hover:bg-emerald-500/10 hover:border-emerald-500/70 hover:text-white shadow-[0_0_10px_rgba(16,185,129,0.04)]'
+                  ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/60 font-bold shadow-[0_0_14px_rgba(30, 185, 150,0.12)]'
+                  : 'bg-emerald-500/[0.04] text-neutral-300 border-emerald-500/40 hover:bg-emerald-500/10 hover:border-emerald-500/70 hover:text-white shadow-[0_0_10px_rgba(30, 185, 150,0.04)]'
               }`}
             >
               <div className={`${isSidebarCollapsed ? 'flex flex-col items-center gap-1' : 'flex items-center gap-3'}`}>
                 <div className={`${isSidebarCollapsed ? 'w-6 h-6' : 'w-5 h-5'} flex items-center justify-center shrink-0 overflow-hidden relative`}>
                   <img
-                    src="https://i.ibb.co/JW6tx1k6/Chat-GPT-Image-21-de-jun-de-2026-17-21-07-removebg-preview.png"
+                    src="https://res.cloudinary.com/dqx8p8orf/image/upload/f_auto/q_auto/gallery_image_20260927_114822-sem-mexer-em-mais-nada-nesse-boneco-mantenha-a-con-removebg-preview_3_ewaz6x.png"
                     alt="Mascote"
                     referrerPolicy="no-referrer"
                     className="w-7 h-7 max-w-none object-contain select-none opacity-90"
@@ -2540,7 +2592,7 @@ export default function StudentDashboard({
                   : 'w-full flex items-center gap-3 px-3.5 py-2.5 text-xs'
               } rounded-xl font-semibold transition-all border cursor-pointer ${
                 activeTab === 'inicio'
-                  ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/15 font-bold shadow-[0_0_12px_rgba(16,185,129,0.03)]'
+                  ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/15 font-bold shadow-[0_0_12px_rgba(30, 185, 150,0.03)]'
                   : 'bg-transparent text-neutral-400 border-transparent hover:bg-neutral-900/40 hover:text-neutral-200'
               }`}
             >
@@ -2558,7 +2610,7 @@ export default function StudentDashboard({
                   : 'w-full flex items-center justify-between px-3.5 py-2.5 text-xs'
               } rounded-xl font-semibold transition-all border cursor-pointer ${
                 activeTab === 'mural'
-                  ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/15 font-bold shadow-[0_0_12px_rgba(16,185,129,0.03)]'
+                  ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/15 font-bold shadow-[0_0_12px_rgba(30, 185, 150,0.03)]'
                   : 'bg-transparent text-neutral-400 border-transparent hover:bg-neutral-900/40 hover:text-neutral-200'
               }`}
             >
@@ -2583,7 +2635,7 @@ export default function StudentDashboard({
                   : 'w-full flex items-center gap-3 px-3.5 py-2.5 text-xs'
               } rounded-xl font-semibold transition-all border cursor-pointer ${
                 activeTab === 'calendario'
-                  ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/15 font-bold shadow-[0_0_12px_rgba(16,185,129,0.03)]'
+                  ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/15 font-bold shadow-[0_0_12px_rgba(30, 185, 150,0.03)]'
                   : 'bg-transparent text-neutral-400 border-transparent hover:bg-neutral-900/40 hover:text-neutral-200'
               }`}
             >
@@ -2601,7 +2653,7 @@ export default function StudentDashboard({
                   : 'w-full flex items-center justify-between px-3.5 py-2.5 text-xs'
               } rounded-xl font-semibold transition-all border cursor-pointer ${
                 activeTab === 'conversas'
-                  ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/15 font-bold shadow-[0_0_12px_rgba(16,185,129,0.03)]'
+                  ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/15 font-bold shadow-[0_0_12px_rgba(30, 185, 150,0.03)]'
                   : 'bg-transparent text-neutral-400 border-transparent hover:bg-neutral-900/40 hover:text-neutral-200'
               }`}
             >
@@ -2633,7 +2685,7 @@ export default function StudentDashboard({
                   : 'w-full flex items-center gap-3 px-3.5 py-2.5 text-xs'
               } rounded-xl font-semibold transition-all border cursor-pointer ${
                 activeTab === 'caderno'
-                  ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30 font-bold shadow-[0_0_12px_rgba(16,185,129,0.1)]'
+                  ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30 font-bold shadow-[0_0_12px_rgba(30, 185, 150,0.1)]'
                   : 'bg-transparent text-neutral-400 border-transparent hover:bg-neutral-900/40 hover:text-neutral-200'
               }`}
             >
@@ -2651,7 +2703,7 @@ export default function StudentDashboard({
                   : 'w-full flex items-center gap-3 px-3.5 py-2.5 text-xs'
               } rounded-xl font-semibold transition-all border cursor-pointer ${
                 activeTab === 'simulados'
-                  ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/15 font-bold shadow-[0_0_12px_rgba(16,185,129,0.03)]'
+                  ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/15 font-bold shadow-[0_0_12px_rgba(30, 185, 150,0.03)]'
                   : 'bg-transparent text-neutral-400 border-transparent hover:bg-neutral-900/40 hover:text-neutral-200'
               }`}
             >
@@ -2680,13 +2732,9 @@ export default function StudentDashboard({
         {/* Music Player Mini Card in Sidebar (above footer) */}
         <div id="sidebar-music-slot" data-collapsed={isSidebarCollapsed} className="w-full mt-auto mb-3 empty:hidden transition-all duration-300"></div>
 
-        <div className="border-t border-neutral-900 pt-5 space-y-3">
+        <div className="border-t border-neutral-900 pt-4 space-y-3 shrink-0">
           {!isSidebarCollapsed ? (
-            <div className="animate-fadeIn space-y-3">
-              <div className="pl-2">
-                <p className="text-neutral-300 text-[11px] font-semibold truncate max-w-[195px]">{profile ? profile.nome_completo : email}</p>
-                <p className="text-neutral-550 text-[9px] font-mono">RA: {getUniqueRA(email)} • {profile ? profile.turma : ''}</p>
-              </div>
+            <div className="animate-fadeIn">
               <div className="flex gap-2 w-full">
                 <button
                   type="button"
@@ -2934,7 +2982,7 @@ export default function StudentDashboard({
             >
               <div className="w-4 h-4 flex items-center justify-center shrink-0 overflow-hidden">
                 <img
-                  src="https://i.ibb.co/JW6tx1k6/Chat-GPT-Image-21-de-jun-de-2026-17-21-07-removebg-preview.png"
+                  src="https://res.cloudinary.com/dqx8p8orf/image/upload/f_auto/q_auto/gallery_image_20260927_114822-sem-mexer-em-mais-nada-nesse-boneco-mantenha-a-con-removebg-preview_3_ewaz6x.png"
                   alt="Mascote"
                   referrerPolicy="no-referrer"
                   className="w-5 h-5 max-w-none object-contain select-none"
@@ -3020,6 +3068,8 @@ export default function StudentDashboard({
             userRole="student"
             userEmail={email}
             userName={profile?.nome_completo || 'Aluno'}
+            userTurma={activeTurma || profile?.turma || ''}
+            virtualClasses={virtualClasses}
             exams={exams}
             mockExams={mockExams}
             onStudyForExam={(title, content) => {
@@ -3457,6 +3507,8 @@ export default function StudentDashboard({
               userRole="student"
               userEmail={email}
               userName={profile?.nome_completo || 'Aluno'}
+              userTurma={activeTurma || profile?.turma || ''}
+              virtualClasses={virtualClasses}
               exams={exams}
               mockExams={mockExams}
               onStudyForExam={(title, content) => {
@@ -3815,7 +3867,7 @@ export default function StudentDashboard({
                       type="submit"
                       onClick={() => handleUpdateSettings()}
                       disabled={savingSettings}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-neutral-950 font-bold rounded-xl transition-all text-xs shadow-[0_0_15px_rgba(16,185,129,0.1)] cursor-pointer"
+                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-neutral-950 font-bold rounded-xl transition-all text-xs shadow-[0_0_15px_rgba(30, 185, 150,0.1)] cursor-pointer"
                     >
                       {savingSettings ? 'Gravando dados...' : 'Salvar Preferências'}
                     </button>
@@ -3919,7 +3971,7 @@ export default function StudentDashboard({
                       <button
                         type="submit"
                         disabled={savingGmail}
-                        className="flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-400 disabled:bg-neutral-800 disabled:text-neutral-500 text-neutral-950 font-bold rounded-xl text-xs transition-all active:scale-98 flex items-center justify-center gap-1.5 cursor-pointer shadow-[0_0_12px_rgba(16,185,129,0.1)]"
+                        className="flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-400 disabled:bg-neutral-800 disabled:text-neutral-500 text-neutral-950 font-bold rounded-xl text-xs transition-all active:scale-98 flex items-center justify-center gap-1.5 cursor-pointer shadow-[0_0_12px_rgba(30, 185, 150,0.1)]"
                       >
                         {savingGmail ? (
                           <span>Salvando...</span>
