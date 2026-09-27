@@ -51,6 +51,7 @@ export default function StudentVirtualClasses({
   const [activeSubTab, setActiveSubTab] = useState<"simulados" | "provas" | "alunos">("simulados");
   const [isExamActive, setIsExamActive] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
+  const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
 
   const fetchNotifications = useCallback(async () => {
     try {
@@ -216,6 +217,10 @@ export default function StudentVirtualClasses({
 
       setJoinSuccess(`Entrou na turma "${vClass.name}" com sucesso!`);
       setJoinCode("");
+      setTimeout(() => {
+        setIsJoinModalOpen(false);
+        setJoinSuccess(null);
+      }, 1500);
       fetchClasses();
     } catch (err) {
       console.error("Error joining class:", err);
@@ -296,29 +301,14 @@ export default function StudentVirtualClasses({
         </div>
 
         {!selectedClass && (
-          <form onSubmit={handleJoinClass} className="flex items-center gap-2">
-            <div className="relative">
-              <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
-              <input
-                type="text"
-                placeholder="Código da Turma"
-                value={joinCode}
-                onChange={(e) => {
-                  setJoinCode(e.target.value);
-                  if (joinError) setJoinError(null);
-                }}
-                className="bg-neutral-900 border border-neutral-800 text-neutral-200 text-xs rounded-xl pl-9 pr-4 py-2 w-48 focus:outline-none focus:border-emerald-500/50 transition-colors uppercase font-mono"
-                required
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={joining || !joinCode.trim()}
-              className="bg-emerald-500 text-neutral-950 font-bold px-4 py-2 rounded-xl text-xs hover:bg-emerald-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap cursor-pointer"
-            >
-              {joining ? "Entrando..." : "Entrar"}
-            </button>
-          </form>
+          <button
+            type="button"
+            onClick={() => setIsJoinModalOpen(true)}
+            className="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-sm"
+          >
+            <Key className="w-4 h-4 text-emerald-400" />
+            <span>Entrar em uma sala</span>
+          </button>
         )}
       </div>
 
@@ -613,6 +603,91 @@ export default function StudentVirtualClasses({
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Modal / Card to Join Class */}
+      {isJoinModalOpen && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fadeIn">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 15 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            className="w-full max-w-md bg-neutral-950 border border-neutral-900 rounded-3xl p-6 shadow-2xl relative space-y-5"
+          >
+            <div>
+              <h3 className="text-lg font-black text-neutral-100 font-display flex items-center gap-2">
+                <Key className="w-5 h-5 text-emerald-400" />
+                <span>Entrar em uma sala</span>
+              </h3>
+              <p className="text-neutral-400 text-xs mt-1.5 leading-relaxed font-sans">
+                Digite o código de 4 dígitos gerado pelo seu professor para se conectar instantaneamente à sala virtual.
+              </p>
+            </div>
+
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              await handleJoinClass(e);
+            }} className="space-y-4">
+              <div className="space-y-1.5">
+                <label htmlFor="modal-join-code" className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest font-mono">
+                  Código de Acesso
+                </label>
+                <div className="relative">
+                  <Key className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
+                  <input
+                    id="modal-join-code"
+                    type="text"
+                    maxLength={4}
+                    placeholder="Ex: 4821"
+                    value={joinCode}
+                    onChange={(e) => {
+                      setJoinCode(e.target.value.replace(/\D/g, ''));
+                      if (joinError) setJoinError(null);
+                    }}
+                    className="w-full bg-neutral-900 border border-neutral-800 text-neutral-100 text-sm font-bold rounded-2xl pl-10 pr-4 py-3 focus:outline-none focus:border-emerald-500/50 transition-colors uppercase font-mono tracking-widest text-center"
+                    required
+                    autoFocus
+                  />
+                </div>
+              </div>
+
+              {joinError && (
+                <div className="p-3.5 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-start gap-2.5 animate-fadeIn font-sans">
+                  <AlertTriangle className="w-4 h-4 shrink-0 text-red-400 mt-0.5" />
+                  <span className="font-semibold leading-relaxed">{joinError}</span>
+                </div>
+              )}
+
+              {joinSuccess && (
+                <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs flex items-start gap-2.5 animate-fadeIn font-sans">
+                  <CheckCircle className="w-4 h-4 shrink-0 text-emerald-400 mt-0.5" />
+                  <span className="font-semibold leading-relaxed">{joinSuccess}</span>
+                </div>
+              )}
+
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsJoinModalOpen(false);
+                    setJoinCode("");
+                    setJoinError(null);
+                    setJoinSuccess(null);
+                  }}
+                  className="flex-1 bg-neutral-900 hover:bg-neutral-850 text-neutral-300 font-bold py-3 rounded-2xl text-xs transition-colors cursor-pointer border border-neutral-850"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={joining || joinCode.length !== 4}
+                  className="flex-1 bg-emerald-500 disabled:bg-neutral-800 text-neutral-950 disabled:text-neutral-500 font-extrabold py-3 rounded-2xl text-xs hover:bg-emerald-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  {joining ? "Entrando..." : "Entrar na Sala"}
+                </button>
+              </div>
+            </form>
+          </motion.div>
         </div>
       )}
     </div>

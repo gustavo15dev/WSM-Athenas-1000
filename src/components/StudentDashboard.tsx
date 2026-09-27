@@ -2867,53 +2867,13 @@ export default function StudentDashboard({
                 <GraduationCap className="w-8 h-8 text-emerald-400" />
               </div>
               <div className="w-full">
-                <div className="flex items-center gap-2 mb-2">
+                <div className="flex items-center gap-2 mb-1.5">
                   <h1 className="text-xl md:text-2xl font-black text-neutral-100 font-display tracking-tight">Athenas</h1>
-                  <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full font-mono uppercase font-bold">Portal do Aluno</span>
+                  <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-0.5 rounded-full font-mono uppercase font-bold">Portal do Aluno</span>
                 </div>
-                <h2 className="text-2xl md:text-3xl font-black bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent tracking-tight mb-2">
+                <h2 className="text-2xl md:text-3xl font-black bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent tracking-tight">
                   Olá, {profile ? profile.nome_completo : email}!
                 </h2>
-                <p className="text-neutral-400 text-xs leading-relaxed max-w-2xl mb-3">
-                  Bem-vindo de volta ao Athenas. Aqui no seu painel principal, você acompanha os lembretes de avaliações físicas e os professores conectados à sua sala.
-                </p>
-                <div className="flex flex-wrap items-center gap-3 text-[11px] font-mono text-neutral-500">
-                  <span className="bg-neutral-900/50 px-2.5 py-1 rounded-md border border-neutral-800 flex items-center gap-1.5">
-                    Turma Ativa: <strong className="text-emerald-300 font-bold">{activeTurma || profile?.turma || 'Sem turma'}</strong>
-                    {activeTurma && profile?.turma && activeTurma !== profile.turma && (
-                      <span className="text-[9px] text-teal-400 bg-teal-950/40 px-1 rounded border border-teal-500/20">Virtual</span>
-                    )}
-                  </span>
-                  <span className="bg-neutral-900/50 px-2.5 py-1 rounded-md border border-neutral-800">
-                    Nº de chamada na Turma: <strong className="text-emerald-400">{(profile?.numero_chamada !== undefined && profile?.numero_chamada !== null) ? profile.numero_chamada : (activeChamada ?? '-')}</strong>
-                  </span>
-                  {allEnrolledClasses.length > 1 && (
-                    <div className="flex items-center gap-1.5 bg-emerald-950/30 px-2.5 py-1 rounded-md border border-emerald-500/30">
-                      <span className="text-emerald-400 font-bold text-[10px]">Trocar Turma:</span>
-                      <select
-                        value={activeTurma || profile?.turma || ''}
-                        onChange={(e) => handleSelectActiveTurma(e.target.value)}
-                        className="bg-neutral-900 text-emerald-300 text-[10px] font-bold px-1.5 py-0.5 rounded border border-emerald-500/40 outline-none cursor-pointer"
-                      >
-                        {allEnrolledClasses.map(c => (
-                          <option key={c} value={c}>
-                            {c} {c === profile?.turma ? '(Oficial)' : '(Virtual)'}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-                  {allEnrolledClasses.length === 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setShowNoRoomModal(true)}
-                      className="bg-emerald-500/15 hover:bg-emerald-500/25 px-2.5 py-1 rounded-md border border-emerald-500/40 text-emerald-300 font-bold flex items-center gap-1.5 transition-all cursor-pointer animate-pulse"
-                    >
-                      <Key className="w-3.5 h-3.5 text-emerald-400" />
-                      <span>Como entrar na sala do professor</span>
-                    </button>
-                  )}
-                </div>
               </div>
             </div>
           ) : (
