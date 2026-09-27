@@ -45,7 +45,7 @@ import {
   Users,
   School
 } from 'lucide-react';
-import { matchesStudentTarget, formatTargetDisplayName } from '../utils/targetMatcher';
+import { matchesStudentTarget, matchesStudentExam, formatTargetDisplayName } from '../utils/targetMatcher';
 import { parseExamSettings, cleanExamContent, cleanNotificationMessage, formatExamDateDisplay, cleanExamObservations, extractExamTime } from '../utils/examSettings';
 import {
   ResponsiveContainer,
@@ -1238,11 +1238,12 @@ export default function StudentDashboard({
 
   // Start Realtime Browser Push Notification Listener for student
   useEffect(() => {
-    const cleanup = startRealtimeNotificationListener('student', profile?.turma, email);
+    const vcIds: string[] = (virtualClasses || []).flatMap((vc: any) => [vc.id, vc.name, vc.access_code].filter(Boolean));
+    const cleanup = startRealtimeNotificationListener('student', activeTurma || profile?.turma, email, vcIds);
     return () => {
       cleanup();
     };
-  }, [profile?.turma, email]);
+  }, [activeTurma, profile?.turma, email, virtualClasses]);
 
   // Sync settings inputs whenever settings modal opens
   useEffect(() => {
@@ -1585,11 +1586,7 @@ export default function StudentDashboard({
       let filteredExams: any[] = [];
       if (dbExams) {
         filteredExams = dbExams.filter((ex: any) => {
-          if (!ex.classes) return false;
-          const matchesCohort = ex.classes.includes(currentActiveTurma);
-          const matchesEmail = ex.classes.map((c: string) => c.toLowerCase().trim()).includes(email.toLowerCase().trim());
-          const matchesVirtualClass = ex.classes.some((c: string) => c === currentActiveTurma || studentVirtualClassIds.includes(c));
-          return matchesCohort || matchesEmail || matchesVirtualClass;
+          return matchesStudentExam(ex, email, currentActiveTurma, studentVirtualClassIds);
         });
         setExams(filteredExams);
       }

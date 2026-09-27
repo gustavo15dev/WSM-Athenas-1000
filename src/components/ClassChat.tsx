@@ -665,19 +665,22 @@ export default function ClassChat({
           filteredProfiles = filteredProfiles.filter(p => {
             const pEmail = (p.email || '').toLowerCase().trim();
             if (pEmail.endsWith('@example.com') || pEmail.endsWith('@atenas.com')) return false;
-            const pSchool = p.escola ? p.escola.toLowerCase().trim() : '';
 
-            // If schools are defined and different, only allow if they are in the same virtual class
+            // Direct teacher of student's virtual class -> ALWAYS ALLOW!
+            if (myVClassTeachers.includes(pEmail)) {
+              return true;
+            }
+
+            const pSchool = p.escola ? p.escola.toLowerCase().trim() : '';
             const isSameSchool = mySchool && pSchool ? mySchool === pSchool : true;
 
             const pTaughtClean = parseAnosLecionados(p.anos_lecionados);
-            const isTeacher = pTaughtClean.length > 0 || Boolean(p.materia) || pEmail.includes('prof') || p.role === 'teacher';
+            const isTeacher = p.role === 'teacher' || pTaughtClean.length > 0 || Boolean(p.materia) || pEmail.includes('prof') || myVClassTeachers.includes(pEmail);
 
             if (isTeacher) {
               const teachesMyTurma = myTurma ? pTaughtClean.some(cls => areTurmasMatching(cls, myTurma)) : false;
-              const ownsVirtualClass = myVClassTeachers.includes(pEmail);
               const sameSchoolTeacher = isSameSchool && (mySchool.length > 0);
-              return teachesMyTurma || ownsVirtualClass || sameSchoolTeacher;
+              return teachesMyTurma || sameSchoolTeacher;
             } else {
               // Student peer: must be in the same virtual class OR same official turma
               if (myVClassStudents.has(pEmail)) return true;
@@ -707,11 +710,17 @@ export default function ClassChat({
           filteredProfiles = filteredProfiles.filter(p => {
             const pEmail = (p.email || '').toLowerCase().trim();
             if (pEmail.endsWith('@example.com') || pEmail.endsWith('@atenas.com')) return false;
+
+            // Direct student in teacher's virtual class -> ALWAYS ALLOW!
+            if (myVClassStudents.has(pEmail)) {
+              return true;
+            }
+
             const pSchool = p.escola ? p.escola.toLowerCase().trim() : '';
             const isSameSchool = mySchool && pSchool ? mySchool === pSchool : true;
 
             const pTaughtClean = parseAnosLecionados(p.anos_lecionados);
-            const isTeacher = pTaughtClean.length > 0 || Boolean(p.materia) || pEmail.includes('prof') || p.role === 'teacher';
+            const isTeacher = p.role === 'teacher' || pTaughtClean.length > 0 || Boolean(p.materia) || pEmail.includes('prof');
 
             if (isTeacher) {
               // Other teacher shares at least one taught turma with this teacher OR shares a virtual class OR same school
@@ -722,8 +731,7 @@ export default function ClassChat({
             } else {
               // Student belongs to teacher's taught classes OR is in teacher's virtual class
               const matchesTaughtClass = p.turma && combinedTaughtClasses.some(ct => areTurmasMatching(p.turma, ct));
-              const matchesVClassStudent = myVClassStudents.has(pEmail);
-              return matchesTaughtClass || matchesVClassStudent;
+              return matchesTaughtClass;
             }
           });
         }
@@ -731,7 +739,7 @@ export default function ClassChat({
         // Map to ChatContact structure
         const mappedContacts: ChatContact[] = filteredProfiles.map(p => {
           const pTaughtClean = parseAnosLecionados(p.anos_lecionados);
-          const isTeacher = pTaughtClean.length > 0 || Boolean(p.materia) || (p.email && p.email.toLowerCase().includes('prof'));
+          const isTeacher = p.role === 'teacher' || pTaughtClean.length > 0 || Boolean(p.materia) || (p.email && p.email.toLowerCase().includes('prof'));
 
           return {
             email: p.email,
@@ -742,6 +750,53 @@ export default function ClassChat({
             isOnline: true
           };
         });
+
+        const existingEmails = new Set(mappedContacts.map(c => c.email.toLowerCase().trim()));
+
+        // Ensure every teacher of student's virtual classes is present in contacts list
+        if (currentUserRole === 'student') {
+          const myTurma = (userTurma || myProfile?.turma || '').trim();
+          const myVClasses = (vClasses || []).filter(vc => {
+            const emails = parseStudentEmails(vc.student_emails);
+            return emails.includes(myEmailLower) || (myTurma && areTurmasMatching(vc.name, myTurma));
+          });
+
+          myVClasses.forEach(vc => {
+            const tEmail = (vc.teacher_email || '').toLowerCase().trim();
+            if (tEmail && tEmail !== myEmailLower && !existingEmails.has(tEmail)) {
+              existingEmails.add(tEmail);
+              const teacherProf = rawList.find(p => p.email && p.email.toLowerCase().trim() === tEmail);
+              mappedContacts.push({
+                email: tEmail,
+                name: teacherProf?.nome_completo || tEmail.split('@')[0],
+                role: 'teacher',
+                turma: vc.name || 'Professor',
+                materia: teacherProf?.materia || 'Biologia',
+                isOnline: true
+              });
+            }
+          });
+        } else {
+          // Ensure every student in teacher's virtual classes is in contacts list
+          const myCreatedVClasses = (vClasses || []).filter(
+            vc => (vc.teacher_email || '').toLowerCase().trim() === myEmailLower
+          );
+          myCreatedVClasses.forEach(vc => {
+            parseStudentEmails(vc.student_emails).forEach(sEmail => {
+              if (sEmail && sEmail !== myEmailLower && !existingEmails.has(sEmail)) {
+                existingEmails.add(sEmail);
+                const sProf = rawList.find(p => p.email && p.email.toLowerCase().trim() === sEmail);
+                mappedContacts.push({
+                  email: sEmail,
+                  name: sProf?.nome_completo || sEmail.split('@')[0],
+                  role: 'student',
+                  turma: sProf?.turma || vc.name || 'Aluno',
+                  isOnline: true
+                });
+              }
+            });
+          });
+        }
 
         // Ensure any participant from message history is also in contacts list so no incoming chat is orphaned
         try {

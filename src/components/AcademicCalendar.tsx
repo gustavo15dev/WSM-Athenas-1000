@@ -28,7 +28,7 @@ import {
   Undo2
 } from 'lucide-react';
 import { parseExamSettings, cleanExamContent, formatExamDateDisplay, cleanExamObservations, extractExamTime } from '../utils/examSettings';
-import { matchesStudentTarget } from '../utils/targetMatcher';
+import { matchesStudentTarget, matchesStudentExam } from '../utils/targetMatcher';
 import { areTurmasMatching } from '../utils/profileDb';
 
 export interface UserCalendarItem {
@@ -184,11 +184,7 @@ export default function AcademicCalendar({
               [vc.id, vc.name, vc.access_code].filter(Boolean)
             );
             list = data.filter((ex: any) => {
-              const target = ex.class_name || ex.turma;
-              const matchesTarget = matchesStudentTarget(target, cleanEmail, userTurma, studentVCIds);
-              const matchesCohort = userTurma && target ? areTurmasMatching(target, userTurma) : false;
-              const isGeneral = !target || ['geral', 'todas', 'toda a escola', 'todos'].includes(target.toLowerCase().trim());
-              return matchesTarget || matchesCohort || isGeneral;
+              return matchesStudentExam(ex, cleanEmail, userTurma, studentVCIds);
             });
           }
 

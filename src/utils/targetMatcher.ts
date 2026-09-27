@@ -59,14 +59,18 @@ export function matchesStudentTarget(
   studentCohort?: string,
   virtualClassIdsOrNames: string[] = []
 ): boolean {
-  if (!rawTarget) return false;
+  if (!rawTarget || !rawTarget.trim()) return false;
   const rawClean = rawTarget.trim().toLowerCase();
+
+  // If student has no room/turma and no virtual classes, they must not receive class-wide exams
+  const hasAnyRoomOrCohort = Boolean(studentCohort && studentCohort.trim()) || virtualClassIdsOrNames.length > 0;
+
   if (['geral', 'todas', 'toda a escola', 'todos'].includes(rawClean)) {
-    return true;
+    return hasAnyRoomOrCohort;
   }
 
   const { classes, students } = parseExamTargets(rawTarget);
-  const emailLower = (studentEmail || '').toLowerCase();
+  const emailLower = (studentEmail || '').toLowerCase().trim();
 
   // 1. Check if student's email is explicitly targeted
   if (students.some(s => s.toLowerCase() === emailLower)) {
@@ -74,7 +78,7 @@ export function matchesStudentTarget(
   }
 
   // Fallback for single string email target
-  if (rawTarget.toLowerCase().trim() === emailLower) {
+  if (rawClean === emailLower) {
     return true;
   }
 
@@ -96,6 +100,61 @@ export function matchesStudentTarget(
   if (classes.length === 0 && students.length === 0) {
     if (studentCohort && areTurmasMatching(rawTarget, studentCohort)) return true;
     if (virtualClassIdsOrNames.some(v => areTurmasMatching(rawTarget, v))) return true;
+  }
+
+  return false;
+}
+
+export function matchesStudentExam(
+  ex: any,
+  studentEmail: string,
+  studentCohort?: string,
+  virtualClassIdsOrNames: string[] = []
+): boolean {
+  if (!ex) return false;
+  const cleanEmail = (studentEmail || '').toLowerCase().trim();
+  const cleanTurma = (studentCohort || '').trim();
+
+  let rawClasses: string[] = [];
+  if (Array.isArray(ex.classes)) {
+    rawClasses = ex.classes.map((c: any) => String(c).trim()).filter(Boolean);
+  } else if (typeof ex.classes === 'string') {
+    try {
+      const parsed = JSON.parse(ex.classes);
+      if (Array.isArray(parsed)) rawClasses = parsed.map(c => String(c).trim()).filter(Boolean);
+      else rawClasses = [ex.classes.trim()];
+    } catch {
+      rawClasses = ex.classes.split(',').map(s => s.trim()).filter(Boolean);
+    }
+  }
+
+  if (ex.class_name) rawClasses.push(String(ex.class_name).trim());
+  if (ex.turma) rawClasses.push(String(ex.turma).trim());
+
+  if (rawClasses.length === 0) {
+    return false;
+  }
+
+  // Direct student email match
+  if (rawClasses.some(c => c.toLowerCase() === cleanEmail)) {
+    return true;
+  }
+
+  // Official student turma match
+  if (cleanTurma && rawClasses.some(c => areTurmasMatching(c, cleanTurma))) {
+    return true;
+  }
+
+  // Virtual class match
+  if (virtualClassIdsOrNames.length > 0 && rawClasses.some(c => virtualClassIdsOrNames.some(vcId => areTurmasMatching(c, vcId) || c.toLowerCase() === vcId.toLowerCase()))) {
+    return true;
+  }
+
+  // General / school-wide match ONLY if student belongs to at least one class/room
+  const hasAnyRoomOrCohort = Boolean(cleanTurma) || virtualClassIdsOrNames.length > 0;
+  const isExplicitGeneral = rawClasses.some(c => ['geral', 'todas', 'toda a escola', 'todos'].includes(c.toLowerCase()));
+  if (isExplicitGeneral && hasAnyRoomOrCohort) {
+    return true;
   }
 
   return false;

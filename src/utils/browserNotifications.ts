@@ -1,5 +1,6 @@
 import { supabase } from '../supabase';
 import { areTurmasMatching } from './profileDb';
+import { matchesStudentTarget } from './targetMatcher';
 
 const NOTIFIED_CACHE_KEY = 'athenas_notified_item_ids_v2';
 
@@ -125,7 +126,8 @@ export async function sendBrowserNotification(
 export function startRealtimeNotificationListener(
   userRole: 'student' | 'teacher',
   userClass?: string,
-  userEmail?: string
+  userEmail?: string,
+  virtualClasses: string[] = []
 ) {
   if (!isNotificationSupported() || Notification.permission !== 'granted') {
     return () => {};
@@ -135,6 +137,7 @@ export function startRealtimeNotificationListener(
   registerServiceWorker();
 
   const notifiedSet = getNotifiedIds();
+  const cleanEmail = (userEmail || '').toLowerCase().trim();
 
   // Helper to check and notify new announcement
   const checkNewAnnouncements = async () => {
@@ -151,14 +154,10 @@ export function startRealtimeNotificationListener(
           const isNotified = notifiedSet.has(ann.id);
           if (!isNotified) {
             // Check if matches class target
-            const targetClass = ann.class_name || ann.target_class || 'all';
-            const matchesClass =
-              targetClass === 'all' ||
-              ['geral', 'todas', 'toda a escola', 'todos'].includes(targetClass.toLowerCase().trim()) ||
-              !userClass ||
-              targetClass.toLowerCase() === userClass.toLowerCase() ||
-              targetClass.includes(userClass) ||
-              areTurmasMatching(targetClass, userClass);
+            const targetClass = ann.class_name || ann.target_class;
+            if (!targetClass) return;
+
+            const matchesClass = matchesStudentTarget(targetClass, cleanEmail, userClass, virtualClasses);
 
             // Only notify if created within the last 24 hours to prevent spamming old items
             const createdTime = new Date(ann.created_at).getTime();
@@ -175,7 +174,7 @@ export function startRealtimeNotificationListener(
             notifiedSet.add(ann.id);
           }
         });
-    }
+      }
     } catch (e) {
       // Ignore polling errors
     }
@@ -196,6 +195,14 @@ export function startRealtimeNotificationListener(
           if (!exam.id) return;
           const isNotified = notifiedSet.has(`sim-${exam.id}`);
           if (!isNotified) {
+            // Check if student belongs to the exam's target
+            const matches = matchesStudentTarget(exam.class_name, cleanEmail, userClass, virtualClasses);
+            if (!matches) {
+              markAsNotified(`sim-${exam.id}`);
+              notifiedSet.add(`sim-${exam.id}`);
+              return;
+            }
+
             const createdTime = new Date(exam.created_at || Date.now()).getTime();
             const isRecent = (Date.now() - createdTime) < (48 * 60 * 60 * 1000);
 
@@ -234,10 +241,13 @@ export function startRealtimeNotificationListener(
       (payload) => {
         const ann = payload.new;
         if (ann && ann.id && !notifiedSet.has(ann.id)) {
-          sendBrowserNotification(`📢 Novo Aviso Publicado: ${ann.title || 'Aviso da Escola'}`, {
-            body: ann.message || 'Há uma nova notificação importante para sua turma.',
-            tag: `ann-${ann.id}`
-          });
+          const targetClass = ann.class_name || ann.target_class;
+          if (matchesStudentTarget(targetClass, cleanEmail, userClass, virtualClasses)) {
+            sendBrowserNotification(`📢 Novo Aviso Publicado: ${ann.title || 'Aviso da Escola'}`, {
+              body: ann.message || 'Há uma nova notificação importante para sua turma.',
+              tag: `ann-${ann.id}`
+            });
+          }
           markAsNotified(ann.id);
           notifiedSet.add(ann.id);
         }
@@ -250,10 +260,12 @@ export function startRealtimeNotificationListener(
         if (userRole === 'student') {
           const exam = payload.new;
           if (exam && exam.id && !notifiedSet.has(`sim-${exam.id}`)) {
-            sendBrowserNotification(`🚨 Novo Simulado Liberado: ${exam.title}`, {
-              body: `Professor(a) ${exam.teacher_name || 'Docente'} acabou de publicar uma avaliação.`,
-              tag: `exam-${exam.id}`
-            });
+            if (matchesStudentTarget(exam.class_name, cleanEmail, userClass, virtualClasses)) {
+              sendBrowserNotification(`🚨 Novo Simulado Liberado: ${exam.title}`, {
+                body: `Professor(a) ${exam.teacher_name || 'Docente'} acabou de publicar uma avaliação.`,
+                tag: `exam-${exam.id}`
+              });
+            }
             markAsNotified(`sim-${exam.id}`);
             notifiedSet.add(`sim-${exam.id}`);
           }
