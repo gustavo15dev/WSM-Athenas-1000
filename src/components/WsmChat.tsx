@@ -3,7 +3,7 @@ import {
   Send, Sparkles, Bot, User, Trash2, HelpCircle, Loader2, 
   History, Plus, MessageSquare, Mic, ArrowUp, X, MicOff, 
   Paperclip, PanelLeftClose, PanelLeft, Search, Pin, Copy, Check, Headphones,
-  Globe
+  Globe, Brain, ChevronRight, ChevronDown
 } from 'lucide-react';
 import { supabase } from '../supabase';
 import AthenasMarkdownRenderer from './AthenasMarkdownRenderer';
@@ -31,6 +31,200 @@ interface ChatMessage {
   sources?: WebSource[];
   isGenerating?: boolean;
   isDelayed?: boolean;
+  startTime?: number;
+  thinkingTimeSeconds?: number;
+  reasoning?: string;
+}
+
+const extractThinkingTimeFromContent = (rawText: string): { cleanText: string; thinkingSeconds?: number; reasoning?: string } => {
+  if (!rawText) return { cleanText: '' };
+  let text = rawText;
+  let thinkingSeconds: number | undefined;
+  let reasoning: string | undefined;
+
+  const timeMatch = text.match(/\[\[THINKING_TIME:([\d.]+)\]\]/);
+  if (timeMatch) {
+    const sec = parseFloat(timeMatch[1]);
+    thinkingSeconds = isNaN(sec) ? undefined : sec;
+    text = text.replace(/\[\[THINKING_TIME:[\d.]+\]\]/g, '').trim();
+  }
+
+  const reasoningMatch = text.match(/\[\[REASONING_CONTENT:([\s\S]*?)\]\]/);
+  if (reasoningMatch) {
+    reasoning = reasoningMatch[1].trim();
+    text = text.replace(/\[\[REASONING_CONTENT:[\s\S]*?\]\]/g, '').trim();
+  } else {
+    const thinkTagMatch = text.match(/<think>([\s\S]*?)<\/think>/i);
+    if (thinkTagMatch) {
+      reasoning = thinkTagMatch[1].trim();
+      text = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+    }
+  }
+
+  return { cleanText: text, thinkingSeconds, reasoning };
+};
+
+const ThinkingGridStyles = () => (
+  <style>{`
+    @keyframes thinkingBlinkDark {
+      0% {
+        background-color: #262626;
+        box-shadow: none;
+      }
+      20% {
+        background-color: #262626;
+      }
+      30% {
+        background-color: #10B981;
+        box-shadow: 0 0 6px rgba(16, 185, 129, 0.5);
+      }
+      55% {
+        background-color: #10B981;
+        box-shadow: 0 0 6px rgba(16, 185, 129, 0.5);
+      }
+      75% {
+        background-color: #262626;
+        box-shadow: none;
+      }
+      100% {
+        background-color: #262626;
+      }
+    }
+
+    .thinking-grid-3x3 {
+      display: grid;
+      grid-template-columns: repeat(3, 7px);
+      grid-template-rows: repeat(3, 7px);
+      gap: 2.5px;
+    }
+
+    .thinking-cell-animated {
+      width: 7px;
+      height: 7px;
+      border-radius: 2px;
+      background: #262626;
+      animation: thinkingBlinkDark 1.8s ease-in-out infinite both;
+      will-change: background-color, box-shadow;
+    }
+
+    .thinking-cell-done {
+      width: 7px;
+      height: 7px;
+      border-radius: 2px;
+      background: #10B981;
+      opacity: 0.9;
+    }
+  `}</style>
+);
+
+function GeneratingIndicator({ startTime, isDelayed }: { startTime?: number; isDelayed?: boolean }) {
+  const [elapsed, setElapsed] = useState<string>('0.0s');
+
+  useEffect(() => {
+    const start = startTime || Date.now();
+    const update = () => {
+      const sec = Math.max(0, (Date.now() - start) / 1000).toFixed(1);
+      setElapsed(`${sec}s`);
+    };
+    update();
+    const interval = setInterval(update, 100);
+    return () => clearInterval(interval);
+  }, [startTime]);
+
+  const cellDelays: Record<number, string> = {
+    0: "0s",
+    1: "0.09s",
+    2: "0.18s",
+    5: "0.27s",
+    8: "0.36s",
+    7: "0.45s",
+    6: "0.54s",
+    3: "0.63s",
+    4: "0.72s"
+  };
+
+  return (
+    <div className="flex items-center gap-3 my-1.5 py-0.5 select-none animate-fadeIn transition-all duration-300">
+      <ThinkingGridStyles />
+      <div className="thinking-grid-3x3 shrink-0">
+        {Array.from({ length: 9 }).map((_, idx) => (
+          <div
+            key={idx}
+            className="thinking-cell-animated"
+            style={{ animationDelay: cellDelays[idx] }}
+          />
+        ))}
+      </div>
+      <div className="text-xs sm:text-sm font-bold text-neutral-200 tracking-tight leading-none font-sans">
+        {isDelayed ? "Gerando Resposta (alta demanda)..." : "Gerando Resposta"}
+      </div>
+      <div className="text-xs sm:text-sm font-mono text-neutral-400 leading-none tabular-nums font-normal">
+        {elapsed}
+      </div>
+    </div>
+  );
+}
+
+function ThinkingDoneHeader({ seconds, reasoning }: { seconds?: number; reasoning?: string }) {
+  const [isExpanded, setIsExpanded] = useState<boolean>(false);
+
+  if ((seconds === undefined || seconds <= 0) && !reasoning) return null;
+
+  const hasReasoning = Boolean(reasoning && reasoning.trim());
+
+  return (
+    <div className="my-1.5 animate-fadeIn select-none w-full">
+      <button
+        type="button"
+        onClick={() => hasReasoning && setIsExpanded(prev => !prev)}
+        disabled={!hasReasoning}
+        className={`flex items-center gap-2.5 py-0.5 group ${
+          hasReasoning ? 'cursor-pointer hover:opacity-90' : 'cursor-default'
+        }`}
+      >
+        <ThinkingGridStyles />
+        <div className="thinking-grid-3x3 shrink-0">
+          {Array.from({ length: 9 }).map((_, idx) => (
+            <div key={idx} className="thinking-cell-done" />
+          ))}
+        </div>
+        <div className="text-xs sm:text-sm font-medium text-neutral-300 tracking-tight leading-none font-sans flex items-center gap-1.5">
+          <span>Pensou por</span>
+          <span className="font-mono font-bold text-emerald-400 leading-none tabular-nums">
+            {(seconds || 0).toFixed(1)}s
+          </span>
+        </div>
+
+        {hasReasoning && (
+          <div className="p-0.5 rounded text-neutral-500 group-hover:text-neutral-300 transition-colors ml-0.5">
+            {isExpanded ? (
+              <ChevronDown className="w-3.5 h-3.5 text-emerald-400" />
+            ) : (
+              <ChevronRight className="w-3.5 h-3.5 text-neutral-400 group-hover:text-neutral-200" />
+            )}
+          </div>
+        )}
+      </button>
+
+      {/* Expandable Reasoning Card */}
+      {hasReasoning && isExpanded && (
+        <div className="mt-2.5 p-3.5 bg-[#0e2118]/25 border border-emerald-500/30 rounded-2xl animate-fadeIn transition-all duration-300 max-w-2xl select-text prose-reasoning">
+          <style>{`
+            .prose-reasoning p, .prose-reasoning li, .prose-reasoning span, .prose-reasoning div {
+              font-size: 12px !important;
+              color: #889891 !important; /* Soft, desaturated gray-green */
+              line-height: 1.6 !important;
+            }
+            .prose-reasoning strong, .prose-reasoning b {
+              font-weight: 700 !important;
+              color: #a4b4ad !important; /* Soft pronounced bold text */
+            }
+          `}</style>
+          <AthenasMarkdownRenderer content={reasoning || ""} />
+        </div>
+      )}
+    </div>
+  );
 }
 
 interface ChatSession {
@@ -179,6 +373,11 @@ const ChatMessageItem = React.memo(({
               </span>
             </div>
 
+            {/* When finished generating and thinking duration exists, show "Pensou por X.Xs" above response */}
+            {!msg.isGenerating && ((msg.thinkingTimeSeconds !== undefined && msg.thinkingTimeSeconds > 0) || msg.reasoning) && (
+              <ThinkingDoneHeader seconds={msg.thinkingTimeSeconds} reasoning={msg.reasoning} />
+            )}
+
             {/* Message Body (Transparent background, no card borders) */}
             <div className="text-neutral-200 text-[14px] md:text-[14.5px] leading-relaxed antialiased select-text pl-0.5 w-full">
               {msg.content ? (
@@ -193,16 +392,9 @@ const ChatMessageItem = React.memo(({
                 />
               ) : null}
 
-              {/* Real-time generating indicator beneath content while AI is still responding */}
+              {/* Real-time generating indicator with 3x3 animated grid + live timer */}
               {msg.isGenerating && (
-                <div className={`flex items-center gap-2 ${msg.content ? 'mt-3 pt-1' : 'py-1'} text-xs text-neutral-400 select-none animate-fadeIn`}>
-                  <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-400 shrink-0" />
-                  <span className="italic animate-pulse text-neutral-300">
-                    {msg.isDelayed 
-                      ? "Isso está demorando mais do que o esperado. Sua resposta está sendo gerada." 
-                      : "Gerando resposta..."}
-                  </span>
-                </div>
+                <GeneratingIndicator startTime={msg.startTime} isDelayed={msg.isDelayed} />
               )}
             </div>
 
@@ -326,6 +518,7 @@ export default function WsmChat({
   const [attachedFiles, setAttachedFiles] = useState<Array<{ name: string; type: string; data: string; size: number }>>([]);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
+  const [isThinkingActive, setIsThinkingActive] = useState<boolean>(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -422,8 +615,10 @@ export default function WsmChat({
   // Auto-expand input bar textarea
   useEffect(() => {
     if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 180)}px`;
+      textareaRef.current.style.height = '24px';
+      if (inputText.trim()) {
+        textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 180)}px`;
+      }
     }
   }, [inputText]);
 
@@ -628,14 +823,17 @@ export default function WsmChat({
       if (error) throw error;
 
       const formatted: ChatMessage[] = (data || []).map(msg => {
-        const { cleanContent, sources } = extractSourcesFromContent(msg.content || '');
+        const { cleanText: textNoThinking, thinkingSeconds, reasoning } = extractThinkingTimeFromContent(msg.content || '');
+        const { cleanContent, sources } = extractSourcesFromContent(textNoThinking);
         return {
           id: msg.id,
           role: msg.role as 'user' | 'assistant',
           content: cleanContent,
           timestamp: new Date(msg.created_at),
           attachments: msg.attachments || [],
-          sources: sources.length > 0 ? sources : undefined
+          sources: sources.length > 0 ? sources : undefined,
+          thinkingTimeSeconds: thinkingSeconds,
+          reasoning: reasoning
         };
       });
 
@@ -898,13 +1096,16 @@ export default function WsmChat({
         attachments: msg.attachments
       }));
 
+      const assistantStartTime = Date.now();
+
       // Immediately add the real-time assistant placeholder with isGenerating = true
       const initialAssistantMessage: ChatMessage = {
         id: assistantMsgId,
         role: 'assistant',
         content: '',
         isGenerating: true,
-        timestamp: new Date()
+        timestamp: new Date(),
+        startTime: assistantStartTime
       };
       setMessages(prev => [...prev, initialAssistantMessage]);
       setIsLoading(true);
@@ -928,7 +1129,8 @@ export default function WsmChat({
             attachments: currentFiles,
             studyExamTheme,
             studyExamContent,
-            userRole
+            userRole,
+            reasoningActive: isThinkingActive
           })
         });
       } finally {
@@ -964,6 +1166,7 @@ export default function WsmChat({
 
       const contentType = res.headers.get("content-type") || "";
       let finalFullText = "";
+      let finalReasoning = "";
       let finalSources: WebSource[] = [];
       const searchStepsState: Array<{ thought: string; count?: number; isSearching: boolean }> = [];
 
@@ -1055,16 +1258,22 @@ export default function WsmChat({
               } else if (eventData.type === "final") {
                 finalFullText = eventData.text || "";
                 const cleanContent = eventData.cleanContent || eventData.text || "";
+                const eventReasoning = eventData.reasoning || "";
+                finalReasoning = eventReasoning;
                 finalSources = (eventData.sources && Array.isArray(eventData.sources) && eventData.sources.length > 0)
                   ? eventData.sources
                   : finalSources;
 
+                const durationSec = Math.max(0.1, Number(((Date.now() - assistantStartTime) / 1000).toFixed(1)));
+
                 setMessages(prev => prev.map(m => m.id === assistantMsgId ? {
                   ...m,
                   content: cleanContent,
+                  reasoning: eventReasoning,
                   sources: finalSources.length > 0 ? finalSources : undefined,
                   isGenerating: false,
-                  isDelayed: false
+                  isDelayed: false,
+                  thinkingTimeSeconds: durationSec
                 } : m));
               } else if (eventData.type === "error") {
                 const errStr = String(eventData.error || "");
@@ -1094,25 +1303,43 @@ export default function WsmChat({
       } else {
         // Fallback for regular JSON responses
         const data = await res.json();
-        finalFullText = data.text || "Sem resposta no momento.";
+        const rawTextFromRes = data.text || "Sem resposta no momento.";
+        
+        // Extract reasoning first from rawTextFromRes
+        const { cleanText, thinkingSeconds, reasoning: fallbackReasoning } = extractThinkingTimeFromContent(rawTextFromRes);
+        
+        finalFullText = cleanText;
+        finalReasoning = fallbackReasoning || data.reasoning || "";
         const { cleanContent, sources: parsedSources } = extractSourcesFromContent(finalFullText);
         finalSources = (data.sources && Array.isArray(data.sources) && data.sources.length > 0)
           ? data.sources
           : parsedSources;
 
+        const durationSec = thinkingSeconds || Math.max(0.1, Number(((Date.now() - assistantStartTime) / 1000).toFixed(1)));
+
         setMessages(prev => prev.map(m => m.id === assistantMsgId ? {
           ...m,
           content: cleanContent,
+          reasoning: finalReasoning,
           sources: finalSources.length > 0 ? finalSources : undefined,
-          isGenerating: false
+          isGenerating: false,
+          thinkingTimeSeconds: durationSec
         } : m));
       }
 
       if (sessionId && finalFullText) {
+        const durationSec = Math.max(0.1, Number(((Date.now() - assistantStartTime) / 1000).toFixed(1)));
+        
+        let contentWithThinking = finalFullText;
+        if (finalReasoning) {
+          contentWithThinking += `\n\n[[REASONING_CONTENT:${finalReasoning}]]`;
+        }
+        contentWithThinking += `\n\n[[THINKING_TIME:${durationSec}]]`;
+
         await supabase.from('wsm_chat_messages').insert([{
           session_id: sessionId,
           role: 'assistant',
-          content: finalFullText
+          content: contentWithThinking
         }]);
       }
 
@@ -1469,12 +1696,9 @@ export default function WsmChat({
                           className="w-7 h-7 max-w-none object-contain select-none transition-all duration-75"
                         />
                       </div>
-                      <span className="text-[11px] font-bold tracking-wide uppercase text-neutral-400 font-mono">WSM Athenas</span>
+                      <span className="text-[11px] font-bold tracking-wide uppercase text-neutral-400 font-mono">Athenas AI</span>
                     </div>
-                    <div className="flex items-center gap-2 pl-0.5 text-xs text-neutral-400">
-                      <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-400" />
-                      <span className="italic animate-pulse">Pensando...</span>
-                    </div>
+                    <GeneratingIndicator />
                   </div>
                 </div>
               )}
@@ -1513,7 +1737,7 @@ export default function WsmChat({
           {/* Centered chat wrapper */}
           <div className="w-full max-w-3xl space-y-2 relative z-50 transition-all duration-300">
             
-            <div className={`bg-[#212121] border border-neutral-800 focus-within:border-neutral-700 rounded-[26px] p-1.5 pr-2 flex flex-col transition-all duration-300 shadow-xl overflow-hidden relative z-50`}>
+            <div className={`bg-[#212121] border border-neutral-800 focus-within:border-neutral-700 rounded-[28px] py-2.5 pl-4 pr-3 flex flex-col transition-all duration-300 shadow-xl overflow-hidden relative z-50`}>
               
               {/* Attached file tags */}
               {attachedFiles.length > 0 && (
@@ -1536,7 +1760,7 @@ export default function WsmChat({
               )}
 
               {/* Text Input Panel */}
-              <div className="flex items-end gap-1.5 w-full relative z-50">
+              <div className="flex items-center gap-1.5 w-full relative z-50">
                 
                 {/* Plus Upload button */}
                 <button
@@ -1544,9 +1768,9 @@ export default function WsmChat({
                   onClick={() => fileInputRef.current?.click()}
                   title="Anexar arquivos (max 5)"
                   disabled={isLoading || isTyping || attachedFiles.length >= 5}
-                  className="w-9 h-9 mb-0.5 ml-0.5 text-neutral-400 hover:text-white rounded-full transition-all flex items-center justify-center shrink-0 cursor-pointer disabled:opacity-30"
+                  className="w-8 h-8 ml-1 text-neutral-400 hover:text-white rounded-full transition-all flex items-center justify-center shrink-0 cursor-pointer disabled:opacity-30"
                 >
-                  <Plus className="w-6 h-6" />
+                  <Plus className="w-5.5 h-5.5" />
                 </button>
 
                 {/* Input TextArea */}
@@ -1563,8 +1787,24 @@ export default function WsmChat({
                     }
                   }}
                   disabled={isLoading || isTyping}
-                  className="flex-1 min-w-0 bg-transparent border-none focus:ring-0 focus:outline-none outline-none text-xs md:text-[15px] text-neutral-200 placeholder-neutral-500 px-1 py-2.5 resize-none max-h-[200px] leading-relaxed overflow-y-auto select-text scrollbar-thin scrollbar-thumb-neutral-700"
+                  className="flex-1 min-w-0 bg-transparent border-none focus:ring-0 focus:outline-none outline-none text-xs md:text-[14.5px] text-neutral-200 placeholder-neutral-500 px-1 py-1 resize-none max-h-[200px] leading-relaxed overflow-y-auto select-text scrollbar-thin scrollbar-thumb-neutral-700"
                 />
+
+                {/* "Pensar" reasoning toggle button */}
+                <button
+                  type="button"
+                  onClick={() => setIsThinkingActive(prev => !prev)}
+                  title={isThinkingActive ? "Raciocínio da IA Ativado (clique para desativar)" : "Ativar Raciocínio da IA (Pensar)"}
+                  disabled={isLoading || isTyping}
+                  className={`h-7.5 px-2.5 rounded-full text-xs font-semibold flex items-center gap-1 transition-all duration-200 cursor-pointer border select-none shrink-0 ${
+                    isThinkingActive
+                      ? 'bg-emerald-500/15 border-emerald-500/50 text-emerald-300 shadow-sm shadow-emerald-500/15 ring-1 ring-emerald-500/30'
+                      : 'bg-neutral-850 hover:bg-neutral-800 border-neutral-750/70 text-neutral-400 hover:text-neutral-200'
+                  }`}
+                >
+                  <Brain className={`w-3.5 h-3.5 transition-transform duration-200 ${isThinkingActive ? 'text-emerald-400 animate-pulse scale-105' : 'text-neutral-400'}`} />
+                  <span className="font-sans font-medium">Pensar</span>
+                </button>
 
                 {/* Send button */}
                 <button
@@ -1572,7 +1812,7 @@ export default function WsmChat({
                   onClick={() => handleSendMessage()}
                   disabled={isLoading || isTyping || (!inputText.trim() && attachedFiles.length === 0)}
                   title="Enviar pergunta"
-                  className="relative z-50 w-8 h-8 mb-1 bg-white disabled:bg-[#333333] text-black disabled:text-neutral-500 rounded-full transition-all flex items-center justify-center shrink-0 cursor-pointer disabled:cursor-not-allowed hover:bg-neutral-200 duration-300 shadow-sm"
+                  className="relative z-50 w-8 h-8 bg-white disabled:bg-[#333333] text-black disabled:text-neutral-500 rounded-full transition-all flex items-center justify-center shrink-0 cursor-pointer disabled:cursor-not-allowed hover:bg-neutral-200 duration-300 shadow-sm"
                 >
                   <ArrowUp className="w-4.5 h-4.5 stroke-[3]" />
                 </button>

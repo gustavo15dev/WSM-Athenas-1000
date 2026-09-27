@@ -51,7 +51,7 @@ async function startServer() {
   // Assistência direta via chamada REST ou SDK com Streaming SSE e Ação Agêntica em Tempo Real
   app.post("/api/gemini/chat", async (req, res) => {
     try {
-      const { message, history, studyExamTheme, studyExamContent, userRole } = req.body;
+      const { message, history, studyExamTheme, studyExamContent, userRole, reasoningActive } = req.body;
       if (!message) {
         return res.status(400).json({ error: "Mensagem obrigatória." });
       }
@@ -424,6 +424,25 @@ FLUXO MANDATÓRIO DE PESQUISA NA WEB:
    - Se ainda faltar algum dado essencial que você precise buscar: gere um novo parágrafo explicativo e uma nova chave {web: "próximo termo"}.
 ═══════════════════════════════════════════════════════════════`;
 
+      if (reasoningActive) {
+        systemInstruction += `
+
+═══════════════════════════════════════════════════════════════
+🧠 MODO RACIOCÍNIO ATIVO (THINKING):
+O usuário ativou o botão de Raciocínio (Pensar).
+Antes de escrever a sua resposta final oficial, você DEVE elaborar primeiro o seu raciocínio passo a passo, reflexão pedagógica e análise conceitual DENTRO de um bloco delimitado pelas tags <think> e </think>.
+
+Formato OBRIGATÓRIO:
+<think>
+1. Análise da pergunta do usuário...
+2. Mapeamento dos tópicos e abordagem...
+3. Estruturação do raciocínio passo a passo...
+</think>
+
+[Sua resposta final completa, limpa e acolhedora para o aluno virá AQUI, fora das tags <think></think>]
+═══════════════════════════════════════════════════════════════`;
+      }
+
       // Programmatic Off-topic Guardrails
       const lowerMsg = message.toLowerCase().trim();
       
@@ -745,6 +764,9 @@ Se você precisa de ajuda com o seu próprio acesso ou esqueceu sua senha, por f
       });
 
       let currentMsgText = message;
+      if (reasoningActive) {
+        currentMsgText += `\n\n[INSTRUÇÃO MANDATÓRIA DE SISTEMA: O modo Raciocínio (Pensar) está ATIVO. Você DEVE obrigatoriamente iniciar sua resposta gerando seu raciocínio pedagógico e conceitual detalhado dentro das tags <think> e </think> antes de prosseguir para a resposta final ao aluno.]`;
+      }
       const currentUserParts: any[] = [];
       const { attachments } = req.body;
       if (attachments && Array.isArray(attachments)) {
@@ -892,12 +914,23 @@ Se você precisa de ajuda com o seu próprio acesso ou esqueceu sua senha, por f
           .replace(/[\uFFFD]/g, '');
       }
 
+      // Extrair raciocínio (<think>...</think>) se presente
+      let extractedReasoning = "";
+      if (textResult) {
+        const thinkMatch = textResult.match(/<think>([\s\S]*?)<\/think>/i);
+        if (thinkMatch) {
+          extractedReasoning = thinkMatch[1].trim();
+          textResult = textResult.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+        }
+      }
+
       const textWithEmbeddedSources = embedSourcesInContent(textResult, allSources);
 
       sendSSE({ 
         type: 'final',
         text: textWithEmbeddedSources, 
         cleanContent: textResult,
+        reasoning: extractedReasoning,
         sources: allSources,
         searchSteps 
       });

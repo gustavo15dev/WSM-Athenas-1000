@@ -16,7 +16,9 @@ import {
   Lock,
   ShieldAlert,
   Monitor,
-  Loader2
+  Loader2,
+  Flag,
+  AlertTriangle
 } from 'lucide-react';
 import { supabase } from '../supabase';
 import { MockExam, MockExamQuestion, MockSubmission } from '../types';
@@ -282,6 +284,18 @@ export default function StudentSimulados({
   const [showTimer, setShowTimer] = useState<boolean>(true);
   const [currentSubmissionId, setCurrentSubmissionId] = useState<string | null>(null);
   const [timeoutModalShown, setTimeoutModalShown] = useState<boolean>(false);
+  const [markedForReview, setMarkedForReview] = useState<Record<string, boolean>>({});
+  const [unansweredWarningData, setUnansweredWarningData] = useState<{
+    unansweredIndices: number[];
+    totalQuestions: number;
+  } | null>(null);
+
+  const toggleMarkForReview = (questionId: string) => {
+    setMarkedForReview(prev => ({
+      ...prev,
+      [questionId]: !prev[questionId]
+    }));
+  };
 
   // Refs to avoid stale closures in event listeners
   const originalExamRef = useRef<MockExam | null>(null);
@@ -448,7 +462,12 @@ export default function StudentSimulados({
     }
     if (!manualGrades) manualGrades = {};
 
-    const pendingWrittenQuestions = writtenQuestions.filter(q => !manualGrades[q.id]);
+    const pendingWrittenQuestions = writtenQuestions.filter(q => {
+      const ans = submission?.answers?.[q.id];
+      const hasAns = ans !== undefined && ans !== null && ans !== '' && ans !== 'undefined';
+      if (!hasAns) return false;
+      return !manualGrades[q.id];
+    });
     const gradedWrittenQuestions = writtenQuestions.filter(q => !!manualGrades[q.id]);
 
     const hasPendingWritten = pendingWrittenQuestions.length > 0;
@@ -1141,6 +1160,8 @@ export default function StudentSimulados({
       setErrorMsg('');
       setSuccessMsg('');
       setTimeoutModalShown(false);
+      setMarkedForReview({});
+      setUnansweredWarningData(null);
 
       let examStartTimestamp = Date.now();
       if (originalStartTime) {
@@ -1473,26 +1494,38 @@ export default function StudentSimulados({
     }
   };
 
-  // Submit Interactive Exam & execute auto-correction
-  const handleSubmitExam = async () => {
+  // Check for unanswered questions before submitting
+  const handleSubmitExam = () => {
     if (!activeExam) return;
     setErrorMsg('');
-    setSubmitting(true);
 
-    // Check for unanswered questions and ask for confirmation
-    const unanswered = activeExam.questions.filter(q => {
+    // Check for unanswered questions
+    const unansweredIndices: number[] = [];
+    activeExam.questions.forEach((q, idx) => {
       const a = studentAnswers[q.id];
-      return a === undefined || a === null || a === '' || a === 'undefined';
-    });
-    if (unanswered.length > 0) {
-      const confirmSubmit = window.confirm(
-        `Você ainda possui ${unanswered.length} questão(ões) sem responder. As questões em branco serão consideradas incorretas.\n\nDeseja finalizar e entregar o simulado mesmo assim?`
-      );
-      if (!confirmSubmit) {
-        setSubmitting(false);
-        return;
+      if (a === undefined || a === null || a === '' || a === 'undefined') {
+        unansweredIndices.push(idx);
       }
+    });
+
+    if (unansweredIndices.length > 0) {
+      setUnansweredWarningData({
+        unansweredIndices,
+        totalQuestions: activeExam.questions.length
+      });
+      return;
     }
+
+    // All questions answered, proceed to final submission
+    executeFinalSubmitExam();
+  };
+
+  // Submit Interactive Exam & execute auto-correction
+  const executeFinalSubmitExam = async () => {
+    if (!activeExam) return;
+    setUnansweredWarningData(null);
+    setErrorMsg('');
+    setSubmitting(true);
 
     try {
       // Exit fullscreen safely
@@ -2103,18 +2136,32 @@ export default function StudentSimulados({
           )}
 
           {/* ACTIVE EXAM INNER CONTAINER (Blurred if not fullscreen) */}
-          <div className={`max-w-3xl mx-auto space-y-6 ${!isFullscreen ? 'blur-md pointer-events-none' : ''}`}>
-            <div className="p-5 rounded-3xl bg-neutral-950 border border-neutral-900 backdrop-blur-md flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div className={`max-w-6xl mx-auto space-y-6 ${!isFullscreen ? 'blur-md pointer-events-none' : ''}`}>
+            
+            {/* Top Exam Header */}
+            <div className="p-5 sm:p-6 rounded-3xl bg-neutral-950/80 border border-neutral-900/90 backdrop-blur-md flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-xl">
               <div>
-                <span className="text-[9px] font-mono tracking-wider text-emerald-400 uppercase font-semibold font-bold">Simulado Online Sendo Realizado</span>
-                <h3 className="text-base font-bold text-neutral-100 mt-1">{activeExam.title}</h3>
-                <p className="text-xs text-neutral-555 font-mono mt-0.5">Disciplina: {activeExam.subject} • Professor(a): {activeExam.teacher_name}</p>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="px-2.5 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-mono uppercase font-bold rounded-full">
+                    {activeExam.subject || 'Simulado'}
+                  </span>
+                  <span className="text-[10px] text-neutral-500 font-mono">
+                    {activeExam.questions?.length || 0} Questões • {activeExam.total_points || 10} pts
+                  </span>
+                </div>
+                <h2 className="text-base sm:text-xl font-bold text-neutral-100 font-display line-clamp-1">
+                  {activeExam.title}
+                </h2>
+                <p className="text-xs text-neutral-400 font-sans mt-0.5">
+                  {activeExam.teacher_name ? `Prof. ${activeExam.teacher_name}` : ''} {studentClass ? `· Turma ${studentClass}` : ''}
+                </p>
               </div>
               
-              <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex items-center gap-3 flex-wrap self-stretch sm:self-auto justify-between sm:justify-end">
+                {/* Timer pill */}
                 {remainingSeconds !== -1 && (
-                  <div className="flex items-center gap-2 bg-neutral-900 border border-neutral-800 rounded-2xl px-3 py-1.5 shrink-0">
-                    <Clock className="w-4 h-4 text-emerald-400" />
+                  <div className="flex items-center gap-2 bg-neutral-900/90 border border-neutral-800 rounded-full px-3.5 py-1.5 shrink-0 shadow-inner">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                     <span className="text-xs font-mono font-bold text-neutral-200">
                       {showTimer ? (() => {
                         const seconds = remainingSeconds;
@@ -2122,35 +2169,28 @@ export default function StudentSimulados({
                         const m = Math.floor((seconds % 3600) / 60);
                         const s = seconds % 60;
                         const pad = (n: number) => n.toString().padStart(2, '0');
-                        return h > 0 ? `${pad(h)}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
-                      })() : "••:••"}
+                        return (h > 0 ? `${pad(h)}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`) + ' restantes';
+                      })() : "••:•• restantes"}
                     </span>
                     <button
+                      type="button"
                       onClick={() => setShowTimer(!showTimer)}
-                      className="text-neutral-500 hover:text-neutral-300 p-0.5 transition-colors cursor-pointer"
+                      className="text-neutral-500 hover:text-neutral-300 p-0.5 transition-colors cursor-pointer ml-1"
                       title={showTimer ? "Ocultar Cronômetro" : "Mostrar Cronômetro"}
                     >
-                      {showTimer ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      {showTimer ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                     </button>
                   </div>
                 )}
 
                 <button
-                  onClick={handleSubmitExam}
-                  disabled={submitting}
-                  className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-neutral-950 font-black rounded-xl text-xs cursor-pointer transition-all flex items-center gap-1.5 shadow-lg shadow-emerald-500/20"
-                >
-                  <CheckCircle className="w-4 h-4" />
-                  <span>{submitting ? "Enviando..." : "Finalizar e Entregar Prova"}</span>
-                </button>
-
-                <button
+                  type="button"
                   onClick={() => {
                     if (window.confirm("Deseja sair do simulado agora? Sua prova será entregue com as respostas já marcadas.")) {
                       handleAbandonSubmit();
                     }
                   }}
-                  className="px-3 py-2 bg-neutral-900 border border-neutral-800 hover:text-red-400 text-neutral-400 rounded-xl text-xs font-semibold cursor-pointer transition-all"
+                  className="px-3.5 py-1.5 bg-neutral-900 hover:bg-neutral-850 border border-neutral-800 hover:text-red-400 text-neutral-400 rounded-xl text-xs font-semibold cursor-pointer transition-all"
                   title="Sair da prova"
                 >
                   Sair
@@ -2158,145 +2198,261 @@ export default function StudentSimulados({
               </div>
             </div>
 
-            {/* Progress bar visualizer */}
-            <div className="space-y-2">
-              <div className="flex justify-between items-center text-xs text-neutral-550">
-                <span>Questão {examProgressIndex + 1} de {activeExam.questions.length}</span>
-                <span>{Math.round(((examProgressIndex) / activeExam.questions.length) * 100)}% concluído</span>
-              </div>
-              <div className="w-full bg-neutral-900 p-0.5 rounded-full overflow-hidden">
-                <div 
-                  className="bg-emerald-400 h-1.5 rounded-full transition-all duration-300" 
-                  style={{ width: `${((examProgressIndex + 1) / activeExam.questions.length) * 100}%` }}
-                />
-              </div>
-            </div>
-
-            {/* Current Question panel */}
-            {(() => {
-              const currentQ = activeExam.questions[examProgressIndex];
-              if (!currentQ) return null;
-              const currentAnswer = studentAnswers[currentQ.id];
-
-              return (
-                <div className="p-8 rounded-3xl bg-neutral-950/60 border border-neutral-900 backdrop-blur-md space-y-6 animate-fadeIn">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="px-2.5 py-1 bg-neutral-900 text-neutral-450 border border-neutral-850 font-bold font-mono text-[10px] rounded">
-                      PERGUNTA {examProgressIndex + 1} • {currentQ.type === 'multiple' ? 'MÚLTIPLA ESCOLA' : 'DISCURSIVA (ESCREVER)'}
+            {/* Two-Column Exam Workspace */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+              
+              {/* Left Column: Progress Bar & Active Question Card */}
+              <div className="lg:col-span-8 space-y-4">
+                
+                {/* Progress bar visualizer */}
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="font-bold text-neutral-200">Questão {examProgressIndex + 1} de {activeExam.questions.length}</span>
+                    <span className="text-neutral-400 font-mono">
+                      {Math.round(((Object.values(studentAnswers).filter(a => a !== undefined && String(a).trim() !== '').length) / activeExam.questions.length) * 100)}% concluído
                     </span>
-                    {currentQ.isEnem && (
-                      <span className="px-2.5 py-1 bg-amber-500/10 text-amber-400 border border-amber-500/20 font-extrabold font-mono text-[10px] rounded flex items-center gap-1 animate-pulse">
-                        ⚡ ENEM {currentQ.enemYear || ""}
-                      </span>
-                    )}
                   </div>
-
-                  <p className="text-sm md:text-base font-semibold text-neutral-250 leading-relaxed max-w-full whitespace-pre-wrap font-sans">{currentQ.text}</p>
-
-                  {currentQ.imageUrls && currentQ.imageUrls.length > 0 ? (
-                    <div className="grid grid-cols-2 gap-2 mt-2 w-full max-w-lg mx-auto">
-                      {currentQ.imageUrls.map((img, imgIdx) => (
-                        <div 
-                          key={imgIdx} 
-                          className="rounded-xl overflow-hidden border border-neutral-900 aspect-video bg-neutral-950 flex items-center justify-center cursor-zoom-in group relative"
-                          onClick={() => window.dispatchEvent(new CustomEvent('wsm-open-image-fullscreen', { detail: img }))}
-                          title="Clique para ampliar"
-                        >
-                          <img src={img} alt={`Imagem ${imgIdx+1}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" referrerPolicy="no-referrer" />
-                          <div className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <span className="text-[10px] font-bold text-white bg-black/60 px-1.5 py-0.5 rounded">🔍</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : currentQ.imageUrl ? (
+                  <div className="w-full bg-neutral-900 rounded-full h-1.5 overflow-hidden">
                     <div 
-                      className="rounded-2xl border border-neutral-900 overflow-hidden bg-neutral-950 p-2 max-h-72 w-fit mx-auto cursor-zoom-in group relative"
-                      onClick={() => window.dispatchEvent(new CustomEvent('wsm-open-image-fullscreen', { detail: currentQ.imageUrl }))}
-                      title="Clique para ampliar"
-                    >
-                      <img src={currentQ.imageUrl} alt="Ilustração da pergunta" className="max-h-64 object-contain group-hover:scale-[1.02] transition-transform duration-300" referrerPolicy="no-referrer" />
-                      <div className="absolute inset-0 bg-black/35 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-2xl">
-                        <span className="text-xs font-bold text-white bg-black/60 px-2 py-1 rounded-lg">Ampliar 🔍</span>
-                      </div>
-                    </div>
-                  ) : null}
-
-                  {/* Multiple choice rendering options as elegant button selectors */}
-                  {currentQ.type === 'multiple' && currentQ.options && (
-                    <div className="space-y-3">
-                      {currentQ.options.map((option, choiceIdx) => {
-                        const isSelected = currentAnswer !== undefined && Number(currentAnswer) === choiceIdx;
-                        return (
-                          <button
-                            key={choiceIdx}
-                            onClick={() => handleAnswerChange(currentQ.id, choiceIdx)}
-                            className={`w-full p-4 border rounded-2xl text-left text-xs font-semibold flex items-center justify-between gap-4 transition-all hover:bg-neutral-900/40 cursor-pointer ${
-                              isSelected
-                                ? 'bg-emerald-500/5 text-emerald-300 border-emerald-500/40'
-                                : 'bg-neutral-950 border-neutral-900 text-neutral-400'
-                            }`}
-                          >
-                            <span className="flex-1 leading-normal whitespace-pre-wrap">{String.fromCharCode(65 + choiceIdx)}) {option}</span>
-                            <div className={`h-4 w-4 rounded-full border flex items-center justify-center shrink-0 ${
-                              isSelected 
-                                ? 'bg-emerald-400 border-emerald-405 text-neutral-900' 
-                                : 'bg-transparent border-neutral-800'
-                            }`}>
-                              {isSelected && <Check className="w-2.5 h-2.5 font-black stroke-[3px]" />}
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {/* Written text answer box */}
-                  {currentQ.type === 'written' && (
-                    <div className="space-y-2">
-                      <label className="block text-[10px] uppercase font-bold tracking-wider text-neutral-500 mb-1">Escreva abaixo sua resposta de forma clara e objetiva:</label>
-                      <textarea
-                        placeholder="Redija aqui sua resposta discursiva..."
-                        rows={5}
-                        value={currentAnswer !== undefined ? String(currentAnswer) : ''}
-                        onChange={(e) => handleAnswerChange(currentQ.id, e.target.value)}
-                        className="w-full px-4 py-3 bg-neutral-950 border border-neutral-850 focus:border-emerald-500/50 rounded-2xl text-xs text-neutral-200 outline-none placeholder-neutral-655 resize-none leading-relaxed"
-                      />
-                    </div>
-                  )}
-
-                  {/* Nav tools inside exam taking */}
-                  <div className="flex justify-between items-center pt-6 border-t border-neutral-900/60 mt-4 [content-visibility:auto]">
-                    <button
-                      onClick={() => changeQuestion(Math.max(0, examProgressIndex - 1))}
-                      disabled={examProgressIndex === 0}
-                      className="px-4 py-2 bg-neutral-900 hover:bg-neutral-800 text-neutral-400 disabled:opacity-0 rounded-xl text-xs font-semibold transition-all cursor-pointer"
-                    >
-                      Anterior
-                    </button>
-
-                    {examProgressIndex < activeExam.questions.length - 1 ? (
-                      <button
-                        onClick={() => changeQuestion(examProgressIndex + 1)}
-                        className="px-5 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-neutral-200 border border-neutral-850 hover:border-neutral-750 font-bold rounded-xl text-xs flex items-center gap-1.5 transition-all cursor-pointer mb-2"
-                      >
-                        <span>Entendido, Próxima</span>
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </button>
-                    ) : (
-                      <button
-                        onClick={handleSubmitExam}
-                        disabled={submitting}
-                        className="px-6 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-neutral-950 font-extrabold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                      >
-                        <CheckCircle className="w-4 h-4" />
-                        <span>{submitting ? "Corrigindo e enviando..." : "Finalizar Simulado"}</span>
-                      </button>
-                    )}
+                      className="bg-emerald-400 h-full rounded-full transition-all duration-300" 
+                      style={{ width: `${((examProgressIndex + 1) / activeExam.questions.length) * 100}%` }}
+                    />
                   </div>
                 </div>
-              );
-            })()}
+
+                {/* Question Container */}
+                {(() => {
+                  const currentQ = activeExam.questions[examProgressIndex];
+                  if (!currentQ) return null;
+                  const currentAnswer = studentAnswers[currentQ.id];
+                  const isMarked = markedForReview[currentQ.id] === true;
+
+                  return (
+                    <div className="p-6 sm:p-8 rounded-3xl bg-neutral-950/80 border border-neutral-900/90 backdrop-blur-md space-y-6 shadow-xl animate-fadeIn">
+                      
+                      {/* Question Top Row: Question Type badge & Mark for Review toggle */}
+                      <div className="flex items-center justify-between gap-3 flex-wrap">
+                        <div className="flex items-center gap-2">
+                          <span className="px-3 py-1 bg-neutral-900 text-neutral-300 border border-neutral-800 font-semibold text-xs rounded-xl font-mono">
+                            Pergunta {examProgressIndex + 1} · {currentQ.type === 'multiple' ? 'Múltipla escolha' : 'Discursiva'}
+                          </span>
+                          {currentQ.isEnem && (
+                            <span className="px-2.5 py-1 bg-amber-500/10 text-amber-400 border border-amber-500/20 font-extrabold font-mono text-[10px] rounded-xl flex items-center gap-1 animate-pulse">
+                              ⚡ ENEM {currentQ.enemYear || ""}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Mark for Review Button */}
+                        <button
+                          type="button"
+                          onClick={() => toggleMarkForReview(currentQ.id)}
+                          className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 border transition-all cursor-pointer ${
+                            isMarked
+                              ? 'bg-amber-500/15 text-amber-300 border-amber-500/50 shadow-sm shadow-amber-500/10'
+                              : 'bg-neutral-900/70 text-neutral-400 border-neutral-800 hover:text-amber-300 hover:border-amber-500/30'
+                          }`}
+                        >
+                          <Flag className={`w-3.5 h-3.5 ${isMarked ? 'fill-amber-400 text-amber-400' : ''}`} />
+                          <span>{isMarked ? 'Marcada para revisão' : 'Marcar para revisão'}</span>
+                        </button>
+                      </div>
+
+                      {/* Question text */}
+                      <h3 className="text-base sm:text-lg font-bold text-neutral-100 leading-relaxed font-sans max-w-full whitespace-pre-wrap">
+                        {currentQ.text}
+                      </h3>
+
+                      {/* Question illustrations */}
+                      {currentQ.imageUrls && currentQ.imageUrls.length > 0 ? (
+                        <div className="grid grid-cols-2 gap-2 mt-2 w-full max-w-lg mx-auto">
+                          {currentQ.imageUrls.map((img, imgIdx) => (
+                            <div 
+                              key={imgIdx} 
+                              className="rounded-xl overflow-hidden border border-neutral-900 aspect-video bg-neutral-950 flex items-center justify-center cursor-zoom-in group relative"
+                              onClick={() => window.dispatchEvent(new CustomEvent('wsm-open-image-fullscreen', { detail: img }))}
+                              title="Clique para ampliar"
+                            >
+                              <img src={img} alt={`Imagem ${imgIdx+1}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" referrerPolicy="no-referrer" />
+                              <div className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                <span className="text-[10px] font-bold text-white bg-black/60 px-1.5 py-0.5 rounded">🔍</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : currentQ.imageUrl ? (
+                        <div 
+                          className="rounded-2xl border border-neutral-900 overflow-hidden bg-neutral-950 p-2 max-h-72 w-fit mx-auto cursor-zoom-in group relative"
+                          onClick={() => window.dispatchEvent(new CustomEvent('wsm-open-image-fullscreen', { detail: currentQ.imageUrl }))}
+                          title="Clique para ampliar"
+                        >
+                          <img src={currentQ.imageUrl} alt="Ilustração da pergunta" className="max-h-64 object-contain group-hover:scale-[1.02] transition-transform duration-300" referrerPolicy="no-referrer" />
+                          <div className="absolute inset-0 bg-black/35 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-2xl">
+                            <span className="text-xs font-bold text-white bg-black/60 px-2 py-1 rounded-lg">Ampliar 🔍</span>
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {/* Multiple choice rendering options as elegant button selectors */}
+                      {currentQ.type === 'multiple' && currentQ.options && (
+                        <div className="space-y-3 pt-2">
+                          {currentQ.options.map((option, choiceIdx) => {
+                            const isSelected = currentAnswer !== undefined && Number(currentAnswer) === choiceIdx;
+                            return (
+                              <button
+                                key={choiceIdx}
+                                type="button"
+                                onClick={() => handleAnswerChange(currentQ.id, choiceIdx)}
+                                className={`w-full p-4 border rounded-2xl text-left text-xs sm:text-sm font-medium flex items-center justify-between gap-4 transition-all cursor-pointer ${
+                                  isSelected
+                                    ? 'bg-emerald-500/5 text-emerald-300 border-emerald-500/60 shadow-sm ring-1 ring-emerald-500/30'
+                                    : 'bg-neutral-900/40 border-neutral-850/80 text-neutral-300 hover:bg-neutral-900 hover:border-neutral-750'
+                                }`}
+                              >
+                                <span className="flex-1 leading-relaxed whitespace-pre-wrap">
+                                  <strong className="font-bold text-neutral-200 mr-2">{String.fromCharCode(65 + choiceIdx)})</strong>
+                                  {option}
+                                </span>
+                                <div className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 transition-all ${
+                                  isSelected 
+                                    ? 'bg-emerald-400 border-emerald-400 text-neutral-950' 
+                                    : 'bg-transparent border-neutral-700'
+                                }`}>
+                                  {isSelected && <Check className="w-3 h-3 stroke-[3.5]" />}
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {/* Written text answer box */}
+                      {currentQ.type === 'written' && (
+                        <div className="space-y-2 pt-2">
+                          <label className="block text-[10px] uppercase font-bold tracking-wider text-neutral-500 mb-1">
+                            Escreva abaixo sua resposta de forma clara e objetiva:
+                          </label>
+                          <textarea
+                            placeholder="Redija aqui sua resposta discursiva..."
+                            rows={5}
+                            value={currentAnswer !== undefined ? String(currentAnswer) : ''}
+                            onChange={(e) => handleAnswerChange(currentQ.id, e.target.value)}
+                            className="w-full px-4 py-3 bg-neutral-950 border border-neutral-850 focus:border-emerald-500/50 rounded-2xl text-xs text-neutral-200 outline-none placeholder-neutral-655 resize-none leading-relaxed"
+                          />
+                        </div>
+                      )}
+
+                      {/* Navigation buttons inside question card */}
+                      <div className="flex justify-between items-center pt-6 border-t border-neutral-900">
+                        <button
+                          type="button"
+                          onClick={() => changeQuestion(Math.max(0, examProgressIndex - 1))}
+                          disabled={examProgressIndex === 0}
+                          className="px-5 py-2.5 bg-neutral-900 hover:bg-neutral-850 disabled:opacity-30 disabled:pointer-events-none text-neutral-300 border border-neutral-800 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
+                        >
+                          <span>← Anterior</span>
+                        </button>
+
+                        {examProgressIndex < activeExam.questions.length - 1 ? (
+                          <button
+                            type="button"
+                            onClick={() => changeQuestion(examProgressIndex + 1)}
+                            className="px-6 py-2.5 bg-neutral-100 hover:bg-white text-neutral-950 font-extrabold rounded-xl text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-md hover:scale-[1.02] active:scale-[0.98]"
+                          >
+                            <span>Próxima →</span>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={handleSubmitExam}
+                            disabled={submitting}
+                            className="px-6 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-neutral-950 font-black rounded-xl text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-lg shadow-emerald-500/20 hover:scale-[1.02] active:scale-[0.98]"
+                          >
+                            <CheckCircle className="w-4 h-4" />
+                            <span>{submitting ? "Enviando..." : "Finalizar Prova"}</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Right Column: Questions Grid Card & Submit Action */}
+              <div className="lg:col-span-4 space-y-4">
+                <div className="bg-neutral-950/80 border border-neutral-900/90 rounded-3xl p-5 sm:p-6 space-y-6 shadow-xl backdrop-blur-md sticky top-6">
+                  
+                  {/* Card Header */}
+                  <div>
+                    <h4 className="text-sm font-bold text-neutral-100 font-display">Questões</h4>
+                    <p className="text-[11px] text-neutral-400 mt-0.5">Clique em um número pra ir direto pra ele</p>
+                  </div>
+
+                  {/* Question Grid Tiles */}
+                  <div className="grid grid-cols-5 gap-2 max-h-[320px] overflow-y-auto p-1 scrollbar-thin scrollbar-thumb-neutral-800 scrollbar-track-transparent">
+                    {activeExam.questions.map((q, idx) => {
+                      const isCurrent = idx === examProgressIndex;
+                      const isAnswered = studentAnswers[q.id] !== undefined && String(studentAnswers[q.id]).trim() !== '';
+                      const isMarked = markedForReview[q.id] === true;
+
+                      return (
+                        <button
+                          key={q.id || idx}
+                          type="button"
+                          onClick={() => changeQuestion(idx)}
+                          className={`h-11 rounded-xl text-xs font-bold transition-all relative flex items-center justify-center cursor-pointer border ${
+                            isCurrent
+                              ? 'border-white bg-neutral-800/90 text-white ring-2 ring-white/30 shadow-md font-extrabold scale-[1.03]'
+                              : isAnswered
+                                ? 'border-emerald-500/60 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-400'
+                                : 'border-neutral-800/90 bg-neutral-900/40 text-neutral-500 hover:border-neutral-700 hover:text-neutral-300'
+                          }`}
+                          title={`Questão ${idx + 1}: ${isAnswered ? 'Respondida' : 'Não respondida'}${isMarked ? ' (Marcada para revisão)' : ''}`}
+                        >
+                          <span>{idx + 1}</span>
+                          {isMarked && (
+                            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-amber-400 rounded-full ring-2 ring-neutral-950 shadow-sm" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Legend */}
+                  <div className="space-y-2 pt-2 border-t border-neutral-900/80 text-[11px] text-neutral-400">
+                    <div className="flex items-center gap-2.5">
+                      <span className="w-3.5 h-3.5 rounded border border-emerald-500/70 bg-emerald-500/10 shrink-0" />
+                      <span>Respondida</span>
+                    </div>
+                    <div className="flex items-center gap-2.5">
+                      <span className="w-3.5 h-3.5 rounded border-2 border-white bg-neutral-800 shrink-0" />
+                      <span>Questão atual</span>
+                    </div>
+                    <div className="flex items-center gap-2.5">
+                      <span className="w-3.5 h-3.5 rounded border border-neutral-800 bg-neutral-900 relative shrink-0 flex items-center justify-center">
+                        <span className="w-2 h-2 rounded-full bg-amber-400" />
+                      </span>
+                      <span>Marcada p/ revisão</span>
+                    </div>
+                    <div className="flex items-center gap-2.5">
+                      <span className="w-3.5 h-3.5 rounded border border-neutral-800 bg-neutral-900 shrink-0" />
+                      <span>Não respondida</span>
+                    </div>
+                  </div>
+
+                  {/* Submit Exam Button */}
+                  <button
+                    type="button"
+                    onClick={handleSubmitExam}
+                    disabled={submitting}
+                    className="w-full py-3.5 bg-emerald-400 hover:bg-emerald-300 active:scale-[0.98] text-neutral-950 font-black rounded-2xl text-xs transition-all shadow-lg shadow-emerald-500/20 cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    <CheckCircle className="w-4 h-4" />
+                    <span>{submitting ? "Enviando prova..." : "Enviar prova"}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       ) : (
@@ -2455,22 +2611,24 @@ export default function StudentSimulados({
                           Incorreto ❌ (+0.0 pt)
                         </span>
                       )
+                    ) : !hasStudentAnswer ? (
+                      <span className="px-2.5 py-0.5 bg-neutral-800 border border-neutral-700 text-neutral-400 text-[10px] font-bold rounded-lg">
+                        Não Respondida (0.0 pt)
+                      </span>
+                    ) : manualGrade ? (
+                      <span className={`px-2.5 py-0.5 text-[10px] font-bold rounded-lg border ${
+                        manualGrade.status === 'correct'
+                          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                          : manualGrade.status === 'half'
+                          ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                          : 'bg-rose-500/10 text-rose-400 border-rose-500/30'
+                      }`}>
+                        Avaliado: +{manualGrade.pointsAwarded.toFixed(1)} pt(s)
+                      </span>
                     ) : (
-                      manualGrade ? (
-                        <span className={`px-2.5 py-0.5 text-[10px] font-bold rounded-lg border ${
-                          manualGrade.status === 'correct'
-                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
-                            : manualGrade.status === 'half'
-                            ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
-                            : 'bg-rose-500/10 text-rose-400 border-rose-500/30'
-                        }`}>
-                          Avaliado: +{manualGrade.pointsAwarded.toFixed(1)} pt(s)
-                        </span>
-                      ) : (
-                        <span className="px-2.5 py-0.5 bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[10px] font-bold rounded-lg animate-pulse">
-                          ⏳ Aguardando Correção da Professora
-                        </span>
-                      )
+                      <span className="px-2.5 py-0.5 bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[10px] font-bold rounded-lg animate-pulse">
+                        ⏳ Aguardando Correção da Professora
+                      </span>
                     )}
                   </div>
 
@@ -2750,6 +2908,90 @@ export default function StudentSimulados({
             >
               Entendido
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL VERMELHO DE ALERTA: QUESTÕES NÃO RESPONDIDAS */}
+      {unansweredWarningData && (
+        <div className="fixed inset-0 z-[10000] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 animate-fadeIn overflow-y-auto">
+          <div className="bg-neutral-950 border-2 border-red-500/50 rounded-3xl p-6 sm:p-8 max-w-lg w-full text-left space-y-5 shadow-2xl shadow-red-950/60 animate-scaleUp relative my-auto">
+            
+            {/* Header com ícone de alerta vermelho em destaque */}
+            <div className="flex items-start gap-4">
+              <div className="w-14 h-14 bg-red-500/15 text-red-400 border border-red-500/30 rounded-2xl flex items-center justify-center shrink-0 shadow-lg shadow-red-500/10">
+                <AlertTriangle className="w-7 h-7 text-red-400 animate-pulse" />
+              </div>
+              <div className="space-y-1 min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-red-500/20 text-red-300 border border-red-500/30 font-mono">
+                    Atenção antes de entregar
+                  </span>
+                </div>
+                <h3 className="text-xl font-black text-neutral-100 font-display">
+                  Questões em Branco!
+                </h3>
+                <p className="text-xs text-neutral-400">
+                  Você ainda possui <strong className="text-red-400 font-bold">{unansweredWarningData.unansweredIndices.length} de {unansweredWarningData.totalQuestions} questões</strong> sem responder.
+                </p>
+              </div>
+            </div>
+
+            {/* Caixa vermelha destacando que questão em branco = erro (nota 0) */}
+            <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-4 space-y-1.5 text-red-200">
+              <div className="flex items-center gap-2 text-red-400 font-bold text-xs uppercase tracking-wide">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>As questões em branco serão zeradas:</span>
+              </div>
+              <p className="text-xs text-neutral-300 leading-relaxed">
+                Ao enviar agora, cada questão não respondida será automaticamente considerada como <strong>erro (nota zero)</strong>. Tem certeza de que deseja entregar o simulado assim mesmo?
+              </p>
+            </div>
+
+            {/* Atalhos para as questões não respondidas */}
+            <div className="space-y-2">
+              <span className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider block">
+                Clique para ir direto à questão e responder:
+              </span>
+              <div className="flex flex-wrap gap-2 max-h-36 overflow-y-auto p-1 scrollbar-thin scrollbar-thumb-neutral-800">
+                {unansweredWarningData.unansweredIndices.map((qIdx) => (
+                  <button
+                    key={qIdx}
+                    type="button"
+                    onClick={() => {
+                      changeQuestion(qIdx);
+                      setUnansweredWarningData(null);
+                    }}
+                    className="px-3 py-1.5 bg-neutral-900 hover:bg-neutral-850 border border-red-500/30 hover:border-red-400 text-red-300 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 group shadow-sm"
+                    title={`Ir para a Questão ${qIdx + 1}`}
+                  >
+                    <span>Questão {qIdx + 1}</span>
+                    <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform text-red-400" />
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Botões de Ação */}
+            <div className="flex flex-col sm:flex-row items-center justify-end gap-3 pt-3 border-t border-neutral-900">
+              <button
+                type="button"
+                onClick={() => setUnansweredWarningData(null)}
+                className="w-full sm:w-auto px-5 py-2.5 bg-neutral-900 hover:bg-neutral-850 text-neutral-300 hover:text-white rounded-xl text-xs font-bold transition-all border border-neutral-800 cursor-pointer text-center"
+              >
+                Voltar e responder
+              </button>
+              <button
+                type="button"
+                onClick={() => executeFinalSubmitExam()}
+                disabled={submitting}
+                className="w-full sm:w-auto px-6 py-2.5 bg-red-600 hover:bg-red-500 active:scale-[0.98] text-white font-black rounded-xl text-xs transition-all shadow-lg shadow-red-600/30 cursor-pointer flex items-center justify-center gap-2"
+              >
+                <span>{submitting ? "Enviando..." : "Enviar assim mesmo"}</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+
           </div>
         </div>
       )}
