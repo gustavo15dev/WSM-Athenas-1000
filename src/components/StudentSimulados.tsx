@@ -2608,39 +2608,118 @@ export default function StudentSimulados({
       {showConfirmStart && (() => {
         const { settings } = parseExamSettings(showConfirmStart.description);
         const isCont = settings.is_controlled === true;
+        const timeLimit = settings.duration_minutes || 0;
+        const totalQuestions = showConfirmStart.questions?.length || 0;
+        const totalPoints = showConfirmStart.total_points || 10;
+        const subject = showConfirmStart.subject || 'Geral';
 
         return (
-          <div className="fixed inset-0 z-[10000] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
-            <div className={`bg-neutral-950 border ${isCont ? 'border-red-500/30' : 'border-emerald-500/30'} rounded-3xl p-8 max-w-lg w-full text-center space-y-6 shadow-2xl animate-scaleUp`}>
-              <div className={`w-16 h-16 ${isCont ? 'bg-red-500/10 text-red-500 border-red-500/20' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'} rounded-full flex items-center justify-center mx-auto border`}>
-                <ShieldAlert className="w-8 h-8 animate-pulse" />
+          <div className="fixed inset-0 z-[10000] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 animate-fadeIn overflow-y-auto">
+            <div className={`bg-neutral-950 border ${isCont ? 'border-amber-500/30' : 'border-emerald-500/30'} rounded-3xl p-6 sm:p-8 max-w-xl w-full text-left space-y-5 shadow-2xl shadow-emerald-950/20 animate-scaleUp relative my-auto`}>
+              
+              {/* Header Badge & Title */}
+              <div className="flex items-start gap-4">
+                <div className={`w-12 h-12 shrink-0 ${isCont ? 'bg-amber-500/10 text-amber-400 border-amber-500/25' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/25'} rounded-2xl flex items-center justify-center border shadow-inner`}>
+                  {isCont ? <ShieldAlert className="w-6 h-6" /> : <ClipboardList className="w-6 h-6" />}
+                </div>
+                <div className="space-y-1 min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">
+                      {subject}
+                    </span>
+                    {isCont ? (
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-500/10 text-amber-400 border border-amber-500/20 font-mono flex items-center gap-1">
+                        <Lock className="w-3 h-3" /> Tentativa Única
+                      </span>
+                    ) : (
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-neutral-900 text-neutral-400 border border-neutral-800 font-mono">
+                        Ritmo Livre
+                      </span>
+                    )}
+                  </div>
+                  <h3 className="text-lg sm:text-xl font-bold text-neutral-100 font-display line-clamp-2">
+                    {showConfirmStart.title}
+                  </h3>
+                  <p className="text-xs text-neutral-400">
+                    O simulado vai começar! Leia com atenção as orientações antes de iniciar:
+                  </p>
+                </div>
               </div>
-              <div className="space-y-2">
-                <h3 className="text-xl font-bold text-neutral-100">
-                  {isCont ? 'Simulado de Tentativa Única!' : 'Iniciar Simulado'}
-                </h3>
-                <p className={`${isCont ? 'text-amber-400' : 'text-emerald-400'} text-xs font-semibold`}>
-                  {isCont ? 'Você só pode entrar neste simulado 1 vez.' : 'Modo de Ritmo Livre & Tentativas Flexíveis.'}
+
+              {/* Info Grid (Time, Questions, Anti-Cheat) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Duração */}
+                <div className="bg-neutral-900/60 border border-neutral-850 rounded-2xl p-3.5 flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-neutral-800 flex items-center justify-center shrink-0 text-emerald-400">
+                    <Clock className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-[11px] font-semibold text-neutral-400 block">Tempo de Prova</span>
+                    <span className="text-xs font-bold text-neutral-200 block mt-0.5">
+                      {timeLimit > 0 ? `${timeLimit} minutos cronometrados` : 'Sem limite de tempo'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Questões */}
+                <div className="bg-neutral-900/60 border border-neutral-850 rounded-2xl p-3.5 flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-neutral-800 flex items-center justify-center shrink-0 text-emerald-400">
+                    <BookOpen className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-[11px] font-semibold text-neutral-400 block">Estrutura</span>
+                    <span className="text-xs font-bold text-neutral-200 block mt-0.5">
+                      {totalQuestions > 0 ? `${totalQuestions} questões` : 'Múltiplas questões'} • {totalPoints} pts
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Anti-cheat & Focus Rules Explanation */}
+              {isCont ? (
+                <div className="bg-amber-500/5 border border-amber-500/20 rounded-2xl p-4 space-y-2">
+                  <div className="flex items-center gap-2 text-amber-400 font-bold text-xs">
+                    <ShieldAlert className="w-4 h-4 shrink-0" />
+                    <span>Regras do Sistema Anti-Cola Ativado:</span>
+                  </div>
+                  <ul className="text-[11.5px] text-neutral-300 space-y-1.5 list-disc pl-4 leading-relaxed">
+                    <li><strong className="text-neutral-100">Não troque de aba</strong> nem minimize o navegador durante o teste.</li>
+                    <li><strong className="text-neutral-100">Permaneça em tela cheia</strong> até clicar em finalizar e entregar.</li>
+                    <li>O sistema monitora trocas de foco e tentativas de cópia para o professor.</li>
+                  </ul>
+                </div>
+              ) : (
+                <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-2xl p-3.5 flex items-center gap-3">
+                  <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <p className="text-[11.5px] text-neutral-300 leading-relaxed">
+                    Você pode responder com tranquilidade e revisar suas respostas antes de enviar.
+                  </p>
+                </div>
+              )}
+
+              {/* Important Exit Warning Card */}
+              <div className="bg-red-500/10 border border-red-500/25 rounded-2xl p-3.5 flex items-start gap-3 text-red-300">
+                <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                <p className="text-[11.5px] leading-relaxed">
+                  <strong className="text-red-200 font-bold">Aviso importante:</strong> Ao iniciar, não feche o navegador nem saia da página do simulado. Se sair, sua prova será enviada automaticamente com o que foi respondido e não será possível refazer.
                 </p>
               </div>
-              <p className="text-neutral-400 text-xs leading-relaxed">
-                {isCont 
-                  ? 'Uma vez iniciado, você DEVE concluir a prova até o fim. Caso saia da página, feche o navegador, ou abandone, sua tentativa será finalizada e enviada automaticamente com as respostas salvas e nota calculada.'
-                  : 'Você pode realizar o simulado tranquilamente no seu próprio ritmo. Suas respostas serão salvas e enviadas com segurança ao finalizar.'
-                }
-              </p>
-              <div className="flex gap-3 justify-center pt-2">
+
+              {/* Actions */}
+              <div className="flex items-center justify-end gap-3 pt-2">
                 <button
+                  type="button"
                   onClick={() => setShowConfirmStart(null)}
-                  className="px-5 py-2 bg-neutral-900 hover:bg-neutral-800 text-neutral-400 rounded-xl text-xs font-bold cursor-pointer transition-all"
+                  className="px-5 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200 rounded-xl text-xs font-bold cursor-pointer transition-all border border-neutral-800"
                 >
-                  Cancelar
+                  Voltar
                 </button>
                 <button
+                  type="button"
                   onClick={() => handleConfirmStartExam(showConfirmStart)}
-                  className="px-5 py-2 bg-emerald-500 hover:bg-emerald-400 text-neutral-950 rounded-xl text-xs font-extrabold cursor-pointer transition-all flex items-center gap-2 shadow-lg"
+                  className="px-6 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-neutral-950 rounded-xl text-xs font-black cursor-pointer transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/20 hover:scale-[1.02] active:scale-[0.98]"
                 >
-                  <span>{isCont ? 'Iniciar e Deixar em Tela Cheia' : 'Iniciar Simulado'}</span>
+                  <span>Iniciar Simulado</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
