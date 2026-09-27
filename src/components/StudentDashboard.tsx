@@ -123,6 +123,44 @@ export default function StudentDashboard({
     }
   };
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const sidebarRef = useRef<HTMLElement>(null);
+  const [hideTopBrand, setHideTopBrand] = useState(false);
+
+  // Dynamic check: hide top branding ONLY when the sidebar content overflows (needs scroll)
+  useEffect(() => {
+    const sidebar = sidebarRef.current;
+    if (!sidebar) return;
+
+    const checkOverflow = () => {
+      if (!hideTopBrand) {
+        if (sidebar.scrollHeight > sidebar.clientHeight + 4) {
+          setHideTopBrand(true);
+        }
+      } else {
+        if (sidebar.clientHeight >= sidebar.scrollHeight + 80) {
+          setHideTopBrand(false);
+        }
+      }
+    };
+
+    const t = setTimeout(checkOverflow, 40);
+    window.addEventListener('resize', checkOverflow);
+
+    let observer: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(() => {
+        checkOverflow();
+      });
+      observer.observe(sidebar);
+    }
+
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener('resize', checkOverflow);
+      if (observer) observer.disconnect();
+    };
+  }, [hideTopBrand, isSidebarCollapsed, activeTab]);
+
   const [studyExamTheme, setStudyExamTheme] = useState<string | undefined>(undefined);
   const [studyExamContent, setStudyExamContent] = useState<string | undefined>(undefined);
 
@@ -2497,43 +2535,46 @@ export default function StudentDashboard({
       {/* Modern Sidebar for desktop */}
       {!isExamActive && (
         <aside 
+          ref={sidebarRef}
           id="dashboard-sidebar" 
           data-collapsed={isSidebarCollapsed}
           className={`${
             isSidebarCollapsed ? 'w-24 px-2.5 py-6' : 'w-64 p-6'
           } h-screen max-h-screen border-r border-emerald-950/20 bg-neutral-950/60 hidden md:flex flex-col shrink-0 justify-between z-30 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-neutral-800/70 scrollbar-track-transparent hover:scrollbar-thumb-neutral-700 transition-all duration-300`}
         >
-        <div className="space-y-8">
-          <div className={`flex ${isSidebarCollapsed ? 'flex-col items-center gap-4' : 'items-center justify-between gap-2 animate-fadeIn'}`}>
-            <div className={`flex ${isSidebarCollapsed ? 'flex-col items-center' : 'items-center'} gap-3`}>
-              <div className="w-11 h-11 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center justify-center shrink-0 overflow-hidden">
-                <img
-                  src="https://res.cloudinary.com/dqx8p8orf/image/upload/f_auto/q_auto/gallery_image_20260927_114822-sem-mexer-em-mais-nada-nesse-boneco-mantenha-a-con-removebg-preview_3_ewaz6x.png"
-                  alt="Logo"
-                  referrerPolicy="no-referrer"
-                  className="w-14 h-14 max-w-none object-contain select-none"
-                />
-              </div>
-              {!isSidebarCollapsed && (
-                <div className="animate-fadeIn">
-                  <h1 className="text-base font-bold text-neutral-100 font-display">Athenas</h1>
-                  <span className="text-[9px] text-emerald-400 font-mono tracking-wider uppercase font-semibold">Portal do Aluno</span>
+        <div className={hideTopBrand ? "space-y-4" : "space-y-8"}>
+          {!hideTopBrand && (
+            <div className={`sidebar-top-brand flex ${isSidebarCollapsed ? 'flex-col items-center gap-4' : 'items-center justify-between gap-2 animate-fadeIn'}`}>
+              <div className={`flex ${isSidebarCollapsed ? 'flex-col items-center' : 'items-center'} gap-3`}>
+                <div className="w-11 h-11 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center justify-center shrink-0 overflow-hidden">
+                  <img
+                    src="https://res.cloudinary.com/dqx8p8orf/image/upload/f_auto/q_auto/gallery_image_20260927_114822-sem-mexer-em-mais-nada-nesse-boneco-mantenha-a-con-removebg-preview_3_ewaz6x.png"
+                    alt="Logo"
+                    referrerPolicy="no-referrer"
+                    className="w-14 h-14 max-w-none object-contain select-none"
+                  />
                 </div>
-              )}
-            </div>
+                {!isSidebarCollapsed && (
+                  <div className="animate-fadeIn">
+                    <h1 className="text-base font-bold text-neutral-100 font-display">Athenas</h1>
+                    <span className="text-[9px] text-emerald-400 font-mono tracking-wider uppercase font-semibold">Portal do Aluno</span>
+                  </div>
+                )}
+              </div>
 
-            <button
-              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-              className="p-1.5 rounded-lg border border-neutral-850 bg-neutral-900/50 text-neutral-450 hover:text-emerald-400 hover:border-emerald-500/25 transition-all cursor-pointer shrink-0"
-              title={isSidebarCollapsed ? "Expandir menu" : "Recolher menu"}
-            >
-              {isSidebarCollapsed ? (
-                <ChevronRight className="w-3.5 h-3.5" />
-              ) : (
-                <ChevronLeft className="w-3.5 h-3.5" />
-              )}
-            </button>
-          </div>
+              <button
+                onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                className="p-1.5 rounded-lg border border-neutral-850 bg-neutral-900/50 text-neutral-450 hover:text-emerald-400 hover:border-emerald-500/25 transition-all cursor-pointer shrink-0"
+                title={isSidebarCollapsed ? "Expandir menu" : "Recolher menu"}
+              >
+                {isSidebarCollapsed ? (
+                  <ChevronRight className="w-3.5 h-3.5" />
+                ) : (
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                )}
+              </button>
+            </div>
+          )}
 
           <div className="space-y-1.5">
             {isSidebarCollapsed && (
