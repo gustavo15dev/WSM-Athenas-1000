@@ -634,7 +634,9 @@ export default function AthenasMarkdownRenderer({
             const isSourceTag = Boolean(matchingSource || isExplicitSourceTag);
 
             if (isSourceTag) {
-              const domain = matchingSource?.domain || extractDomain(href || '');
+              const rawDomain = matchingSource?.domain || extractDomain(href || '');
+              const isValidDomain = Boolean(rawDomain && rawDomain.includes('.') && rawDomain.length > 3 && !rawDomain.includes('/'));
+              const domain = isValidDomain ? rawDomain : 'web';
               const sourceTitle = matchingSource?.title || childText || domain || 'Fonte';
 
               return (
@@ -651,12 +653,16 @@ export default function AthenasMarkdownRenderer({
                   className="inline-flex items-center gap-1.5 px-2 py-0.5 mx-1 my-0.5 rounded-full text-[11px] font-medium bg-neutral-900/95 text-emerald-300 hover:text-emerald-200 border border-emerald-500/30 hover:border-emerald-400 hover:bg-emerald-950/60 transition-all cursor-pointer select-none align-middle shadow-xs group/tag"
                   title={`Fonte consultada: ${sourceTitle} (${domain}) - Clique para ver detalhes`}
                 >
-                  <img
-                    src={`https://www.google.com/s2/favicons?domain=${domain}&sz=32`}
-                    alt=""
-                    className="w-3.5 h-3.5 rounded-full object-contain shrink-0 bg-neutral-800 p-0.5"
-                    onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
-                  />
+                  {isValidDomain ? (
+                    <img
+                      src={`https://www.google.com/s2/favicons?domain=${encodeURIComponent(rawDomain)}&sz=32`}
+                      alt=""
+                      className="w-3.5 h-3.5 rounded-full object-contain shrink-0 bg-neutral-800 p-0.5"
+                      onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
+                    />
+                  ) : (
+                    <Globe className="w-3 h-3 text-emerald-400 shrink-0" />
+                  )}
                   <span className="truncate max-w-[140px] font-mono">{sourceTitle}</span>
                   <span className="text-[10px] text-emerald-400/80 group-hover/tag:translate-x-0.5 group-hover/tag:-translate-y-0.5 transition-transform">
                     ↗

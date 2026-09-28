@@ -84,9 +84,11 @@ export default function SourcesDrawer({
                 </div>
               ) : (
                 sources.map((source, idx) => {
-                  const domain = source.domain || extractDomain(source.url);
+                  const rawDomain = source.domain || extractDomain(source.url);
+                  const isValidDomain = Boolean(rawDomain && rawDomain.includes('.') && rawDomain.length > 3 && !rawDomain.includes('/'));
+                  const domain = isValidDomain ? rawDomain : 'web';
                   const isHighlighted = Boolean(activeSourceUrl && source.url === activeSourceUrl);
-                  const faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
+                  const faviconUrl = isValidDomain ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(rawDomain)}&sz=64` : '';
 
                   return (
                     <div
@@ -100,14 +102,18 @@ export default function SourcesDrawer({
                       {/* Left: Favicon / Logo Image + Title & Domain */}
                       <div className="flex items-center gap-3.5 min-w-0 flex-1">
                         <div className="w-10 h-10 rounded-xl bg-neutral-800/90 border border-neutral-700/60 flex items-center justify-center shrink-0 overflow-hidden shadow-xs">
-                          <img
-                            src={faviconUrl}
-                            alt=""
-                            className="w-5 h-5 object-contain"
-                            onError={(e) => {
-                              (e.currentTarget as HTMLElement).style.display = 'none';
-                            }}
-                          />
+                          {faviconUrl ? (
+                            <img
+                              src={faviconUrl}
+                              alt=""
+                              className="w-5 h-5 object-contain"
+                              onError={(e) => {
+                                (e.currentTarget as HTMLElement).style.display = 'none';
+                              }}
+                            />
+                          ) : (
+                            <Globe className="w-5 h-5 text-emerald-400" />
+                          )}
                         </div>
 
                         <div className="min-w-0 flex-1">
