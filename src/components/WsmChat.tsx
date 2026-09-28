@@ -1141,8 +1141,17 @@ export default function WsmChat({
         let errorMsg = "Não foi possível obter resposta do Athenas.";
         try {
           const errData = await res.json();
-          if (errData && errData.error) errorMsg = typeof errData.error === 'string' ? errData.error : JSON.stringify(errData.error);
-        } catch (e) {}
+          if (errData && errData.error) {
+            errorMsg = typeof errData.error === 'string' ? errData.error : JSON.stringify(errData.error);
+          } else if (errData && errData.message) {
+            errorMsg = errData.message;
+          }
+        } catch {
+          try {
+            const rawText = await res.text();
+            if (rawText && rawText.length < 300) errorMsg = rawText;
+          } catch {}
+        }
 
         const is503 = res.status === 503 || 
           errorMsg.includes("503") || 
@@ -1159,6 +1168,10 @@ export default function WsmChat({
           } : m));
           await new Promise(r => setTimeout(r, 5000));
           return handleSendMessage(rawText);
+        }
+
+        if (res.status === 500 || errorMsg.includes("500") || errorMsg.includes("server error")) {
+          throw new Error("Instabilidade temporária na comunicação com a IA. Se estiver na Vercel, certifique-se de que a variável GEMINI_API_KEY ou ELE_KEY está configurada no painel de Environment Variables.");
         }
 
         throw new Error(errorMsg);
