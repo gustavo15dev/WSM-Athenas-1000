@@ -260,6 +260,10 @@ export default function TeacherDashboard({
   }, [teacherSimulados]);
 
   const teacherTaughtStudents = useMemo(() => {
+    if ((!virtualClasses || virtualClasses.length === 0) && legacyClasses.length === 0) {
+      return [];
+    }
+
     return (studentsUnderMentorship || []).filter((st) => {
       if (!st || !st.email) return false;
 
@@ -269,12 +273,7 @@ export default function TeacherDashboard({
       // 2. Exclude non-student profiles if role is present
       if (st.role && st.role.toLowerCase() !== 'student') return false;
 
-      // 3. Match official/legacy class
-      const matchesOfficial = legacyClasses.some(
-        (cls) => cls.toLowerCase() === (st.turma || '').trim().toLowerCase()
-      );
-
-      // 4. Match virtual class (by name or by student_emails)
+      // 3. Match virtual class created by this teacher
       const matchesVirtual = (virtualClasses || []).some((vc) => {
         if (!vc) return false;
         if (vc.name && (st.turma || '').trim().toLowerCase() === vc.name.trim().toLowerCase()) {
@@ -291,10 +290,15 @@ export default function TeacherDashboard({
             emails = vc.student_emails.split(',').map((s: string) => s.trim()).filter(Boolean);
           }
         }
-        return emails.some((e: any) => e && String(e).toLowerCase() === st.email.toLowerCase());
+        return emails.some((e: any) => e && String(e).toLowerCase().trim() === st.email.toLowerCase().trim());
       });
 
-      return matchesOfficial || matchesVirtual;
+      // 4. Match explicit legacy class if defined
+      const matchesLegacy = legacyClasses.length > 0 && legacyClasses.some(
+        (cls) => cls.toLowerCase() === (st.turma || '').trim().toLowerCase()
+      );
+
+      return matchesVirtual || matchesLegacy;
     });
   }, [studentsUnderMentorship, legacyClasses, virtualClasses, email]);
 
@@ -571,11 +575,10 @@ export default function TeacherDashboard({
 
           resolvedVirtualClasses = dbVirtualClasses.filter((vc: any) => {
             const vcMail = (vc.teacher_email || '').toLowerCase().trim();
+            const vcTeacherId = vc.teacher_id ? String(vc.teacher_id).trim() : '';
+            const profileId = profile?.id ? String(profile.id).trim() : '';
             if (vcMail && (vcMail === emailLower || vcMail === profileEmailLower)) return true;
-            if (emailLower.endsWith('@wsmathenas.com') && vcMail === emailLower.replace('@wsmathenas.com', '@atenas.com')) return true;
-            if (emailLower.endsWith('@atenas.com') && vcMail === emailLower.replace('@atenas.com', '@wsmathenas.com')) return true;
-            if (vc.name && teacherAnos.includes(vc.name.toLowerCase().trim())) return true;
-            if (profileNameLower && vc.teacher_name && vc.teacher_name.toLowerCase().trim() === profileNameLower) return true;
+            if (profileId && vcTeacherId && vcTeacherId === profileId) return true;
             return false;
           });
           const seenIds = new Set<string>();
@@ -592,7 +595,7 @@ export default function TeacherDashboard({
         console.warn("Could not load virtual classes:", vcErr);
       }
 
-      // 3. Load teacher's mock exams (simulados) safely - query & filtering aligned with TeacherSimulados
+      // 3. Load teacher's mock exams (simulados) safely - strict isolation by teacher
       try {
         const { data: dbMockExams, error: mockErr } = await supabase
           .from('wsm_mock_exams')
@@ -602,20 +605,18 @@ export default function TeacherDashboard({
         if (!mockErr && dbMockExams) {
           const emailLower = email.toLowerCase().trim();
           const profileEmailLower = (profile?.email || '').toLowerCase().trim();
-          const profileNameLower = (profile?.nome_completo || '').toLowerCase().trim();
-          const teacherSubjectLower = (profile?.materia || 'biologia').toLowerCase().trim();
+          const profileId = profile?.id ? String(profile.id).trim() : '';
 
-          const legacyAnos = (profile?.anos_lecionados || []).map((cls: string) => cls.trim().toLowerCase());
           const vcNames = resolvedVirtualClasses.map((vc: any) => (vc.name || '').trim().toLowerCase());
           const vcIds = resolvedVirtualClasses.map((vc: any) => (vc.id || '').trim().toLowerCase());
           const vcCodes = resolvedVirtualClasses.map((vc: any) => (vc.access_code || '').trim().toLowerCase());
-          const teacherClassesLower = Array.from(new Set([...legacyAnos, ...vcNames, ...vcIds, ...vcCodes])).filter(Boolean);
+          const teacherClassesLower = Array.from(new Set([...vcNames, ...vcIds, ...vcCodes])).filter(Boolean);
 
           const filteredExams = dbMockExams.filter((exam: any) => {
             const exTeacherEmail = (exam.teacher_email || '').toLowerCase().trim();
-            const exTeacherName = (exam.teacher_name || '').toLowerCase().trim();
-            const exSubject = (exam.subject || '').toLowerCase().trim();
+            const exTeacherId = exam.teacher_id ? String(exam.teacher_id).trim() : '';
 
+            // 1. Created by this teacher by email
             if (
               (exTeacherEmail && exTeacherEmail === emailLower) ||
               (exTeacherEmail && profileEmailLower && exTeacherEmail === profileEmailLower) ||
@@ -625,15 +626,13 @@ export default function TeacherDashboard({
               return true;
             }
 
-            if (
-              profileNameLower &&
-              exTeacherName &&
-              (exTeacherName === profileNameLower || profileNameLower.includes(exTeacherName) || exTeacherName.includes(profileNameLower))
-            ) {
+            // 2. Created by this teacher by teacher_id
+            if (profileId && exTeacherId && exTeacherId === profileId) {
               return true;
             }
 
-            if (exam.class_name) {
+            // 3. Explicitly assigned to one of this teacher's virtual classes
+            if (exam.class_name && teacherClassesLower.length > 0) {
               const { classes } = parseExamTargets(exam.class_name);
               if (classes.some(c => teacherClassesLower.includes(c.toLowerCase().trim()))) {
                 return true;
@@ -642,15 +641,6 @@ export default function TeacherDashboard({
               if (teacherClassesLower.some(tc => tc && (rawClassLower === tc || rawClassLower.includes(tc)))) {
                 return true;
               }
-            }
-
-            if (
-              teacherSubjectLower &&
-              exSubject &&
-              exSubject === teacherSubjectLower &&
-              (!exTeacherEmail || exTeacherEmail === emailLower || exTeacherEmail === profileEmailLower)
-            ) {
-              return true;
             }
 
             return false;
@@ -2786,7 +2776,7 @@ export default function TeacherDashboard({
               email={email}
               teacherId={profile?.id}
               teacherName={profile?.nome_completo || 'Professor'}
-              allStudents={studentsUnderMentorship}
+              allStudents={teacherTaughtStudents}
               virtualClasses={virtualClasses}
               anosLecionados={profile?.anos_lecionados || []}
               onRefreshData={loadTeacherData}

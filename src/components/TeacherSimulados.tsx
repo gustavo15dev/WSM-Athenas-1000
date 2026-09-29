@@ -711,26 +711,19 @@ export default function TeacherSimulados({
 
         const filteredExams = dbExams.filter((exam: any) => {
           const exTeacherEmail = (exam.teacher_email || '').toLowerCase().trim();
-          const exTeacherName = (exam.teacher_name || '').toLowerCase().trim();
-          const exSubject = (exam.subject || '').toLowerCase().trim();
 
+          // 1. Strict match by teacher's email
           if (
-            (exTeacherEmail && exTeacherEmail === emailLower) ||
-            (emailLower.endsWith('@wsmathenas.com') && exTeacherEmail === emailLower.replace('@wsmathenas.com', '@atenas.com')) ||
-            (emailLower.endsWith('@atenas.com') && exTeacherEmail === emailLower.replace('@atenas.com', '@wsmathenas.com'))
+            exTeacherEmail &&
+            (exTeacherEmail === emailLower ||
+             (emailLower.endsWith('@wsmathenas.com') && exTeacherEmail === emailLower.replace('@wsmathenas.com', '@atenas.com')) ||
+             (emailLower.endsWith('@atenas.com') && exTeacherEmail === emailLower.replace('@atenas.com', '@wsmathenas.com')))
           ) {
             return true;
           }
 
-          if (
-            teacherNameLower &&
-            exTeacherName &&
-            (exTeacherName === teacherNameLower || teacherNameLower.includes(exTeacherName) || exTeacherName.includes(teacherNameLower))
-          ) {
-            return true;
-          }
-
-          if (exam.class_name) {
+          // 2. Explicitly assigned to one of this teacher's virtual classes
+          if (exam.class_name && teacherClassesLower.length > 0) {
             const { classes } = parseExamTargets(exam.class_name);
             if (classes.some(c => teacherClassesLower.includes(c.toLowerCase().trim()))) {
               return true;
@@ -739,15 +732,6 @@ export default function TeacherSimulados({
             if (teacherClassesLower.some(tc => tc && (rawClassLower === tc || rawClassLower.includes(tc)))) {
               return true;
             }
-          }
-
-          if (
-            teacherSubjectLower &&
-            exSubject &&
-            exSubject === teacherSubjectLower &&
-            (!exTeacherEmail || exTeacherEmail === emailLower)
-          ) {
-            return true;
           }
 
           return false;
@@ -839,11 +823,9 @@ export default function TeacherSimulados({
           .select('*')
           .order('name', { ascending: true });
         if (dbVCls) {
-          const teacherClassesLower = (availableClasses || []).map(a => a.toLowerCase());
+          const emailLower = email.toLowerCase().trim();
           const myVClasses = dbVCls.filter((vc: any) =>
-            (vc.teacher_email && vc.teacher_email.toLowerCase() === email.toLowerCase()) ||
-            teacherClassesLower.includes((vc.name || '').toLowerCase()) ||
-            teacherClassesLower.includes((vc.id || '').toLowerCase())
+            vc.teacher_email && vc.teacher_email.toLowerCase().trim() === emailLower
           );
           const seenIds = new Set<string>();
           const dedupedVClasses = myVClasses.filter((vc: any) => {

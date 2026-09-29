@@ -101,8 +101,7 @@ export default function TeacherNotebooksReview({
           .select('*');
         if (vClasses) {
           const myVClasses = vClasses.filter((vc: any) =>
-            (vc.teacher_email && vc.teacher_email.toLowerCase().trim() === teacherEmail.toLowerCase().trim()) ||
-            currentClasses.includes((vc.name || '').toLowerCase().trim())
+            vc.teacher_email && vc.teacher_email.toLowerCase().trim() === teacherEmail.toLowerCase().trim()
           );
           myVClasses.forEach((vc: any) => {
             if (vc.name) teacherVirtualClassNames.push(vc.name.toLowerCase().trim());

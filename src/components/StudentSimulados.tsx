@@ -289,6 +289,13 @@ export default function StudentSimulados({
     unansweredIndices: number[];
     totalQuestions: number;
   } | null>(null);
+  const [blockedActionToast, setBlockedActionToast] = useState<string | null>(null);
+  const [infractionModal, setInfractionModal] = useState<{
+    isOpen: boolean;
+    count: number;
+    reason: string;
+  } | null>(null);
+  const lastInfractionTimeRef = useRef<number>(0);
 
   const toggleMarkForReview = (questionId: string) => {
     setMarkedForReview(prev => ({
@@ -756,28 +763,90 @@ export default function StudentSimulados({
     return () => clearInterval(interval);
   }, [email, studentClass]);
 
-  // Track tab switches during active exam - ONLY for controlled exams
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.hidden && activeExam) {
-        const { settings } = parseExamSettings(activeExam.description);
-        const isControlled = settings.mode === 'controlled' || settings.is_controlled === true;
-        if (isControlled) {
-          const nextTelemetry = {
-            ...telemetryRef.current,
-            tabSwitches: telemetryRef.current.tabSwitches + 1
-          };
-          setTelemetry(nextTelemetry);
-          saveProgressToDb(studentAnswersRef.current, nextTelemetry);
-        } else {
-          // Normal mode: do not flag tab switches as violations
-          saveProgressToDb(studentAnswersRef.current, telemetryRef.current);
-        }
+  // Register an infraction event (tab switch, window blur, fullscreen exit)
+  const registerInfraction = (reason: string) => {
+    if (!activeExam) return;
+    const { settings } = parseExamSettings(activeExam.description);
+    const isControlled = settings.mode === 'controlled' || settings.is_controlled === true;
+    if (!isControlled) return;
+
+    const now = Date.now();
+    // Throttle duplicate events within 1.5 seconds (e.g. blur followed immediately by visibilitychange)
+    if (now - lastInfractionTimeRef.current < 1500) {
+      return;
+    }
+    lastInfractionTimeRef.current = now;
+
+    const currentCount = (telemetryRef.current.tabSwitches || 0) + 1;
+    const nowIso = new Date().toISOString();
+
+    const existingLogs = Array.isArray((telemetryRef.current as any).infracoes_log)
+      ? (telemetryRef.current as any).infracoes_log
+      : [];
+
+    const updatedLogs = [
+      ...existingLogs,
+      {
+        count: currentCount,
+        reason,
+        timestamp: nowIso
       }
+    ];
+
+    const nextTelemetry = {
+      ...telemetryRef.current,
+      tabSwitches: currentCount,
+      infracoes_log: updatedLogs
+    };
+
+    setTelemetry(nextTelemetry);
+    saveProgressToDb(studentAnswersRef.current, nextTelemetry);
+
+    logSystemAction({
+      userEmail: email.toLowerCase(),
+      userName: studentName,
+      role: 'student',
+      action: 'VIOLATION_ANTICOLA',
+      details: `Infração #${currentCount}/3 no simulado "${activeExam.title}": ${reason}`,
+      metadata: { examId: activeExam.id, infractionCount: currentCount, reason }
+    }).catch(err => console.error(err));
+
+    if (currentCount >= 3) {
+      handleViolationSubmit();
+    } else {
+      setInfractionModal({
+        isOpen: true,
+        count: currentCount,
+        reason
+      });
+    }
+  };
+
+  // Track tab switches and window blur during active exam - ONLY for controlled exams
+  useEffect(() => {
+    if (!activeExam) return;
+    const { settings } = parseExamSettings(activeExam.description);
+    const isControlled = settings.mode === 'controlled' || settings.is_controlled === true;
+    if (!isControlled) return;
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        registerInfraction("Troca de aba ou janela minimizada detectada.");
+      }
+    };
+
+    const handleWindowBlur = () => {
+      // Trigger infraction on window blur (e.g. Alt+Tab, click on other apps)
+      registerInfraction("Saída do foco da prova (clique fora, Alt+Tab ou troca de aplicativo).");
     };
     
     document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("blur", handleWindowBlur);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("blur", handleWindowBlur);
+    };
   }, [activeExam]);
 
   // Warn on page reload/close when exam is active
@@ -830,16 +899,6 @@ export default function StudentSimulados({
     return () => clearInterval(interval);
   }, [activeExam]);
 
-  // Monitor violations limit to trigger auto-submit (2x or more tab switches / exits for CONTROLLED exams only)
-  useEffect(() => {
-    if (!activeExam) return;
-    const { settings } = parseExamSettings(activeExam.description);
-    const isControlled = settings.mode === 'controlled' || settings.is_controlled === true;
-    if (isControlled && telemetry.tabSwitches >= 2) {
-      handleViolationSubmit();
-    }
-  }, [telemetry.tabSwitches, activeExam]);
-
   // Fisher-Yates shuffle helper
   const shuffleArray = <T,>(array: T[]): T[] => {
     const arr = [...array];
@@ -853,14 +912,22 @@ export default function StudentSimulados({
   };
 
   // Helper to trigger fullscreen
-  const requestFullscreen = () => {
-    const elem = document.documentElement;
-    if (elem.requestFullscreen) {
-      elem.requestFullscreen().then(() => {
-        setIsFullscreen(true);
-      }).catch(err => {
-        console.error("Erro ao solicitar tela cheia:", err);
-      });
+  const requestFullscreen = async () => {
+    try {
+      const elem: any = document.documentElement;
+      if (elem.requestFullscreen) {
+        await elem.requestFullscreen();
+      } else if (elem.webkitRequestFullscreen) {
+        await elem.webkitRequestFullscreen();
+      } else if (elem.mozRequestFullScreen) {
+        await elem.mozRequestFullScreen();
+      } else if (elem.msRequestFullscreen) {
+        await elem.msRequestFullscreen();
+      }
+      setIsFullscreen(true);
+    } catch (err) {
+      console.warn("Fullscreen request error (e.g. sandbox/iframe):", err);
+      setIsFullscreen(true);
     }
   };
 
@@ -875,39 +942,40 @@ export default function StudentSimulados({
     }
 
     const { settings } = parseExamSettings(activeExam.description);
-    const isCont = settings.is_controlled === true;
+    const isCont = settings.mode === 'controlled' || settings.is_controlled === true;
     if (!isCont) {
       setIsFullscreen(true); // Always true for normal exams to bypass fullscreen overlay & blur
       return;
     }
 
     const checkFullscreen = () => {
-      const isFull = !!document.fullscreenElement;
+      const isFull = !!(
+        document.fullscreenElement ||
+        (document as any).webkitFullscreenElement ||
+        (document as any).mozFullScreenElement ||
+        (document as any).msFullscreenElement
+      );
       setIsFullscreen(isFull);
+
       if (isFull) {
         wasInFullscreenRef.current = true;
       } else if (wasInFullscreenRef.current) {
         // Only trigger exit violation if student was actively in fullscreen previously
-        const nextTelemetry = {
-          ...telemetryRef.current,
-          tabSwitches: telemetryRef.current.tabSwitches + 1
-        };
-        setTelemetry(nextTelemetry);
-        saveProgressToDb(studentAnswersRef.current, nextTelemetry);
-
-        logSystemAction({
-          userEmail: email.toLowerCase(),
-          userName: studentName,
-          role: 'student',
-          action: 'VIOLATION_FULLSCREEN',
-          details: `Aluno saiu da tela cheia durante o simulado "${activeExam.title}".`,
-          metadata: { examId: activeExam.id }
-        }).catch(err => console.error(err));
+        registerInfraction("Saída do modo tela cheia obrigatório.");
       }
     };
 
     document.addEventListener('fullscreenchange', checkFullscreen);
-    const initialIsFull = !!document.fullscreenElement;
+    document.addEventListener('webkitfullscreenchange', checkFullscreen);
+    document.addEventListener('mozfullscreenchange', checkFullscreen);
+    document.addEventListener('MSFullscreenChange', checkFullscreen);
+
+    const initialIsFull = !!(
+      document.fullscreenElement ||
+      (document as any).webkitFullscreenElement ||
+      (document as any).mozFullScreenElement ||
+      (document as any).msFullscreenElement
+    );
     setIsFullscreen(initialIsFull);
     if (initialIsFull) {
       wasInFullscreenRef.current = true;
@@ -915,57 +983,121 @@ export default function StudentSimulados({
 
     return () => {
       document.removeEventListener('fullscreenchange', checkFullscreen);
+      document.removeEventListener('webkitfullscreenchange', checkFullscreen);
+      document.removeEventListener('mozfullscreenchange', checkFullscreen);
+      document.removeEventListener('MSFullscreenChange', checkFullscreen);
     };
   }, [activeExam]);
 
-  // Copy, Select, ContextMenu & print blockers
+  // Copy, Select, ContextMenu & Key shortcuts blockers for controlled exams
   useEffect(() => {
     if (!activeExam) return;
 
     const { settings } = parseExamSettings(activeExam.description);
-    const isCont = settings.is_controlled === true;
+    const isCont = settings.mode === 'controlled' || settings.is_controlled === true;
     if (!isCont) return; // Skip blockers for normal exams
+
+    const showToast = (msg: string) => {
+      setBlockedActionToast(msg);
+      setTimeout(() => setBlockedActionToast(null), 2500);
+    };
 
     const handleCopy = (e: ClipboardEvent) => {
       e.preventDefault();
+      e.stopPropagation();
+      showToast("🔒 Cópia de texto (Ctrl+C) bloqueada no modo Anticola.");
+    };
+
+    const handleCut = (e: ClipboardEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      showToast("🔒 Recorte de texto (Ctrl+X) bloqueado no modo Anticola.");
+    };
+
+    const handlePaste = (e: ClipboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (target && target.tagName === 'TEXTAREA') {
+        e.preventDefault();
+        e.stopPropagation();
+        showToast("🔒 Colagem de texto externo desativada.");
+      }
     };
 
     const handleSelectStart = (e: Event) => {
+      const target = e.target as HTMLElement;
+      if (target && (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT')) {
+        return; // allow typing selection inside inputs
+      }
       e.preventDefault();
+      e.stopPropagation();
     };
 
     const handleContextMenu = (e: MouseEvent) => {
       e.preventDefault();
+      e.stopPropagation();
+      showToast("🔒 Menu de contexto (botão direito) desativado.");
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (
-        e.key === 'PrintScreen' ||
-        (e.ctrlKey && e.key === 'p') ||
-        (e.metaKey && e.key === 'p') ||
-        (e.ctrlKey && e.key === 'c') ||
-        (e.metaKey && e.key === 'c') ||
-        (e.ctrlKey && e.key === 'u') ||
-        (e.ctrlKey && e.shiftKey && e.key === 'I') ||
-        e.key === 'F12'
-      ) {
+      const key = (e.key || '').toLowerCase();
+      const isCtrlOrCmd = e.ctrlKey || e.metaKey;
+
+      // Block F12 (DevTools)
+      if (e.key === 'F12' || e.keyCode === 123) {
         e.preventDefault();
         e.stopPropagation();
-        if (e.key === 'PrintScreen') {
-          alert("Captura de tela/PrintScreen não é permitida durante o simulado para manter a integridade da avaliação!");
+        showToast("🔒 DevTools / Inspecionar elemento bloqueado.");
+        return;
+      }
+
+      // Block PrintScreen
+      if (e.key === 'PrintScreen' || key === 'printscreen' || e.keyCode === 44) {
+        e.preventDefault();
+        e.stopPropagation();
+        showToast("🔒 Captura de tela bloqueada durante o simulado.");
+        return;
+      }
+
+      // Block Ctrl+C, Ctrl+X, Ctrl+A, Ctrl+P, Ctrl+U, Ctrl+S
+      if (isCtrlOrCmd) {
+        if (key === 'c' || key === 'x' || key === 'a' || key === 'p' || key === 'u' || key === 's') {
+          e.preventDefault();
+          e.stopPropagation();
+          showToast(`🔒 Atalho Ctrl+${key.toUpperCase()} bloqueado no modo Anticola.`);
+          return;
+        }
+
+        // Block DevTools shortcuts: Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+Shift+C
+        if (e.shiftKey && (key === 'i' || key === 'j' || key === 'c')) {
+          e.preventDefault();
+          e.stopPropagation();
+          showToast("🔒 Ferramentas de desenvolvedor bloqueadas.");
+          return;
         }
       }
     };
 
-    document.addEventListener('copy', handleCopy);
-    document.addEventListener('selectstart', handleSelectStart);
-    document.addEventListener('contextmenu', handleContextMenu);
+    window.addEventListener('copy', handleCopy, true);
+    window.addEventListener('cut', handleCut, true);
+    window.addEventListener('paste', handlePaste, true);
+    window.addEventListener('selectstart', handleSelectStart, true);
+    window.addEventListener('contextmenu', handleContextMenu, true);
+    window.addEventListener('keydown', handleKeyDown, true);
+    document.addEventListener('copy', handleCopy, true);
+    document.addEventListener('cut', handleCut, true);
+    document.addEventListener('contextmenu', handleContextMenu, true);
     document.addEventListener('keydown', handleKeyDown, true);
 
     return () => {
-      document.removeEventListener('copy', handleCopy);
-      document.removeEventListener('selectstart', handleSelectStart);
-      document.removeEventListener('contextmenu', handleContextMenu);
+      window.removeEventListener('copy', handleCopy, true);
+      window.removeEventListener('cut', handleCut, true);
+      window.removeEventListener('paste', handlePaste, true);
+      window.removeEventListener('selectstart', handleSelectStart, true);
+      window.removeEventListener('contextmenu', handleContextMenu, true);
+      window.removeEventListener('keydown', handleKeyDown, true);
+      document.removeEventListener('copy', handleCopy, true);
+      document.removeEventListener('cut', handleCut, true);
+      document.removeEventListener('contextmenu', handleContextMenu, true);
       document.removeEventListener('keydown', handleKeyDown, true);
     };
   }, [activeExam]);
@@ -2099,30 +2231,89 @@ export default function StudentSimulados({
       ) : activeExam ? (
         /* ACTIVE EXAM INTERACTIVE FORM TAKING MODE */
         <div className="fixed inset-0 z-[9999] bg-neutral-950 overflow-y-auto p-4 md:p-8 select-none">
-          {/* Inject style tag to disable standard print layout */}
+          {/* Inject style tag to disable standard print layout and text selection */}
           <style>{`
             @media print {
               body {
                 display: none !important;
               }
             }
+            .select-none, .select-none * {
+              -webkit-user-select: none !important;
+              -moz-user-select: none !important;
+              -ms-user-select: none !important;
+              user-select: none !important;
+            }
+            textarea, input {
+              -webkit-user-select: text !important;
+              -moz-user-select: text !important;
+              -ms-user-select: text !important;
+              user-select: text !important;
+            }
           `}</style>
+
+          {/* TOAST FOR BLOCKED ACTIONS (Ctrl+C, Ctrl+A, Right Click, DevTools) */}
+          {blockedActionToast && (
+            <div className="fixed top-6 right-6 z-[10003] bg-red-950/95 border border-red-500/60 text-red-200 px-4 py-3 rounded-2xl text-xs font-bold shadow-2xl backdrop-blur-md flex items-center gap-2.5 animate-slideIn">
+              <ShieldAlert className="w-4 h-4 text-red-400 shrink-0 animate-pulse" />
+              <span>{blockedActionToast}</span>
+            </div>
+          )}
+
+          {/* INFRACTION MODAL (Tab Switch / Blur / Exit Fullscreen Warning) */}
+          {infractionModal?.isOpen && (
+            <div className="fixed inset-0 z-[10002] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
+              <div className="bg-neutral-950 border border-red-500/50 rounded-3xl p-6 sm:p-8 max-w-md w-full text-center space-y-5 shadow-2xl shadow-red-950/50 animate-scaleUp">
+                <div className="w-16 h-16 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center mx-auto border border-red-500/30">
+                  <AlertTriangle className="w-8 h-8 animate-pulse" />
+                </div>
+                <div className="space-y-2">
+                  <span className="px-3 py-1 bg-red-500/20 text-red-300 border border-red-500/40 font-mono font-bold text-xs rounded-full inline-block">
+                    Infração #{infractionModal.count} de 3
+                  </span>
+                  <h3 className="text-xl font-bold text-neutral-100 font-display">Saída da Prova Detectada</h3>
+                  <p className="text-xs text-neutral-300 leading-relaxed">
+                    {infractionModal.reason}
+                  </p>
+                </div>
+                <div className="p-3.5 bg-neutral-900/80 border border-neutral-800 rounded-2xl text-left space-y-1">
+                  <p className="text-[11px] text-amber-400 font-bold flex items-center gap-1.5">
+                    <ShieldAlert className="w-3.5 h-3.5 shrink-0" />
+                    <span>Atenção: Limite de 3 infrações</span>
+                  </p>
+                  <p className="text-[10.5px] text-neutral-400 leading-relaxed">
+                    Ao atingir 3 infrações, a sua prova será finalizada automaticamente e entregue ao professor com registro de cola.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInfractionModal(null);
+                    requestFullscreen();
+                  }}
+                  className="w-full py-3 bg-red-500 hover:bg-red-400 text-neutral-950 font-extrabold rounded-xl text-xs cursor-pointer transition-all active:scale-95 shadow-lg shadow-red-500/20"
+                >
+                  Estou ciente e vou retornar à prova
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* WARNING OVERLAY IF NOT FULLSCREEN */}
           {!isFullscreen && (
-            <div className="fixed inset-0 z-[10000] bg-neutral-950/80 backdrop-blur-xl flex items-center justify-center p-4">
+            <div className="fixed inset-0 z-[10000] bg-neutral-950/85 backdrop-blur-xl flex items-center justify-center p-4">
               <div className="bg-neutral-900 border border-red-500/30 rounded-3xl p-8 max-w-lg w-full text-center space-y-6 shadow-2xl animate-scaleUp">
                 <div className="w-16 h-16 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center mx-auto border border-red-500/20">
                   <ShieldAlert className="w-8 h-8 animate-pulse" />
                 </div>
                 <div className="space-y-2">
-                  <h3 className="text-xl font-bold text-neutral-100">Você está violando as regras da plataforma.</h3>
+                  <h3 className="text-xl font-bold text-neutral-100 font-display">Tela Cheia Obrigatória</h3>
                   <p className="text-amber-400 text-xs font-semibold">
-                    Você pode estar consultando outras abas durante o simulado.
+                    Este simulado é controlado e exige o modo de tela cheia ativo.
                   </p>
                 </div>
                 <p className="text-neutral-400 text-xs leading-relaxed">
-                  Por favor, deixe em tela cheia novamente e continue a fazer seu simulado, sem consulta à web. Iremos avisar o(a) professor(a) o ocorrido.
+                  Por favor, deixe em tela cheia novamente e continue a fazer seu simulado, sem consulta à web. Saídas de tela são registradas na auditoria.
                 </p>
                 <button
                   onClick={requestFullscreen}
@@ -2158,6 +2349,27 @@ export default function StudentSimulados({
               </div>
               
               <div className="flex items-center gap-3 flex-wrap self-stretch sm:self-auto justify-between sm:justify-end">
+                {/* Visual Anti-Cheat Infractions Counter Badge */}
+                {(() => {
+                  const isCont = parseExamSettings(activeExam.description).settings.is_controlled === true;
+                  if (!isCont) return null;
+                  const switches = telemetry.tabSwitches || 0;
+                  return (
+                    <div className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border text-xs font-mono font-bold shadow-sm transition-all ${
+                      switches === 0
+                        ? 'bg-neutral-900/90 text-emerald-400 border-emerald-500/30'
+                        : switches === 1
+                        ? 'bg-amber-500/15 text-amber-300 border-amber-500/50 animate-pulse'
+                        : 'bg-red-500/20 text-red-300 border-red-500/70 animate-bounce'
+                    }`}>
+                      <ShieldAlert className={`w-4 h-4 ${switches > 0 ? 'text-red-400' : 'text-emerald-400'}`} />
+                      <span>
+                        {switches === 0 ? '🛡️ Anticola: 0/3 infrações' : `🚨 Tentativas de cola: ${switches}/3`}
+                      </span>
+                    </div>
+                  );
+                })()}
+
                 {/* Timer pill */}
                 {remainingSeconds !== -1 && (
                   <div className="flex items-center gap-2 bg-neutral-900/90 border border-neutral-800 rounded-full px-3.5 py-1.5 shrink-0 shadow-inner">

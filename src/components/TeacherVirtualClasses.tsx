@@ -518,10 +518,15 @@ export default function TeacherVirtualClasses({
           .order("created_at", { ascending: false });
         if (error) throw error;
         
-        const myVClasses = (allVClasses || []).filter((vc: any) =>
-          (vc.teacher_email && vc.teacher_email.toLowerCase() === email.toLowerCase()) ||
-          (anosLecionados || []).map((a: string) => a.toLowerCase()).includes((vc.name || "").toLowerCase())
-        );
+        const emailLower = email.toLowerCase().trim();
+        const teacherIdStr = teacherId ? String(teacherId).trim() : '';
+        const myVClasses = (allVClasses || []).filter((vc: any) => {
+          const vcEmail = (vc.teacher_email || '').toLowerCase().trim();
+          const vcTeacherId = vc.teacher_id ? String(vc.teacher_id).trim() : '';
+          if (vcEmail && vcEmail === emailLower) return true;
+          if (teacherIdStr && vcTeacherId && vcTeacherId === teacherIdStr) return true;
+          return false;
+        });
         setVirtualClasses(myVClasses);
       } catch (error) {
         console.error("Error fetching virtual classes:", error);
@@ -747,25 +752,22 @@ export default function TeacherVirtualClasses({
   };
 
   // Normalize list of classes teacher teaches
-  // Now combining anosLecionados (legacy) and virtualClasses names
+  // Strictly classes created by this teacher
   const legacyClasses = (anosLecionados || []).map((cls) => cls.trim()).filter(Boolean);
   const virtualClassesNames = virtualClasses.map(vc => vc.name);
-  const teacherClasses = Array.from(new Set([...legacyClasses, ...virtualClassesNames]));
+  const teacherClasses = Array.from(new Set([...virtualClassesNames, ...legacyClasses]));
 
   // Union of students taught by this teacher
-  const taughtStudents = allStudents.filter((st) => {
+  const taughtStudents = (virtualClasses.length === 0 && legacyClasses.length === 0)
+    ? []
+    : allStudents.filter((st) => {
     if (!st || !st.email) return false;
     // Exclude teacher themselves if present
     if (email && st.email.toLowerCase() === email.toLowerCase()) return false;
     // Exclude non-students
     if ((st as any).role && (st as any).role.toLowerCase() !== 'student') return false;
 
-    // 1. Match by turma
-    const matchesTurma = teacherClasses.some(
-      (cls) => cls.toLowerCase() === (st.turma || "").trim().toLowerCase()
-    );
-
-    // 2. Match by virtual class student_emails or virtual class name
+    // 1. Match by virtual class student_emails or virtual class name
     const matchesVirtual = virtualClasses.some((vc) => {
       if (!vc) return false;
       if (vc.name && (st.turma || "").trim().toLowerCase() === vc.name.trim().toLowerCase()) return true;
@@ -775,10 +777,15 @@ export default function TeacherVirtualClasses({
       else if (typeof vc.student_emails === 'string') {
         try { emails = JSON.parse(vc.student_emails); } catch { emails = vc.student_emails.split(',').map((s: string) => s.trim()).filter(Boolean); }
       }
-      return emails.some((e: any) => e && String(e).toLowerCase() === st.email.toLowerCase());
+      return emails.some((e: any) => e && String(e).toLowerCase().trim() === st.email.toLowerCase().trim());
     });
 
-    return matchesTurma || matchesVirtual;
+    // 2. Match by legacy class only if teacher has explicit legacy classes
+    const matchesTurma = legacyClasses.length > 0 && legacyClasses.some(
+      (cls) => cls.toLowerCase() === (st.turma || "").trim().toLowerCase()
+    );
+
+    return matchesVirtual || matchesTurma;
   });
 
   // Students belonging to the currently selected room/class

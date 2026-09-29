@@ -492,9 +492,8 @@ export default function ClassChat({
           if (!isTeacher) {
             const matchesTaughtClass = combinedTaughtClasses.length > 0 && combinedTaughtClasses.some(cls => areTurmasMatching(p.turma, cls));
             const matchesVClass = teacherVClassStudents.has(emailLower);
-            const isFallbackAllowed = combinedTaughtClasses.length === 0 && teacherVClassStudents.size === 0;
 
-            if (matchesTaughtClass || matchesVClass || isFallbackAllowed) {
+            if (matchesTaughtClass || matchesVClass) {
               taughtStudentsMap.set(emailLower, {
                 email: p.email,
                 name: p.nome_completo || p.email.split('@')[0],
