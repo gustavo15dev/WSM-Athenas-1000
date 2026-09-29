@@ -650,7 +650,7 @@ export default function ClassChat({
           }
           setResolvedStudentTurma(myTurma);
 
-          // Student's virtual classes
+          // Student's virtual classes: ONLY rooms where the student is enrolled
           const myVClasses = (vClasses || []).filter(vc => {
             const emails = parseStudentEmails(vc.student_emails);
             return emails.includes(myEmailLower) || (myTurma && areTurmasMatching(vc.name, myTurma));
@@ -663,26 +663,25 @@ export default function ClassChat({
 
           filteredProfiles = filteredProfiles.filter(p => {
             const pEmail = (p.email || '').toLowerCase().trim();
-            if (pEmail.endsWith('@example.com') || pEmail.endsWith('@atenas.com')) return false;
-
-            // Direct teacher of student's virtual class -> ALWAYS ALLOW!
-            if (myVClassTeachers.includes(pEmail)) {
-              return true;
-            }
-
-            const pSchool = p.escola ? p.escola.toLowerCase().trim() : '';
-            const isSameSchool = mySchool && pSchool ? mySchool === pSchool : true;
+            if (pEmail === myEmailLower || pEmail.endsWith('@example.com') || pEmail.endsWith('@atenas.com')) return false;
 
             const pTaughtClean = parseAnosLecionados(p.anos_lecionados);
             const isTeacher = p.role === 'teacher' || pTaughtClean.length > 0 || Boolean(p.materia) || pEmail.includes('prof') || myVClassTeachers.includes(pEmail);
 
             if (isTeacher) {
-              const teachesMyTurma = myTurma ? pTaughtClean.some(cls => areTurmasMatching(cls, myTurma)) : false;
-              const sameSchoolTeacher = isSameSchool && (mySchool.length > 0);
-              return teachesMyTurma || sameSchoolTeacher;
+              // Strictly: ONLY teachers of rooms the student is enrolled in or official cohort!
+              if (myVClassTeachers.includes(pEmail)) {
+                return true;
+              }
+              if (myTurma && pTaughtClean.some(cls => areTurmasMatching(cls, myTurma))) {
+                return true;
+              }
+              return false;
             } else {
               // Student peer: must be in the same virtual class OR same official turma
               if (myVClassStudents.has(pEmail)) return true;
+              const pSchool = p.escola ? p.escola.toLowerCase().trim() : '';
+              const isSameSchool = mySchool && pSchool ? mySchool === pSchool : true;
               if (myTurma && p.turma && areTurmasMatching(p.turma, myTurma)) {
                 return isSameSchool;
               }
