@@ -244,7 +244,7 @@ export default async function handler(req: any, res: any) {
       } catch {}
     }
 
-    const { message, history, studyExamTheme, studyExamContent, userRole, reasoningActive } = body || {};
+    const { message, history, studyExamTheme, studyExamContent, userRole, reasoningActive, clientDateTime } = body || {};
 
     if (!message) {
       return res.status(400).json({ error: "Mensagem obrigatória." });
@@ -277,6 +277,41 @@ export default async function handler(req: any, res: any) {
       return res.status(200).json({ text: configMsg, sources: [] });
     }
 
+    // Contexto Temporal do Sistema Interno (Data, Dia da semana, Mês, Ano e Horário do Usuário)
+    const now = new Date();
+    const timeZone = clientDateTime?.timeZone || 'America/Sao_Paulo';
+    const resolvedDay = clientDateTime?.day || now.toLocaleDateString('pt-BR', { day: 'numeric', timeZone });
+    const rawWd = clientDateTime?.weekday || now.toLocaleDateString('pt-BR', { weekday: 'long', timeZone });
+    const resolvedWeekday = rawWd.charAt(0).toUpperCase() + rawWd.slice(1);
+    const rawMo = clientDateTime?.month || now.toLocaleDateString('pt-BR', { month: 'long', timeZone });
+    const resolvedMonth = rawMo.charAt(0).toUpperCase() + rawMo.slice(1);
+    const resolvedMonthNum = clientDateTime?.monthNumber || (now.getMonth() + 1);
+    const resolvedYear = clientDateTime?.year || now.toLocaleDateString('pt-BR', { year: 'numeric', timeZone });
+    const resolvedTime = clientDateTime?.time || now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone });
+    const resolvedFullFormatted = clientDateTime?.fullFormatted || `${resolvedWeekday}, ${resolvedDay} de ${resolvedMonth} de ${resolvedYear} às ${resolvedTime}`;
+    const resolvedFormattedDate = clientDateTime?.formattedDate || `${resolvedDay}/${resolvedMonthNum}/${resolvedYear}`;
+
+    const systemTemporalContext = `
+═══════════════════════════════════════════════════════════════
+🕒 CONTEXTO TEMPORAL OFICIAL DO SISTEMA INTERNO (TEMPO REAL):
+- Data de Hoje: ${resolvedFullFormatted}
+- Dia do mês: ${resolvedDay}
+- Dia da semana: ${resolvedWeekday}
+- Mês: ${resolvedMonth} (mês ${resolvedMonthNum})
+- Ano: ${resolvedYear}
+- Horário atual do usuário: ${resolvedTime} (${timeZone})
+- Formato padrão da data: ${resolvedFormattedDate}
+
+DIRETRIZ TEMPORAL RIGOROSA:
+Você sabe com 100% de exatidão que dia é hoje, que horas são e em qual ano estamos.
+Sempre que o usuário perguntar:
+- "que dia é hoje?", "qual a data de hoje?", "que dia da semana é hoje?"
+- "que horas são?", "qual é o horário?"
+- "em que mês estamos?", "em que ano estamos?"
+- "quanto tempo falta para o fim do ano / mês?", ou qualquer pergunta sobre prazos ou calendário escolar:
+Responda com total clareza, certeza e naturalidade, utilizando SEMPRE com precisão os dados temporais acima fornecidos pelo sistema interno.
+═══════════════════════════════════════════════════════════════`;
+
     let systemInstruction = "";
 
     if (userRole === "teacher") {
@@ -298,6 +333,9 @@ Seu objetivo é guiar alunos a APRENDER através do método socrático e explica
 - Formatação rica: use negritos para termos chave, listas organizadas, e LaTeX ($...$) para equações.
 - Sempre acolhedor, dinâmico e focado no crescimento pedagógico do estudante.`;
     }
+
+    // Injetar contexto temporal em todas as instruções
+    systemInstruction += `\n\n` + systemTemporalContext;
 
     // Thinking mode prompt instruction
     if (reasoningActive) {

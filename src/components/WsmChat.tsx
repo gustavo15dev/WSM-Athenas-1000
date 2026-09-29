@@ -1114,6 +1114,22 @@ export default function WsmChat({
       const fetchController = new AbortController();
       const fetchTimeoutId = setTimeout(() => fetchController.abort(), 90000);
 
+      // Obter dia, dia da semana, mês, ano e hora local do sistema do usuário
+      const now = new Date();
+      const rawWeekday = now.toLocaleDateString('pt-BR', { weekday: 'long' });
+      const rawMonth = now.toLocaleDateString('pt-BR', { month: 'long' });
+      const clientDateTime = {
+        day: now.getDate(),
+        weekday: rawWeekday.charAt(0).toUpperCase() + rawWeekday.slice(1),
+        month: rawMonth.charAt(0).toUpperCase() + rawMonth.slice(1),
+        monthNumber: now.getMonth() + 1,
+        year: now.getFullYear(),
+        time: now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Sao_Paulo',
+        formattedDate: now.toLocaleDateString('pt-BR'),
+        fullFormatted: `${rawWeekday.charAt(0).toUpperCase() + rawWeekday.slice(1)}, ${now.getDate()} de ${rawMonth} de ${now.getFullYear()} às ${now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
+      };
+
       let res: Response;
       try {
         res = await fetch("/api/gemini/chat", {
@@ -1130,7 +1146,8 @@ export default function WsmChat({
             studyExamTheme,
             studyExamContent,
             userRole,
-            reasoningActive: isThinkingActive
+            reasoningActive: isThinkingActive,
+            clientDateTime
           })
         });
       } finally {

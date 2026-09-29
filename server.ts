@@ -51,7 +51,7 @@ async function startServer() {
   // Assistência direta via chamada REST ou SDK com Streaming SSE e Ação Agêntica em Tempo Real
   app.post("/api/gemini/chat", async (req, res) => {
     try {
-      const { message, history, studyExamTheme, studyExamContent, userRole, reasoningActive } = req.body;
+      const { message, history, studyExamTheme, studyExamContent, userRole, reasoningActive, clientDateTime } = req.body;
       if (!message) {
         return res.status(400).json({ error: "Mensagem obrigatória." });
       }
@@ -86,11 +86,47 @@ async function startServer() {
         throw new Error("Chave de API não configurada. Defina ELE_KEY ou GEMINI_API_KEY.");
       }
 
+      // Contexto Temporal do Sistema Interno (Data, Dia da semana, Mês, Ano e Horário do Usuário)
+      const now = new Date();
+      const timeZone = clientDateTime?.timeZone || 'America/Sao_Paulo';
+      const resolvedDay = clientDateTime?.day || now.toLocaleDateString('pt-BR', { day: 'numeric', timeZone });
+      const rawWd = clientDateTime?.weekday || now.toLocaleDateString('pt-BR', { weekday: 'long', timeZone });
+      const resolvedWeekday = rawWd.charAt(0).toUpperCase() + rawWd.slice(1);
+      const rawMo = clientDateTime?.month || now.toLocaleDateString('pt-BR', { month: 'long', timeZone });
+      const resolvedMonth = rawMo.charAt(0).toUpperCase() + rawMo.slice(1);
+      const resolvedMonthNum = clientDateTime?.monthNumber || (now.getMonth() + 1);
+      const resolvedYear = clientDateTime?.year || now.toLocaleDateString('pt-BR', { year: 'numeric', timeZone });
+      const resolvedTime = clientDateTime?.time || now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone });
+      const resolvedFullFormatted = clientDateTime?.fullFormatted || `${resolvedWeekday}, ${resolvedDay} de ${resolvedMonth} de ${resolvedYear} às ${resolvedTime}`;
+      const resolvedFormattedDate = clientDateTime?.formattedDate || `${resolvedDay}/${resolvedMonthNum}/${resolvedYear}`;
+
+      const systemTemporalContext = `
+═══════════════════════════════════════════════════════════════
+🕒 CONTEXTO TEMPORAL OFICIAL DO SISTEMA INTERNO (TEMPO REAL):
+- Data de Hoje: ${resolvedFullFormatted}
+- Dia do mês: ${resolvedDay}
+- Dia da semana: ${resolvedWeekday}
+- Mês: ${resolvedMonth} (mês ${resolvedMonthNum})
+- Ano: ${resolvedYear}
+- Horário atual do usuário: ${resolvedTime} (${timeZone})
+- Formato padrão da data: ${resolvedFormattedDate}
+
+DIRETRIZ TEMPORAL RIGOROSA:
+Você sabe com 100% de exatidão que dia é hoje, que horas são e em qual ano estamos.
+Sempre que o usuário perguntar:
+- "que dia é hoje?", "qual a data de hoje?", "que dia da semana é hoje?"
+- "que horas são?", "qual é o horário?"
+- "em que mês estamos?", "em que ano estamos?"
+- "quanto tempo falta para o fim do ano / mês?", ou qualquer pergunta sobre prazos ou calendário escolar:
+Responda com total clareza, certeza e naturalidade, utilizando SEMPRE com precisão os dados temporais acima fornecidos pelo sistema interno.
+═══════════════════════════════════════════════════════════════`;
+
       let systemInstruction = "";
 
       if (userRole === "teacher") {
         systemInstruction = `Você é o Athenas, assistente educacional para PROFESSORES na plataforma Athenas.
 Você NÃO ensina o professor. Você o APOIA em seu trabalho pedagógico.
+${systemTemporalContext}
 
 ═══════════════════════════════════════════════════════════════
 
@@ -424,6 +460,8 @@ FLUXO MANDATÓRIO DE PESQUISA NA WEB:
    - Se ainda faltar algum dado essencial que você precise buscar: gere um novo parágrafo explicativo e uma nova chave {web: "próximo termo"}.
 ═══════════════════════════════════════════════════════════════`;
 
+      systemInstruction += `\n\n` + systemTemporalContext;
+
       if (reasoningActive) {
         systemInstruction += `
 
@@ -486,7 +524,7 @@ Se você precisa de ajuda com o seu próprio acesso ou esqueceu sua senha, por f
         "matemática", "português", "geometria", "álgebra", "célula", "genética", "dna", "plantas", "clima", "ecologia", 
         "documentário", "aula", "prova", "simulado", "athenas", "tutor", "ensinar", "educação", "pedagógico", "professor", 
         "aluno", "questão", "estudar", "aprender", "fórmula", "equação", "átomo", "molécula", "revolução", "brasil", 
-        "império", "colonial", "monarquia", "república"
+        "império", "colonial", "monarquia", "república", "dia", "data", "hoje", "hora", "horas", "horário", "semana", "mês", "ano", "calendário", "tempo"
       ];
 
       const hasOffTopicWord = offTopicKeywords.some(word => matchWord(lowerMsg, word));
