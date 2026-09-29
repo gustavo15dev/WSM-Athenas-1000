@@ -1548,6 +1548,82 @@ Por favor, avalie a resposta do estudante e responda no formato JSON solicitado.
     }
   });
 
+  // API: Buscar estritamente os professores das turmas em que o aluno está matriculado (BUG-04)
+  app.all("/api/get-student-teachers", async (req, res) => {
+    try {
+      const email = String(req.query.email || req.body?.email || "").toLowerCase().trim();
+      if (!email) {
+        return res.status(400).json({ error: "Email do aluno é obrigatório." });
+      }
+
+      // 1. Buscar salas virtuais onde o aluno está cadastrado no array student_emails
+      const { data: virtualClasses, error: vcError } = await serverSupabase
+        .from("wsm_virtual_classes")
+        .select("id, name, teacher_email, teacher_id, student_emails");
+
+      if (vcError) {
+        console.error("[get-student-teachers] Erro ao buscar salas virtuais:", vcError);
+        return res.status(500).json({ error: vcError.message });
+      }
+
+      // Filtrar apenas as salas onde o aluno está matriculado
+      const studentEnrolledClasses = (virtualClasses || []).filter((vc: any) => {
+        if (!vc) return false;
+        let emails: string[] = [];
+        if (Array.isArray(vc.student_emails)) {
+          emails = vc.student_emails.map((e: any) => String(e).toLowerCase().trim());
+        } else if (typeof vc.student_emails === "string") {
+          try {
+            const parsed = JSON.parse(vc.student_emails);
+            if (Array.isArray(parsed)) emails = parsed.map((e: any) => String(e).toLowerCase().trim());
+            else emails = vc.student_emails.split(",").map((s: string) => s.toLowerCase().trim());
+          } catch {
+            emails = vc.student_emails.split(",").map((s: string) => s.toLowerCase().trim());
+          }
+        }
+        return emails.includes(email);
+      });
+
+      if (studentEnrolledClasses.length === 0) {
+        // Aluno não está em nenhuma sala virtual -> retorna lista vazia imediatamente
+        return res.json([]);
+      }
+
+      // 2. Extrair os emails e IDs dos professores únicos dessas turmas
+      const teacherEmails = Array.from(new Set(
+        studentEnrolledClasses
+          .map((vc: any) => (vc.teacher_email || "").toLowerCase().trim())
+          .filter(Boolean)
+      ));
+
+      if (teacherEmails.length === 0) {
+        return res.json([]);
+      }
+
+      // 3. Buscar os perfis desses professores (sem o campo 'escola' para evitar erro 400)
+      const { data: teachers, error: tError } = await serverSupabase
+        .from("wsm_user_profiles")
+        .select("id, email, nome_completo, materia, role, anos_lecionados")
+        .in("email", teacherEmails);
+
+      if (tError) {
+        console.error("[get-student-teachers] Erro ao buscar perfis dos professores:", tError);
+        return res.status(500).json({ error: tError.message });
+      }
+
+      // Filtrar professores válidos
+      const filtered = (teachers || []).filter((t: any) => {
+        const tEmail = (t.email || "").toLowerCase().trim();
+        return teacherEmails.includes(tEmail) && !tEmail.endsWith("@example.com") && !tEmail.endsWith("@atenas.com");
+      });
+
+      return res.json(filtered);
+    } catch (err: any) {
+      console.error("[get-student-teachers] Erro inesperado:", err);
+      return res.status(500).json({ error: err.message || "Erro interno" });
+    }
+  });
+
   // In-memory cache for INEP school queries
   const inepSchoolCache = new Map<string, any[]>();
 

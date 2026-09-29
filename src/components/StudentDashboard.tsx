@@ -72,6 +72,7 @@ import VirtualNotebook from './VirtualNotebook';
 import { startRealtimeNotificationListener } from '../utils/browserNotifications';
 import { supabase } from '../supabase';
 import { safeUpsertUserProfile, areTurmasMatching, setWelcomeModalDismissedInDb } from '../utils/profileDb';
+import { getStudentTeachers } from '../utils/studentTeachers';
 
 interface StudentDashboardProps {
   email: string;
@@ -1540,42 +1541,9 @@ export default function StudentDashboard({
         console.warn("Could not set active chamada:", chErr);
       }
 
-      // 1. Fetch Teachers belonging to the student's virtual classes or cohort
-      const { data: teacherProfiles } = await supabase
-        .from('wsm_user_profiles')
-        .select('*')
-        .eq('role', 'teacher');
-      
-      let filteredTeachers: any[] = [];
-      if (teacherProfiles) {
-        const allowedTeacherEmails = new Set(
-          studentVirtualClassesList
-            .map((vc: any) => (vc.teacher_email || '').toLowerCase().trim())
-            .filter(Boolean)
-        );
-
-        filteredTeachers = teacherProfiles.filter((t: any) => {
-          if (!t || !t.email) return false;
-          const tEmail = t.email.toLowerCase().trim();
-          if (tEmail.endsWith('@example.com') || tEmail.endsWith('@atenas.com')) return false;
-
-          if (allowedTeacherEmails.has(tEmail)) return true;
-          const anos = Array.isArray(t.anos_lecionados)
-            ? t.anos_lecionados.map((a: string) => String(a).trim())
-            : (typeof t.anos_lecionados === 'string' ? t.anos_lecionados.split(',').map((a: string) => a.trim()) : []);
-          if (currentActiveTurma && anos.some((a: string) => areTurmasMatching(a, currentActiveTurma))) {
-            return true;
-          }
-          return false;
-        });
-
-        // Deduplicate teachers
-        const uniqueFiltered = filteredTeachers.filter((t: any, idx: number, arr: any[]) =>
-          arr.findIndex((x: any) => (x.email || '').toLowerCase().trim() === (t.email || '').toLowerCase().trim()) === idx
-        );
-
-        setTeachers(uniqueFiltered);
-      }
+      // 1. Fetch Teachers belonging strictly to the student's virtual classes (BUG-04)
+      const enrolledTeachers = await getStudentTeachers(email, currentActiveTurma);
+      setTeachers(enrolledTeachers);
 
       // 2. Fetch Exams for this cohort, virtual classes, or individual email
       const { data: dbExams } = await supabase
@@ -1631,7 +1599,7 @@ export default function StudentDashboard({
           .order('created_at', { ascending: false });
         if (dbAnns) {
           const activeTeacherMap = new Map<string, any>();
-          (teacherProfiles || []).forEach((t: any) => {
+          (enrolledTeachers || []).forEach((t: any) => {
             if (t.email && !t.email.toLowerCase().endsWith('@atenas.com')) {
               activeTeacherMap.set(t.email.toLowerCase().trim(), t);
             }

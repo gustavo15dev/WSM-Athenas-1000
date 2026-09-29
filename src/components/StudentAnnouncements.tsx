@@ -21,6 +21,7 @@ import {
 import { supabase } from '../supabase';
 import { areTurmasMatching } from '../utils/profileDb';
 import { matchesStudentTarget, getStudentVirtualClassIdentifiers } from '../utils/targetMatcher';
+import { getStudentTeachers } from '../utils/studentTeachers';
 
 interface Announcement {
   id: string;
@@ -112,11 +113,8 @@ export default function StudentAnnouncements({
 
       const vClassIdentifiers = getStudentVirtualClassIdentifiers(emailLower, allVCls || []);
 
-      // 2. Fetch announcements & JOIN with active teachers in wsm_user_profiles
-      const { data: dbTeacherProfiles } = await supabase
-        .from('wsm_user_profiles')
-        .select('id, email, nome_completo, role')
-        .eq('role', 'teacher');
+      // 2. Fetch announcements & JOIN strictly with active enrolled teachers (BUG-04)
+      const dbTeacherProfiles = await getStudentTeachers(studentEmail, studentTurma);
 
       const activeTeacherMap = new Map<string, { id: string; email: string; nome_completo?: string }>();
       (dbTeacherProfiles || []).forEach((t: any) => {

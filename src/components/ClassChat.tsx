@@ -36,6 +36,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../supabase';
 import { sendBrowserNotification } from '../utils/browserNotifications';
+import { getStudentTeachers } from '../utils/studentTeachers';
 
 export interface ChatContact {
   email: string;
@@ -614,82 +615,146 @@ export default function ClassChat({
     async function loadContacts() {
       setLoadingContacts(true);
       try {
-        // Fetch all user profiles from wsm_user_profiles including school and role
-        const { data: profiles, error } = await supabase
-          .from('wsm_user_profiles')
-          .select('id, nome_completo, turma, anos_lecionados, materia, email, escola, role');
-
-        let rawList: any[] = profiles || [];
-
-        // Also fetch virtual classes to check member overlap
-        const { data: vClasses } = await supabase
-          .from('wsm_virtual_classes')
-          .select('id, name, student_emails, teacher_email');
-
-        // Resolve current user profile
-        const myProfile = rawList.find(
-          p => p.email && p.email.toLowerCase().trim() === myEmailLower
-        );
-        const mySchool = myProfile?.escola ? myProfile.escola.toLowerCase().trim() : '';
-
-        // Filter out current user
-        let filteredProfiles = rawList.filter(
-          p => p.email && p.email.toLowerCase().trim() !== myEmailLower
-        );
+        let mappedContacts: ChatContact[] = [];
 
         if (currentUserRole === 'student') {
-          let myTurma = (userTurma || myProfile?.turma || '').trim();
-          if (!myTurma) {
-            const enrolledVC = (vClasses || []).find(vc => {
-              const emails = parseStudentEmails(vc.student_emails);
-              return emails.includes(myEmailLower);
-            });
-            if (enrolledVC?.name) {
-              myTurma = enrolledVC.name;
-            }
+          // --- FLUXO DO ESTUDANTE (BUG-04: Isolamento estrito de docentes) ---
+          // 1. Buscar estritamente os professores das turmas em que o aluno está matriculado
+          const enrolledTeachers = await getStudentTeachers(myEmailLower, userTurma);
+          const allowedTeacherEmails = new Set(
+            enrolledTeachers.map(t => (t.email || '').toLowerCase().trim()).filter(Boolean)
+          );
+
+          // 2. Buscar turmas virtuais para identificar colegas da mesma sala
+          const { data: vClasses } = await supabase
+            .from('wsm_virtual_classes')
+            .select('id, name, student_emails, teacher_email');
+
+          let myTurma = (userTurma || '').trim();
+          const myVClasses = (vClasses || []).filter(vc => {
+            const emails = parseStudentEmails(vc.student_emails);
+            return emails.includes(myEmailLower);
+          });
+
+          if (!myTurma && myVClasses.length > 0) {
+            myTurma = myVClasses[0].name || '';
           }
           setResolvedStudentTurma(myTurma);
 
-          // Student's virtual classes: ONLY rooms where the student is enrolled
-          const myVClasses = (vClasses || []).filter(vc => {
-            const emails = parseStudentEmails(vc.student_emails);
-            return emails.includes(myEmailLower) || (myTurma && areTurmasMatching(vc.name, myTurma));
-          });
-          const myVClassTeachers = myVClasses.map(vc => (vc.teacher_email || '').toLowerCase().trim()).filter(Boolean);
-          const myVClassStudents = new Set<string>();
+          // Colegas de sala estritamente matriculados nas mesmas salas virtuais
+          const classmateEmailsSet = new Set<string>();
           myVClasses.forEach(vc => {
-            parseStudentEmails(vc.student_emails).forEach(e => myVClassStudents.add(e));
+            parseStudentEmails(vc.student_emails).forEach(e => {
+              if (e && e !== myEmailLower && !e.endsWith('@example.com') && !e.endsWith('@atenas.com')) {
+                classmateEmailsSet.add(e);
+              }
+            });
           });
 
-          filteredProfiles = filteredProfiles.filter(p => {
-            const pEmail = (p.email || '').toLowerCase().trim();
-            if (pEmail === myEmailLower || pEmail.endsWith('@example.com') || pEmail.endsWith('@atenas.com')) return false;
+          const classmateEmails = Array.from(classmateEmailsSet);
+          let classmateProfiles: any[] = [];
 
-            const pTaughtClean = parseAnosLecionados(p.anos_lecionados);
-            const isTeacher = p.role === 'teacher' || pTaughtClean.length > 0 || Boolean(p.materia) || pEmail.includes('prof') || myVClassTeachers.includes(pEmail);
+          if (classmateEmails.length > 0) {
+            // Buscar apenas os perfis desses colegas (SEM campo 'escola' para evitar erro 400)
+            const { data: cData } = await supabase
+              .from('wsm_user_profiles')
+              .select('id, nome_completo, turma, email, role')
+              .in('email', classmateEmails);
 
-            if (isTeacher) {
-              // Strictly: ONLY teachers of rooms the student is enrolled in or official cohort!
-              if (myVClassTeachers.includes(pEmail)) {
-                return true;
-              }
-              if (myTurma && pTaughtClean.some(cls => areTurmasMatching(cls, myTurma))) {
-                return true;
-              }
-              return false;
-            } else {
-              // Student peer: must be in the same virtual class OR same official turma
-              if (myVClassStudents.has(pEmail)) return true;
-              const pSchool = p.escola ? p.escola.toLowerCase().trim() : '';
-              const isSameSchool = mySchool && pSchool ? mySchool === pSchool : true;
-              if (myTurma && p.turma && areTurmasMatching(p.turma, myTurma)) {
-                return isSameSchool;
-              }
-              return false;
+            if (cData) classmateProfiles = cData;
+          }
+
+          // 3. Montar lista de contatos do aluno
+          // a. Professores matriculados (se o aluno tem 1 professor, só aparece ele!)
+          enrolledTeachers.forEach(t => {
+            const tEmail = (t.email || '').toLowerCase().trim();
+            mappedContacts.push({
+              email: t.email,
+              name: t.nome_completo || t.email.split('@')[0],
+              role: 'teacher',
+              turma: 'Professor',
+              materia: t.materia || 'Biologia',
+              isOnline: true
+            });
+          });
+
+          // b. Colegas matriculados na mesma turma
+          classmateProfiles.forEach(c => {
+            const cEmail = (c.email || '').toLowerCase().trim();
+            if (cEmail !== myEmailLower && c.role !== 'teacher') {
+              mappedContacts.push({
+                email: c.email,
+                name: c.nome_completo || c.email.split('@')[0],
+                role: 'student',
+                turma: c.turma || myTurma || 'Aluno',
+                isOnline: true
+              });
             }
           });
+
+          // c. Fallback de histórico de mensagens: estritamente restrito a docentes ou colegas permitidos
+          try {
+            const { data: histMsgs } = await supabase
+              .from('wsm_direct_messages')
+              .select('sender_email, sender_name, sender_role, receiver_email, receiver_name, receiver_role, turma_context')
+              .or(`sender_email.ilike.${myEmailLower},receiver_email.ilike.${myEmailLower}`);
+
+            const existingEmails = new Set(mappedContacts.map(c => c.email.toLowerCase().trim()));
+
+            (histMsgs || []).forEach(m => {
+              const otherEmail = (m.sender_email.toLowerCase().trim() === myEmailLower ? m.receiver_email : m.sender_email).toLowerCase().trim();
+              const otherName = m.sender_email.toLowerCase().trim() === myEmailLower ? m.receiver_name : m.sender_name;
+              const otherRole = m.sender_email.toLowerCase().trim() === myEmailLower ? m.receiver_role : m.sender_role;
+
+              if (otherEmail && otherEmail !== myEmailLower && !existingEmails.has(otherEmail)) {
+                // Aluno NUNCA pode ter contato com professor não matriculado
+                const isProf = otherRole === 'teacher' || otherEmail.includes('prof');
+                if (isProf) {
+                  if (allowedTeacherEmails.has(otherEmail)) {
+                    existingEmails.add(otherEmail);
+                    mappedContacts.push({
+                      email: otherEmail,
+                      name: otherName || otherEmail.split('@')[0],
+                      role: 'teacher',
+                      turma: m.turma_context || 'Professor',
+                      isOnline: true
+                    });
+                  }
+                } else if (classmateEmailsSet.has(otherEmail)) {
+                  existingEmails.add(otherEmail);
+                  mappedContacts.push({
+                    email: otherEmail,
+                    name: otherName || otherEmail.split('@')[0],
+                    role: 'student',
+                    turma: m.turma_context || 'Aluno',
+                    isOnline: true
+                  });
+                }
+              }
+            });
+          } catch (e) {
+            console.warn('Fallback loading history contacts:', e);
+          }
         } else {
-          // Teacher Role
+          // --- FLUXO DO PROFESSOR ---
+          const { data: profiles } = await supabase
+            .from('wsm_user_profiles')
+            .select('id, nome_completo, turma, anos_lecionados, materia, email, role');
+
+          let rawList: any[] = profiles || [];
+
+          const { data: vClasses } = await supabase
+            .from('wsm_virtual_classes')
+            .select('id, name, student_emails, teacher_email');
+
+          const myProfile = rawList.find(
+            p => p.email && p.email.toLowerCase().trim() === myEmailLower
+          );
+
+          let filteredProfiles = rawList.filter(
+            p => p.email && p.email.toLowerCase().trim() !== myEmailLower
+          );
+
           const profileTaught = parseAnosLecionados(myProfile?.anos_lecionados);
           const propsTaught = parseAnosLecionados(userAnosLecionados);
 
@@ -709,76 +774,39 @@ export default function ClassChat({
             const pEmail = (p.email || '').toLowerCase().trim();
             if (pEmail.endsWith('@example.com') || pEmail.endsWith('@atenas.com')) return false;
 
-            // Direct student in teacher's virtual class -> ALWAYS ALLOW!
             if (myVClassStudents.has(pEmail)) {
               return true;
             }
-
-            const pSchool = p.escola ? p.escola.toLowerCase().trim() : '';
-            const isSameSchool = mySchool && pSchool ? mySchool === pSchool : true;
 
             const pTaughtClean = parseAnosLecionados(p.anos_lecionados);
             const isTeacher = p.role === 'teacher' || pTaughtClean.length > 0 || Boolean(p.materia) || pEmail.includes('prof');
 
             if (isTeacher) {
-              // Other teacher shares at least one taught turma with this teacher OR shares a virtual class OR same school
               const sharesTaughtClass = pTaughtClean.some(t => combinedTaughtClasses.some(ct => areTurmasMatching(t, ct)));
               const sharesVirtualClass = myCreatedVClasses.some(vc => (vc.teacher_email || '').toLowerCase().trim() === pEmail);
-              const isSameSchoolTeacher = isSameSchool && (mySchool.length > 0);
-              return sharesTaughtClass || sharesVirtualClass || isSameSchoolTeacher;
+              return sharesTaughtClass || sharesVirtualClass;
             } else {
-              // Student belongs to teacher's taught classes OR is in teacher's virtual class
               const matchesTaughtClass = p.turma && combinedTaughtClasses.some(ct => areTurmasMatching(p.turma, ct));
               return matchesTaughtClass;
             }
           });
-        }
 
-        // Map to ChatContact structure
-        const mappedContacts: ChatContact[] = filteredProfiles.map(p => {
-          const pTaughtClean = parseAnosLecionados(p.anos_lecionados);
-          const isTeacher = p.role === 'teacher' || pTaughtClean.length > 0 || Boolean(p.materia) || (p.email && p.email.toLowerCase().includes('prof'));
+          mappedContacts = filteredProfiles.map(p => {
+            const pTaughtClean = parseAnosLecionados(p.anos_lecionados);
+            const isTeacher = p.role === 'teacher' || pTaughtClean.length > 0 || Boolean(p.materia) || (p.email && p.email.toLowerCase().includes('prof'));
 
-          return {
-            email: p.email,
-            name: p.nome_completo || p.email.split('@')[0],
-            role: isTeacher ? 'teacher' : 'student',
-            turma: isTeacher ? (pTaughtClean.join(', ') || 'Professor') : (p.turma || userTurma || 'Turma'),
-            materia: p.materia,
-            isOnline: true
-          };
-        });
-
-        const existingEmails = new Set(mappedContacts.map(c => c.email.toLowerCase().trim()));
-
-        // Ensure every teacher of student's virtual classes is present in contacts list
-        if (currentUserRole === 'student') {
-          const myTurma = (userTurma || myProfile?.turma || '').trim();
-          const myVClasses = (vClasses || []).filter(vc => {
-            const emails = parseStudentEmails(vc.student_emails);
-            return emails.includes(myEmailLower) || (myTurma && areTurmasMatching(vc.name, myTurma));
+            return {
+              email: p.email,
+              name: p.nome_completo || p.email.split('@')[0],
+              role: isTeacher ? 'teacher' : 'student',
+              turma: isTeacher ? (pTaughtClean.join(', ') || 'Professor') : (p.turma || userTurma || 'Turma'),
+              materia: p.materia,
+              isOnline: true
+            };
           });
 
-          myVClasses.forEach(vc => {
-            const tEmail = (vc.teacher_email || '').toLowerCase().trim();
-            if (tEmail && tEmail !== myEmailLower && !existingEmails.has(tEmail)) {
-              existingEmails.add(tEmail);
-              const teacherProf = rawList.find(p => p.email && p.email.toLowerCase().trim() === tEmail);
-              mappedContacts.push({
-                email: tEmail,
-                name: teacherProf?.nome_completo || tEmail.split('@')[0],
-                role: 'teacher',
-                turma: vc.name || 'Professor',
-                materia: teacherProf?.materia || 'Biologia',
-                isOnline: true
-              });
-            }
-          });
-        } else {
-          // Ensure every student in teacher's virtual classes is in contacts list
-          const myCreatedVClasses = (vClasses || []).filter(
-            vc => (vc.teacher_email || '').toLowerCase().trim() === myEmailLower
-          );
+          const existingEmails = new Set(mappedContacts.map(c => c.email.toLowerCase().trim()));
+
           myCreatedVClasses.forEach(vc => {
             parseStudentEmails(vc.student_emails).forEach(sEmail => {
               if (sEmail && sEmail !== myEmailLower && !existingEmails.has(sEmail)) {
@@ -794,35 +822,32 @@ export default function ClassChat({
               }
             });
           });
-        }
 
-        // Ensure any participant from message history is also in contacts list so no incoming chat is orphaned
-        try {
-          const { data: histMsgs } = await supabase
-            .from('wsm_direct_messages')
-            .select('sender_email, sender_name, sender_role, receiver_email, receiver_name, receiver_role, turma_context')
-            .or(`sender_email.ilike.${myEmailLower},receiver_email.ilike.${myEmailLower}`);
+          try {
+            const { data: histMsgs } = await supabase
+              .from('wsm_direct_messages')
+              .select('sender_email, sender_name, sender_role, receiver_email, receiver_name, receiver_role, turma_context')
+              .or(`sender_email.ilike.${myEmailLower},receiver_email.ilike.${myEmailLower}`);
 
-          const existingEmails = new Set(mappedContacts.map(c => c.email.toLowerCase().trim()));
+            (histMsgs || []).forEach(m => {
+              const otherEmail = (m.sender_email.toLowerCase().trim() === myEmailLower ? m.receiver_email : m.sender_email).toLowerCase().trim();
+              const otherName = m.sender_email.toLowerCase().trim() === myEmailLower ? m.receiver_name : m.sender_name;
+              const otherRole = m.sender_email.toLowerCase().trim() === myEmailLower ? m.receiver_role : m.sender_role;
 
-          (histMsgs || []).forEach(m => {
-            const otherEmail = m.sender_email.toLowerCase().trim() === myEmailLower ? m.receiver_email : m.sender_email;
-            const otherName = m.sender_email.toLowerCase().trim() === myEmailLower ? m.receiver_name : m.sender_name;
-            const otherRole = m.sender_email.toLowerCase().trim() === myEmailLower ? m.receiver_role : m.sender_role;
-
-            if (otherEmail && otherEmail.toLowerCase().trim() !== myEmailLower && !existingEmails.has(otherEmail.toLowerCase().trim())) {
-              existingEmails.add(otherEmail.toLowerCase().trim());
-              mappedContacts.push({
-                email: otherEmail,
-                name: otherName || otherEmail.split('@')[0],
-                role: (otherRole as any) || (otherEmail.includes('prof') ? 'teacher' : 'student'),
-                turma: m.turma_context || 'Sala Virtual',
-                isOnline: true
-              });
-            }
-          });
-        } catch (e) {
-          console.warn('Fallback loading history contacts:', e);
+              if (otherEmail && otherEmail !== myEmailLower && !existingEmails.has(otherEmail)) {
+                existingEmails.add(otherEmail);
+                mappedContacts.push({
+                  email: otherEmail,
+                  name: otherName || otherEmail.split('@')[0],
+                  role: (otherRole as any) || (otherEmail.includes('prof') ? 'teacher' : 'student'),
+                  turma: m.turma_context || 'Sala Virtual',
+                  isOnline: true
+                });
+              }
+            });
+          } catch (e) {
+            console.warn('Fallback loading history contacts:', e);
+          }
         }
 
         // Set contacts list

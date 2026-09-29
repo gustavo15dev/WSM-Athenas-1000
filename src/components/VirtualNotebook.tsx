@@ -34,6 +34,7 @@ import {
 } from '../types';
 import { supabase } from '../supabase';
 import { areTurmasMatching } from '../utils/profileDb';
+import { getStudentTeachers } from '../utils/studentTeachers';
 
 interface VirtualNotebookProps {
   userRole: 'student' | 'teacher';
@@ -491,45 +492,13 @@ export default function VirtualNotebook({
           console.warn('Could not query virtual classes for teacher routing:', vcErr);
         }
 
-        // 2. Fetch teacher profiles from wsm_user_profiles
-        let teacherProfiles: any[] = [];
-        try {
-          const { data } = await supabase
-            .from('wsm_user_profiles')
-            .select('email, nome_completo, role, anos_lecionados, materia')
-            .ilike('role', 'teacher');
-          if (data) teacherProfiles = data;
-        } catch (tpErr) {
-          console.warn('Could not query teacher profiles:', tpErr);
-        }
-
-        // 3. Filter strictly to teachers linked to this student's class or virtual classes
-        const validTeachers = teacherProfiles.filter(t => {
+        // 2. Fetch teacher profiles strictly from enrolled rooms (BUG-04 & BUG-05)
+        const enrolledTeachers = await getStudentTeachers(cleanUserEmail, cleanUserTurma);
+        const finalList = enrolledTeachers.filter(t => {
           if (!t || !t.email) return false;
           const tEmail = t.email.toLowerCase().trim();
-          
-          // Exclude demo, dummy, or deprecated dev domains
-          if (tEmail.endsWith('@example.com') || tEmail.endsWith('@atenas.com')) return false;
-
-          // Check if student is actively enrolled in this teacher's virtual class
-          if (studentTeacherEmails.has(tEmail)) return true;
-
-          // Check if teacher officially teaches this student's turma
-          const taughtClasses = Array.isArray(t.anos_lecionados)
-            ? t.anos_lecionados
-            : (typeof t.anos_lecionados === 'string' ? t.anos_lecionados.split(',').map((s: string) => s.trim()) : []);
-
-          if (cleanUserTurma && taughtClasses.some((c: string) => areTurmasMatching(c, cleanUserTurma))) {
-            return true;
-          }
-          return false;
+          return !tEmail.endsWith('@example.com') && !tEmail.endsWith('@atenas.com');
         });
-
-        // Deduplicate and filter out any invalid/unrelated accounts
-        // We do NOT fallback to all teachers in the database when cleanUserTurma is set
-        const finalList = validTeachers.filter((t, idx, arr) => 
-          arr.findIndex(x => (x.email || '').toLowerCase().trim() === (t.email || '').toLowerCase().trim()) === idx
-        );
 
         if (finalList.length > 0) {
           // Sort teachers so that the matched class teacher appears first
