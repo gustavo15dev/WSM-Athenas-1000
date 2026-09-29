@@ -1015,11 +1015,44 @@ export default function StudentSimulados({
     };
 
     const handlePaste = (e: ClipboardEvent) => {
-      const target = e.target as HTMLElement;
-      if (target && target.tagName === 'TEXTAREA') {
+      const pastedData = e.clipboardData?.getData('text') || '';
+      if (pastedData.trim().length > 0) {
+        const activeQ = activeExam.questions?.[examProgressIndex];
+        const questionId = activeQ?.id || `q_${examProgressIndex + 1}`;
+        const nowIso = new Date().toISOString();
+
+        const newRecord = {
+          questionId: questionId,
+          questionIndex: examProgressIndex + 1,
+          pastedContent: pastedData,
+          timestamp: nowIso,
+          charactersCount: pastedData.length
+        };
+
+        const currentPastes = Array.isArray((telemetryRef.current as any).pasted_texts)
+          ? (telemetryRef.current as any).pasted_texts
+          : [];
+
+        const nextTelemetry = {
+          ...telemetryRef.current,
+          pasted_texts: [...currentPastes, newRecord]
+        };
+
+        setTelemetry(nextTelemetry);
+        saveProgressToDb(studentAnswersRef.current, nextTelemetry);
+
+        logSystemAction({
+          userEmail: email.toLowerCase(),
+          userName: studentName,
+          role: 'student',
+          action: 'PASTE_DETECTED',
+          details: `Texto colado (${pastedData.length} caracteres) na Questão ${examProgressIndex + 1} do simulado "${activeExam.title}".`,
+          metadata: { examId: activeExam.id, questionIndex: examProgressIndex + 1, pastedSnippet: pastedData.slice(0, 150), length: pastedData.length }
+        }).catch(err => console.error(err));
+
         e.preventDefault();
         e.stopPropagation();
-        showToast("🔒 Colagem de texto externo desativada.");
+        showToast(`🔒 Colagem de texto (${pastedData.length} carac.) bloqueada e registrada no relatório.`);
       }
     };
 
@@ -2785,6 +2818,43 @@ export default function StudentSimulados({
               </div>
             );
           })()}
+
+          {/* Telemetria e Integridade da Tentativa */}
+          {reviewSubmission?.telemetry && (
+            <div className="p-5 rounded-3xl bg-neutral-950/70 border border-neutral-900 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono uppercase font-bold text-neutral-450 tracking-wider flex items-center gap-1.5">
+                  <ShieldAlert className="w-3.5 h-3.5 text-emerald-400" />
+                  Relatório de Integridade e Telemetria
+                </span>
+                {reviewSubmission.telemetry.pasted_texts && reviewSubmission.telemetry.pasted_texts.length > 0 ? (
+                  <span className="px-2.5 py-0.5 bg-red-500/15 text-red-300 border border-red-500/30 text-[10px] font-mono font-bold rounded-full">
+                    🚨 {reviewSubmission.telemetry.pasted_texts.length} colagem(ns) registrada(s)
+                  </span>
+                ) : (
+                  <span className="px-2.5 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-mono font-bold rounded-full">
+                    🛡️ Respostas 100% Digitadas Manualmente
+                  </span>
+                )}
+              </div>
+
+              {reviewSubmission.telemetry.pasted_texts && reviewSubmission.telemetry.pasted_texts.length > 0 && (
+                <div className="p-3 bg-red-950/20 border border-red-500/20 rounded-2xl space-y-2 text-left">
+                  <span className="text-[10px] font-mono font-bold text-red-400 block">
+                    Trechos de texto colados identificados durante a prova:
+                  </span>
+                  <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                    {reviewSubmission.telemetry.pasted_texts.map((pItem: any, idx: number) => (
+                      <div key={idx} className="p-2 bg-black/60 rounded-xl border border-red-500/20 text-[11px] font-mono text-neutral-300">
+                        <span className="text-red-400 text-[10px] block mb-0.5">Questão {pItem.questionIndex || 'Discursiva'} • {pItem.charactersCount} caracteres:</span>
+                        "{pItem.pastedContent}"
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Questions overview */}
           <div className="space-y-6 pt-2">

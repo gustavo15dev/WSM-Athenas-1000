@@ -104,6 +104,13 @@ export interface MockSubmission {
     violation?: boolean;
     violation_submitted?: boolean;
     abandoned?: boolean;
+    pasted_texts?: Array<{
+      questionId: string;
+      questionIndex?: number;
+      pastedContent: string;
+      timestamp: string;
+      charactersCount: number;
+    }>;
     manual_grades?: Record<string, {
       status: 'correct' | 'half' | 'wrong';
       pointsAwarded: number;

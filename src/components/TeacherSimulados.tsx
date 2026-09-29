@@ -5535,6 +5535,61 @@ export default function TeacherSimulados({
                         <p className="text-[9px] text-neutral-500 mt-1">Indica se o aluno saiu da tela da prova.</p>
                       </div>
 
+                      {/* Registro de Textos Colados pelo Aluno */}
+                      <div className={`p-4 rounded-2xl border ${
+                        tel.pasted_texts && Array.isArray(tel.pasted_texts) && tel.pasted_texts.length > 0
+                          ? 'bg-red-950/20 border-red-500/40'
+                          : 'bg-neutral-900/50 border-neutral-850'
+                      }`}>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-[10px] uppercase font-bold tracking-wider text-neutral-400">
+                            Detecção de Colagem (Clipboard)
+                          </span>
+                          {tel.pasted_texts && Array.isArray(tel.pasted_texts) && tel.pasted_texts.length > 0 ? (
+                            <span className="px-2 py-0.5 bg-red-500/20 text-red-400 border border-red-500/30 text-[9px] font-mono font-bold rounded-full flex items-center gap-1">
+                              <AlertCircle className="w-3 h-3" />
+                              <span>{tel.pasted_texts.length} colagem(ns) detectada(s)</span>
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[9px] font-mono font-bold rounded-full">
+                              ✓ 100% Digitado Manualmente
+                            </span>
+                          )}
+                        </div>
+
+                        {tel.pasted_texts && Array.isArray(tel.pasted_texts) && tel.pasted_texts.length > 0 ? (
+                          <div className="space-y-3 mt-3">
+                            <p className="text-[10px] text-red-300">
+                              O aluno tentou colar textos externos durante a realização desta prova:
+                            </p>
+                            <div className="space-y-2.5 max-h-60 overflow-y-auto pr-1">
+                              {tel.pasted_texts.map((pasteItem: any, pIdx: number) => (
+                                <div key={pIdx} className="p-3 bg-black/60 border border-red-500/20 rounded-xl space-y-1.5 text-left">
+                                  <div className="flex items-center justify-between text-[10px] font-mono">
+                                    <span className="text-red-400 font-bold">
+                                      Questão {pasteItem.questionIndex || 'Discursiva'}
+                                    </span>
+                                    <span className="text-neutral-500">
+                                      {pasteItem.timestamp ? new Date(pasteItem.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : ''}
+                                    </span>
+                                  </div>
+                                  <div className="text-[11px] text-neutral-200 font-mono bg-neutral-950 p-2 rounded border border-neutral-850 whitespace-pre-wrap select-text leading-relaxed">
+                                    "{pasteItem.pastedContent}"
+                                  </div>
+                                  <span className="text-[9px] text-neutral-500 block">
+                                    Total de caracteres colados: {pasteItem.charactersCount || pasteItem.pastedContent?.length || 0}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-[10px] text-neutral-500 mt-1">
+                            Nenhum evento de colar (Ctrl+V ou botão direito) foi registrado. Todo o conteúdo foi digitado pelo aluno.
+                          </p>
+                        )}
+                      </div>
+
                       <div className="bg-neutral-900/50 border border-neutral-850 p-4 rounded-2xl">
                         <span className="text-[10px] text-neutral-500 uppercase font-bold tracking-wider block mb-3">Detalhes por Questão</span>
                         <div className="space-y-3">
