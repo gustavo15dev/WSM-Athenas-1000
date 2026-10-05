@@ -989,13 +989,17 @@ export default function StudentSimulados({
     };
   }, [activeExam]);
 
-  // Copy, Select, ContextMenu & Key shortcuts blockers for controlled exams
+  // Copy, Select, ContextMenu & Key shortcuts blockers for online exams
   useEffect(() => {
     if (!activeExam) return;
 
+    // Apply document & body styles to block selection across the entire page
+    document.body.classList.add('exam-session-active');
+    document.body.style.userSelect = 'none';
+    (document.body.style as any).webkitUserSelect = 'none';
+
     const { settings } = parseExamSettings(activeExam.description);
     const isCont = settings.mode === 'controlled' || settings.is_controlled === true;
-    if (!isCont) return; // Skip blockers for normal exams
 
     const showToast = (msg: string) => {
       setBlockedActionToast(msg);
@@ -1003,18 +1007,27 @@ export default function StudentSimulados({
     };
 
     const handleCopy = (e: ClipboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (target && (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT')) {
+        return; // Allow copying own response inside textarea if needed
+      }
       e.preventDefault();
       e.stopPropagation();
-      showToast("🔒 Cópia de texto (Ctrl+C) bloqueada no modo Anticola.");
+      showToast("🔒 Seleção e cópia de texto bloqueadas durante a prova.");
     };
 
     const handleCut = (e: ClipboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (target && (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT')) {
+        return;
+      }
       e.preventDefault();
       e.stopPropagation();
-      showToast("🔒 Recorte de texto (Ctrl+X) bloqueado no modo Anticola.");
+      showToast("🔒 Recorte de texto bloqueado durante a prova.");
     };
 
     const handlePaste = (e: ClipboardEvent) => {
+      if (!isCont) return; // Only controlled exams track telemetry
       const pastedData = e.clipboardData?.getData('text') || '';
       if (pastedData.trim().length > 0) {
         const activeQ = activeExam.questions?.[examProgressIndex];
@@ -1059,27 +1072,50 @@ export default function StudentSimulados({
     const handleSelectStart = (e: Event) => {
       const target = e.target as HTMLElement;
       if (target && (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT')) {
-        return; // allow typing selection inside inputs
+        return; // allow cursor in inputs
       }
+      e.preventDefault();
+      e.stopPropagation();
+      return false;
+    };
+
+    const handleSelectionChange = () => {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0 && sel.toString().length > 0) {
+        const activeEl = document.activeElement;
+        if (activeEl && (activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'INPUT')) {
+          return;
+        }
+        sel.removeAllRanges();
+      }
+    };
+
+    const handleDragStart = (e: DragEvent) => {
       e.preventDefault();
       e.stopPropagation();
     };
 
     const handleContextMenu = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (target && (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT')) {
+        return;
+      }
       e.preventDefault();
       e.stopPropagation();
-      showToast("🔒 Menu de contexto (botão direito) desativado.");
+      showToast("🔒 Menu de contexto desativado na prova.");
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
       const key = (e.key || '').toLowerCase();
       const isCtrlOrCmd = e.ctrlKey || e.metaKey;
+      const target = e.target as HTMLElement;
+      const isInInput = target && (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT');
 
       // Block F12 (DevTools)
       if (e.key === 'F12' || e.keyCode === 123) {
         e.preventDefault();
         e.stopPropagation();
-        showToast("🔒 DevTools / Inspecionar elemento bloqueado.");
+        showToast("🔒 Inspecionar elemento bloqueado na prova.");
         return;
       }
 
@@ -1091,22 +1127,36 @@ export default function StudentSimulados({
         return;
       }
 
-      // Block Ctrl+C, Ctrl+X, Ctrl+A, Ctrl+P, Ctrl+U, Ctrl+S
-      if (isCtrlOrCmd) {
-        if (key === 'c' || key === 'x' || key === 'a' || key === 'p' || key === 'u' || key === 's') {
-          e.preventDefault();
-          e.stopPropagation();
-          showToast(`🔒 Atalho Ctrl+${key.toUpperCase()} bloqueado no modo Anticola.`);
-          return;
-        }
+      // Block Ctrl+A (Select All) outside inputs
+      if (isCtrlOrCmd && key === 'a' && !isInInput) {
+        e.preventDefault();
+        e.stopPropagation();
+        showToast("🔒 Seleção de texto bloqueada durante o simulado.");
+        return;
+      }
 
-        // Block DevTools shortcuts: Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+Shift+C
-        if (e.shiftKey && (key === 'i' || key === 'j' || key === 'c')) {
-          e.preventDefault();
-          e.stopPropagation();
-          showToast("🔒 Ferramentas de desenvolvedor bloqueadas.");
-          return;
-        }
+      // Block Ctrl+C (Copy) outside inputs
+      if (isCtrlOrCmd && key === 'c' && !isInInput) {
+        e.preventDefault();
+        e.stopPropagation();
+        showToast("🔒 Cópia de texto bloqueada durante o simulado.");
+        return;
+      }
+
+      // Block Ctrl+P, Ctrl+U, Ctrl+S
+      if (isCtrlOrCmd && (key === 'p' || key === 'u' || key === 's')) {
+        e.preventDefault();
+        e.stopPropagation();
+        showToast(`🔒 Atalho Ctrl+${key.toUpperCase()} bloqueado durante o simulado.`);
+        return;
+      }
+
+      // Block DevTools shortcuts: Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+Shift+C
+      if (isCtrlOrCmd && e.shiftKey && (key === 'i' || key === 'j' || key === 'c')) {
+        e.preventDefault();
+        e.stopPropagation();
+        showToast("🔒 Ferramentas de desenvolvedor bloqueadas.");
+        return;
       }
     };
 
@@ -1114,22 +1164,32 @@ export default function StudentSimulados({
     window.addEventListener('cut', handleCut, true);
     window.addEventListener('paste', handlePaste, true);
     window.addEventListener('selectstart', handleSelectStart, true);
+    window.addEventListener('dragstart', handleDragStart, true);
     window.addEventListener('contextmenu', handleContextMenu, true);
     window.addEventListener('keydown', handleKeyDown, true);
     document.addEventListener('copy', handleCopy, true);
     document.addEventListener('cut', handleCut, true);
+    document.addEventListener('selectstart', handleSelectStart, true);
+    document.addEventListener('selectionchange', handleSelectionChange, true);
     document.addEventListener('contextmenu', handleContextMenu, true);
     document.addEventListener('keydown', handleKeyDown, true);
 
     return () => {
+      document.body.classList.remove('exam-session-active');
+      document.body.style.userSelect = '';
+      (document.body.style as any).webkitUserSelect = '';
+
       window.removeEventListener('copy', handleCopy, true);
       window.removeEventListener('cut', handleCut, true);
       window.removeEventListener('paste', handlePaste, true);
       window.removeEventListener('selectstart', handleSelectStart, true);
+      window.removeEventListener('dragstart', handleDragStart, true);
       window.removeEventListener('contextmenu', handleContextMenu, true);
       window.removeEventListener('keydown', handleKeyDown, true);
       document.removeEventListener('copy', handleCopy, true);
       document.removeEventListener('cut', handleCut, true);
+      document.removeEventListener('selectstart', handleSelectStart, true);
+      document.removeEventListener('selectionchange', handleSelectionChange, true);
       document.removeEventListener('contextmenu', handleContextMenu, true);
       document.removeEventListener('keydown', handleKeyDown, true);
     };
@@ -2263,7 +2323,28 @@ export default function StudentSimulados({
         </div>
       ) : activeExam ? (
         /* ACTIVE EXAM INTERACTIVE FORM TAKING MODE */
-        <div className="fixed inset-0 z-[9999] bg-neutral-950 overflow-y-auto p-4 md:p-8 select-none">
+        <div 
+          className="fixed inset-0 z-[9999] bg-neutral-950 overflow-y-auto p-4 md:p-8 select-none exam-taker-workspace"
+          onDragStart={(e) => {
+            e.preventDefault();
+          }}
+          onCopy={(e) => {
+            const target = e.target as HTMLElement;
+            if (target?.tagName !== 'TEXTAREA' && target?.tagName !== 'INPUT') {
+              e.preventDefault();
+              setBlockedActionToast("🔒 Seleção e cópia de texto bloqueadas durante a prova.");
+              setTimeout(() => setBlockedActionToast(null), 2500);
+            }
+          }}
+          onContextMenu={(e) => {
+            const target = e.target as HTMLElement;
+            if (target?.tagName !== 'TEXTAREA' && target?.tagName !== 'INPUT') {
+              e.preventDefault();
+              setBlockedActionToast("🔒 Menu de contexto desativado na prova.");
+              setTimeout(() => setBlockedActionToast(null), 2500);
+            }
+          }}
+        >
           {/* Inject style tag to disable standard print layout and text selection */}
           <style>{`
             @media print {
@@ -2271,13 +2352,22 @@ export default function StudentSimulados({
                 display: none !important;
               }
             }
-            .select-none, .select-none * {
+            body, html, .exam-taker-workspace, .exam-taker-workspace * {
               -webkit-user-select: none !important;
               -moz-user-select: none !important;
               -ms-user-select: none !important;
               user-select: none !important;
+              -webkit-touch-callout: none !important;
             }
-            textarea, input {
+            ::selection, *::selection {
+              background: transparent !important;
+              color: inherit !important;
+            }
+            ::-moz-selection, *::-moz-selection {
+              background: transparent !important;
+              color: inherit !important;
+            }
+            textarea, input[type="text"] {
               -webkit-user-select: text !important;
               -moz-user-select: text !important;
               -ms-user-select: text !important;
