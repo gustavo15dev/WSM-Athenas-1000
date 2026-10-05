@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { supabase } from '../supabase';
 import { 
@@ -25,7 +25,20 @@ import {
   ListTodo,
   CalendarDays,
   UserCheck,
-  Undo2
+  Undo2,
+  CalendarRange,
+  Flame,
+  CheckCircle2,
+  ChevronDown,
+  CalendarCheck,
+  CalendarClock,
+  Pin,
+  GraduationCap,
+  Bell,
+  CheckCircle,
+  Clock3,
+  Compass,
+  Laptop
 } from 'lucide-react';
 import { parseExamSettings, cleanExamContent, formatExamDateDisplay, cleanExamObservations, extractExamTime } from '../utils/examSettings';
 import { matchesStudentTarget, matchesStudentExam } from '../utils/targetMatcher';
@@ -82,9 +95,9 @@ export default function AcademicCalendar({
   // Filter and Search states
   const [activeFilter, setActiveFilter] = useState<'all' | 'prova' | 'simulado' | 'evento' | 'tarefa'>('all');
   const [searchTerm, setSearchTerm] = useState('');
-  const [viewMode, setViewMode] = useState<'month' | 'agenda'>('month');
+  const [viewMode, setViewMode] = useState<'month' | 'week' | 'agenda'>('month');
 
-  // Custom User Items state (stored in localStorage / Supabase)
+  // Custom User Items state (stored in localStorage & Supabase)
   const [userItems, setUserItems] = useState<UserCalendarItem[]>(() => {
     try {
       const storageKey = `athenas_calendar_items_${userEmail.toLowerCase().trim()}`;
@@ -93,7 +106,6 @@ export default function AcademicCalendar({
     } catch {
       // Fallback
     }
-    // Clean initial state for new accounts (no fake or unrequested global events)
     return [];
   });
 
@@ -107,23 +119,21 @@ export default function AcademicCalendar({
   const [newItemSubject, setNewItemSubject] = useState('');
   const [newItemDescription, setNewItemDescription] = useState('');
 
-  // Confirmation & Undo states for deletion (P2-02)
+  // Confirmation & Undo states for deletion
   const [itemToDelete, setItemToDelete] = useState<UserCalendarItem | null>(null);
   const [undoItem, setUndoItem] = useState<UserCalendarItem | null>(null);
   const [undoTimer, setUndoTimer] = useState<NodeJS.Timeout | null>(null);
   const [toastFeedback, setToastFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Helper to safely extract YYYY-MM-DD from any date string or timestamp
-  const extractDateStr = (raw: any): string | null => {
+  const extractDateStr = useCallback((raw: any): string | null => {
     if (!raw) return null;
     if (typeof raw === 'string') {
       const trimmed = raw.trim();
-      // Match "YYYY-MM-DD..."
       const matchIso = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})/);
       if (matchIso) {
         return `${matchIso[1]}-${matchIso[2]}-${matchIso[3]}`;
       }
-      // Match "DD/MM/YYYY"
       const matchBr = trimmed.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
       if (matchBr) {
         return `${matchBr[3]}-${matchBr[2]}-${matchBr[1]}`;
@@ -141,7 +151,7 @@ export default function AcademicCalendar({
       // ignore
     }
     return null;
-  };
+  }, []);
 
   // Local state for DB fetched exams/simulados to guarantee synchronization
   const [dbExams, setDbExams] = useState<any[]>([]);
@@ -160,7 +170,6 @@ export default function AcademicCalendar({
         }
         const { data, error } = await query;
 
-        // Also fetch notifications to cross-reference time
         let notifsList: any[] = [];
         try {
           const { data: nData } = await supabase
@@ -262,7 +271,7 @@ export default function AcademicCalendar({
     return Array.from(map.values());
   }, [mockExams, dbMockExams]);
 
-  // Fetch calendar items from Supabase if table exists, with fallback to LocalStorage
+  // Fetch calendar items from Supabase with fallback to LocalStorage
   useEffect(() => {
     if (!userEmail) return;
 
@@ -375,7 +384,7 @@ export default function AcademicCalendar({
   const allCalendarDays = [...prevMonthDays, ...currentMonthDays, ...nextMonthDays];
 
   // Helper to fetch all events for a given YYYY-MM-DD date
-  const getEventsForDate = (y: number, m: number, d: number) => {
+  const getEventsForDate = useCallback((y: number, m: number, d: number) => {
     const formattedMonth = String(m + 1).padStart(2, '0');
     const formattedDay = String(d).padStart(2, '0');
     const dateStr = `${y}-${formattedMonth}-${formattedDay}`;
@@ -386,7 +395,7 @@ export default function AcademicCalendar({
       return exDate === dateStr;
     });
 
-    // 2. Simulados (virtual exams) - only scheduled if they have a valid deadline/date
+    // 2. Simulados (virtual exams)
     const dayMockExams = effectiveMockExams.filter(me => {
       const rawDeadline = me.deadline || me.due_date || me.exam_date;
       if (!rawDeadline) return false;
@@ -406,7 +415,7 @@ export default function AcademicCalendar({
       userItems: dayUserItems,
       totalCount: dayExams.length + dayMockExams.length + dayUserItems.length
     };
-  };
+  }, [effectiveExams, effectiveMockExams, userItems, extractDateStr]);
 
   const handlePrevMonth = () => {
     setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
@@ -446,7 +455,6 @@ export default function AcademicCalendar({
     setUserItems(prev => [newItem, ...prev]);
     setIsModalOpen(false);
 
-    // Sync to Supabase in background if table exists
     try {
       await supabase.from('user_calendar_events').insert({
         id: newItem.id,
@@ -464,7 +472,6 @@ export default function AcademicCalendar({
       // Ignored - fallback to LocalStorage
     }
 
-    // Reset form
     setNewItemTitle('');
     setNewItemDescription('');
     setNewItemSubject('');
@@ -500,30 +507,23 @@ export default function AcademicCalendar({
     const target = itemToDelete;
     setItemToDelete(null);
 
-    // Clear any previous undo timer
     if (undoTimer) clearTimeout(undoTimer);
 
-    // Optimistically remove from state
     setUserItems(prev => prev.filter(item => item.id !== target.id));
     setUndoItem(target);
 
-    // Show undo toast
     setToastFeedback({
       type: 'success',
-      message: `Evento "${target.title}" excluído.`
+      message: `Compromisso "${target.title}" removido.`
     });
 
-    // Start 8-second countdown before finalizing Supabase deletion
     const timer = setTimeout(async () => {
       setUndoItem(null);
       try {
-        const { error } = await supabase
+        await supabase
           .from('user_calendar_events')
           .delete()
           .eq('id', target.id);
-        if (error) {
-          console.warn('Erro ao deletar no Supabase:', error);
-        }
       } catch (err) {
         console.warn('Falha na exclusão remota:', err);
       }
@@ -538,10 +538,8 @@ export default function AcademicCalendar({
     const restored = undoItem;
     setUndoItem(null);
 
-    // Restore locally
     setUserItems(prev => [restored, ...prev]);
 
-    // Restore to Supabase
     try {
       await supabase.from('user_calendar_events').upsert({
         id: restored.id,
@@ -561,18 +559,42 @@ export default function AcademicCalendar({
 
     setToastFeedback({
       type: 'success',
-      message: `Exclusão desfeita! "${restored.title}" foi restaurado.`
+      message: `"${restored.title}" foi restaurado.`
     });
   };
 
-  // Get selected day items filtered
+  // Selected day items filtered
   const selectedDayEvents = useMemo(() => {
-    if (!selectedDayStr) return { exams: [], mockExams: [], userItems: [] };
+    if (!selectedDayStr) return { exams: [], mockExams: [], userItems: [], totalCount: 0 };
     const [y, m, d] = selectedDayStr.split('-').map(Number);
-    return getEventsForDate(y, m - 1, d);
-  }, [selectedDayStr, effectiveExams, effectiveMockExams, userItems]);
+    const events = getEventsForDate(y, m - 1, d);
 
-  // Overall statistics for banner
+    // Apply search filter if typed
+    if (searchTerm.trim()) {
+      const q = searchTerm.toLowerCase().trim();
+      return {
+        exams: events.exams.filter(ex => 
+          (ex.title && ex.title.toLowerCase().includes(q)) || 
+          (ex.materia && ex.materia.toLowerCase().includes(q)) ||
+          (ex.content && ex.content.toLowerCase().includes(q))
+        ),
+        mockExams: events.mockExams.filter(me => 
+          (me.title && me.title.toLowerCase().includes(q)) || 
+          (me.subject && me.subject.toLowerCase().includes(q))
+        ),
+        userItems: events.userItems.filter(ui => 
+          (ui.title && ui.title.toLowerCase().includes(q)) || 
+          (ui.description && ui.description.toLowerCase().includes(q)) ||
+          (ui.subject && ui.subject.toLowerCase().includes(q))
+        ),
+        totalCount: events.totalCount
+      };
+    }
+
+    return events;
+  }, [selectedDayStr, getEventsForDate, searchTerm]);
+
+  // Overall statistics for the month
   const monthlyStats = useMemo(() => {
     const currentYearMonth = `${year}-${String(month + 1).padStart(2, '0')}`;
     
@@ -588,232 +610,635 @@ export default function AcademicCalendar({
       return d && d.startsWith(currentYearMonth);
     }).length;
 
-    const pendingUserTasks = userItems.filter(i => {
+    const totalTasksThisMonth = userItems.filter(i => {
       const d = extractDateStr(i.date || i.event_date);
-      return i.type === 'tarefa' && !i.completed && d && d.startsWith(currentYearMonth);
+      return i.type === 'tarefa' && d && d.startsWith(currentYearMonth);
     }).length;
 
-    const totalUserEvents = userItems.filter(i => {
+    const completedTasksThisMonth = userItems.filter(i => {
       const d = extractDateStr(i.date || i.event_date);
-      return d && d.startsWith(currentYearMonth);
+      return i.type === 'tarefa' && i.completed && d && d.startsWith(currentYearMonth);
     }).length;
+
+    const pendingUserTasks = userItems.filter(i => {
+      return i.type === 'tarefa' && !i.completed;
+    }).length;
+
+    // Nearest upcoming exam or mock
+    const todayIso = new Date().toISOString().slice(0, 10);
+    const allUpcoming = [
+      ...effectiveExams.map(e => ({
+        title: e.title,
+        materia: e.materia || 'Geral',
+        type: 'Prova Presencial',
+        date: extractDateStr(e.exam_date || e.date || e.data_prova || e.data),
+        color: 'rose'
+      })),
+      ...effectiveMockExams.map(m => ({
+        title: m.title,
+        materia: m.subject || 'Simulado',
+        type: 'Simulado Online',
+        date: extractDateStr(m.deadline || m.due_date || m.exam_date),
+        color: 'emerald'
+      }))
+    ]
+      .filter(item => item.date && item.date >= todayIso)
+      .sort((a, b) => (a.date! > b.date! ? 1 : -1));
+
+    const nextEvent = allUpcoming[0] || null;
+
+    // Days difference to next event
+    let daysToNextEvent = null;
+    if (nextEvent?.date) {
+      const todayDate = new Date(todayIso);
+      const nextDate = new Date(nextEvent.date);
+      const diffTime = nextDate.getTime() - todayDate.getTime();
+      daysToNextEvent = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    }
 
     return {
       totalExamsThisMonth,
       totalMocksThisMonth,
+      totalTasksThisMonth,
+      completedTasksThisMonth,
       pendingUserTasks,
-      totalUserEvents
+      nextEvent,
+      daysToNextEvent
     };
-  }, [effectiveExams, effectiveMockExams, userItems, year, month]);
+  }, [effectiveExams, effectiveMockExams, userItems, year, month, extractDateStr]);
+
+  // Formatted date string for selected day headline
+  const selectedDayFormattedHeadline = useMemo(() => {
+    if (!selectedDayStr) return '';
+    try {
+      const [y, m, d] = selectedDayStr.split('-').map(Number);
+      const dateObj = new Date(y, m - 1, d);
+      return new Intl.DateTimeFormat('pt-BR', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
+      }).format(dateObj);
+    } catch {
+      return selectedDayStr;
+    }
+  }, [selectedDayStr]);
+
+  // All chronological events for Agenda view
+  const allChronologicalItems = useMemo(() => {
+    const list: {
+      id: string;
+      title: string;
+      category: 'prova' | 'simulado' | 'evento' | 'tarefa' | 'estudo' | 'lembrete';
+      dateStr: string;
+      timeStr?: string;
+      subject?: string;
+      teacherName?: string;
+      description?: string;
+      content?: string;
+      completed?: boolean;
+      priority?: 'baixa' | 'media' | 'alta';
+      rawObject: any;
+    }[] = [];
+
+    // Provas
+    effectiveExams.forEach(ex => {
+      const d = extractDateStr(ex.exam_date || ex.date || ex.data_prova || ex.data);
+      if (d) {
+        list.push({
+          id: `ex-${ex.id || ex.title}-${d}`,
+          title: ex.title,
+          category: 'prova',
+          dateStr: d,
+          timeStr: ex.exam_time || undefined,
+          subject: ex.materia || 'Geral',
+          teacherName: ex.teacher_name,
+          content: cleanExamContent(ex.content),
+          description: cleanExamObservations(ex.observations),
+          rawObject: ex
+        });
+      }
+    });
+
+    // Simulados
+    effectiveMockExams.forEach(me => {
+      const rawDeadline = me.deadline || me.due_date || me.exam_date;
+      const d = extractDateStr(rawDeadline);
+      if (d) {
+        list.push({
+          id: `me-${me.id || me.title}-${d}`,
+          title: me.title,
+          category: 'simulado',
+          dateStr: d,
+          timeStr: undefined,
+          subject: me.subject || 'Simulado',
+          teacherName: me.teacher_name,
+          description: me.description,
+          rawObject: me
+        });
+      }
+    });
+
+    // User Items
+    userItems.forEach(ui => {
+      const d = extractDateStr(ui.date || ui.event_date);
+      if (d) {
+        list.push({
+          id: ui.id,
+          title: ui.title,
+          category: ui.type,
+          dateStr: d,
+          timeStr: ui.time,
+          subject: ui.subject,
+          description: ui.description,
+          completed: ui.completed,
+          priority: ui.priority,
+          rawObject: ui
+        });
+      }
+    });
+
+    // Filter by category
+    let filtered = list;
+    if (activeFilter === 'prova') filtered = filtered.filter(i => i.category === 'prova');
+    if (activeFilter === 'simulado') filtered = filtered.filter(i => i.category === 'simulado');
+    if (activeFilter === 'evento') filtered = filtered.filter(i => i.category === 'evento' || i.category === 'estudo' || i.category === 'lembrete');
+    if (activeFilter === 'tarefa') filtered = filtered.filter(i => i.category === 'tarefa');
+
+    // Filter by search
+    if (searchTerm.trim()) {
+      const q = searchTerm.toLowerCase().trim();
+      filtered = filtered.filter(i => 
+        i.title.toLowerCase().includes(q) ||
+        (i.subject && i.subject.toLowerCase().includes(q)) ||
+        (i.description && i.description.toLowerCase().includes(q))
+      );
+    }
+
+    return filtered.sort((a, b) => a.dateStr.localeCompare(b.dateStr));
+  }, [effectiveExams, effectiveMockExams, userItems, activeFilter, searchTerm, extractDateStr]);
+
+  // Group agenda items by date
+  const agendaGroupedByDate = useMemo(() => {
+    const groups: Record<string, typeof allChronologicalItems> = {};
+    allChronologicalItems.forEach(item => {
+      if (!groups[item.dateStr]) {
+        groups[item.dateStr] = [];
+      }
+      groups[item.dateStr].push(item);
+    });
+    return Object.entries(groups).sort(([dateA], [dateB]) => dateA.localeCompare(dateB));
+  }, [allChronologicalItems]);
+
+  // Current week days calculation for Week View
+  const currentWeekDays = useMemo(() => {
+    const [y, m, d] = selectedDayStr.split('-').map(Number);
+    const selectedDate = new Date(y, m - 1, d);
+    const dayOfWeek = selectedDate.getDay(); // 0 is Sunday
+    const weekStart = new Date(selectedDate);
+    weekStart.setDate(selectedDate.getDate() - dayOfWeek);
+
+    const days = [];
+    for (let i = 0; i < 7; i++) {
+      const dayDate = new Date(weekStart);
+      dayDate.setDate(weekStart.getDate() + i);
+      const dy = dayDate.getFullYear();
+      const dm = String(dayDate.getMonth() + 1).padStart(2, '0');
+      const dd = String(dayDate.getDate()).padStart(2, '0');
+      const dateStr = `${dy}-${dm}-${dd}`;
+
+      days.push({
+        date: dayDate,
+        dateStr,
+        dayNumber: dayDate.getDate(),
+        weekdayLabel: weekDays[i],
+        isToday: (() => {
+          const today = new Date();
+          return today.getDate() === dayDate.getDate() && 
+                 today.getMonth() === dayDate.getMonth() && 
+                 today.getFullYear() === dayDate.getFullYear();
+        })(),
+        isSelected: dateStr === selectedDayStr
+      });
+    }
+    return days;
+  }, [selectedDayStr, weekDays]);
+
+  // Dynamic counts for quick filter tags
+  const filterCounts = useMemo(() => {
+    const today = new Date();
+    const currYearMonth = `${year}-${String(month + 1).padStart(2, '0')}`;
+
+    let provas = 0;
+    let simulados = 0;
+    let tarefas = 0;
+    let eventos = 0;
+
+    effectiveExams.forEach(ex => {
+      const d = extractDateStr(ex.exam_date || ex.date || ex.data_prova || ex.data);
+      if (d && d.startsWith(currYearMonth)) provas++;
+    });
+
+    effectiveMockExams.forEach(me => {
+      const rawDeadline = me.deadline || me.due_date || me.exam_date;
+      const d = extractDateStr(rawDeadline);
+      if (d && d.startsWith(currYearMonth)) simulados++;
+    });
+
+    userItems.forEach(ui => {
+      const d = extractDateStr(ui.date || ui.event_date);
+      if (d && d.startsWith(currYearMonth)) {
+        if (ui.type === 'tarefa') tarefas++;
+        else eventos++;
+      }
+    });
+
+    return {
+      all: provas + simulados + tarefas + eventos,
+      provas,
+      simulados,
+      tarefas,
+      eventos
+    };
+  }, [effectiveExams, effectiveMockExams, userItems, year, month, extractDateStr]);
 
   return (
-    <div className="p-4 sm:p-6 md:p-8 rounded-3xl bg-neutral-950/60 border border-neutral-900/90 backdrop-blur-md space-y-6 shadow-2xl">
+    <div className="space-y-6">
       
-      {/* Top Header Banner */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 border-b border-neutral-900 pb-6 relative overflow-hidden">
-        {/* Glow behind header */}
-        <div className="absolute top-0 right-1/3 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+      {/* 1. Header Banner & Executive Metric Strip */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-neutral-900/90 via-neutral-900/70 to-neutral-950/90 border border-neutral-800/80 p-6 md:p-8 backdrop-blur-xl shadow-2xl shadow-black/40">
+        {/* Subtle decorative glow circles */}
+        <div className="absolute -top-24 -right-24 w-80 h-80 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-24 -left-24 w-80 h-80 rounded-full bg-teal-500/10 blur-3xl pointer-events-none" />
 
-        <div className="flex items-center gap-4 relative z-10">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-400 p-0.5 shadow-lg shadow-emerald-500/20 shrink-0 flex items-center justify-center">
-            <div className="w-full h-full bg-neutral-950 rounded-[14px] flex items-center justify-center">
-              <CalendarIcon className="w-6 h-6 text-emerald-400" />
-            </div>
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-xl sm:text-2xl font-extrabold text-neutral-100 font-display tracking-tight">
-                Calendário Acadêmico & Pessoal
-              </h2>
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/15 border border-emerald-500/30 text-emerald-400">
-                {userRole === 'teacher' ? 'Professor' : 'Aluno'}
+        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+          
+          {/* Brand & Contextual Headline */}
+          <div className="flex items-start gap-4">
+            <div className="relative">
+              <div className="w-13 h-13 rounded-2xl bg-gradient-to-tr from-emerald-600/30 to-teal-400/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center shadow-lg shadow-emerald-950/40">
+                <CalendarIcon className="w-6 h-6" />
+              </div>
+              <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
               </span>
             </div>
-            <p className="text-xs text-neutral-400 mt-1">
-              Gerencie suas provas, simulados, eventos pessoais e tarefas diárias em um único lugar.
-            </p>
+            <div>
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                  Calendário Acadêmico
+                </h1>
+                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold tracking-wide uppercase bg-emerald-500/15 border border-emerald-500/30 text-emerald-400">
+                  {userTurma ? `${userTurma} · ` : ''}{userRole === 'teacher' ? 'Docente' : 'Estudante'}
+                </span>
+              </div>
+              <p className="text-xs sm:text-sm text-neutral-400 mt-1 max-w-xl font-normal leading-relaxed">
+                Gestão centralizada de avaliações, simulados online e cronograma individual de estudos.
+              </p>
+            </div>
+          </div>
+
+          {/* Top Actions: View Mode Switcher + New Item */}
+          <div className="flex items-center gap-3 self-start lg:self-center flex-wrap">
+            {/* View Mode Segmented Control */}
+            <div className="inline-flex p-1 bg-neutral-950/90 border border-neutral-800 rounded-2xl shadow-inner">
+              <button
+                type="button"
+                onClick={() => setViewMode('month')}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  viewMode === 'month'
+                    ? 'bg-neutral-800 text-white shadow-md border border-neutral-700/60'
+                    : 'text-neutral-400 hover:text-neutral-200'
+                }`}
+              >
+                <CalendarDays className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Mês</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('week')}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  viewMode === 'week'
+                    ? 'bg-neutral-800 text-white shadow-md border border-neutral-700/60'
+                    : 'text-neutral-400 hover:text-neutral-200'
+                }`}
+              >
+                <CalendarRange className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Semana</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('agenda')}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  viewMode === 'agenda'
+                    ? 'bg-neutral-800 text-white shadow-md border border-neutral-700/60'
+                    : 'text-neutral-400 hover:text-neutral-200'
+                }`}
+              >
+                <CalendarClock className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Agenda</span>
+              </button>
+            </div>
+
+            {/* Create Item Button */}
+            <button
+              type="button"
+              onClick={() => {
+                setNewItemDate(selectedDayStr);
+                setIsModalOpen(true);
+              }}
+              className="px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-neutral-950 font-bold text-xs rounded-2xl flex items-center gap-2 transition-all shadow-lg shadow-emerald-500/20 active:scale-95 cursor-pointer"
+            >
+              <Plus className="w-4 h-4 stroke-[2.5]" />
+              <span>Novo Registro</span>
+            </button>
           </div>
         </div>
 
-        {/* Quick Actions & View Mode Controls */}
-        <div className="flex flex-wrap items-center gap-3 relative z-10">
-          <button
-            type="button"
-            onClick={() => setIsModalOpen(true)}
-            className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-neutral-950 font-extrabold text-xs rounded-xl flex items-center gap-2 transition-all shadow-lg shadow-emerald-500/20 cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Criar Evento / Tarefa</span>
-          </button>
-
-          <div className="flex items-center bg-neutral-900 border border-neutral-800 p-1 rounded-xl">
-            <button
-              type="button"
-              onClick={() => setViewMode('month')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                viewMode === 'month' ? 'bg-neutral-800 text-emerald-400 shadow-sm' : 'text-neutral-400 hover:text-neutral-200'
-              }`}
-            >
-              <CalendarDays className="w-3.5 h-3.5" />
-              <span>Visão Mês</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode('agenda')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                viewMode === 'agenda' ? 'bg-neutral-800 text-emerald-400 shadow-sm' : 'text-neutral-400 hover:text-neutral-200'
-              }`}
-            >
-              <ListTodo className="w-3.5 h-3.5" />
-              <span>Minhas Tarefas ({userItems.filter(i => i.type === 'tarefa').length})</span>
-            </button>
+        {/* 2. Structured Executive KPI Metric Strip */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 pt-6 mt-6 border-t border-neutral-800/80">
+          
+          {/* Provas Presenciais */}
+          <div className="p-4 rounded-2xl bg-neutral-950/60 border border-neutral-800/80 hover:border-rose-500/30 transition-all flex items-center justify-between group">
+            <div>
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400 block flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-rose-400 animate-pulse" />
+                Provas Presenciais
+              </span>
+              <div className="flex items-baseline gap-2 mt-1">
+                <span className="text-2xl font-black font-mono text-white tabular-nums">
+                  {monthlyStats.totalExamsThisMonth}
+                </span>
+                <span className="text-[11px] text-neutral-500">neste mês</span>
+              </div>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center group-hover:scale-105 transition-transform">
+              <FileText className="w-5 h-5" />
+            </div>
           </div>
+
+          {/* Simulados Online */}
+          <div className="p-4 rounded-2xl bg-neutral-950/60 border border-neutral-800/80 hover:border-emerald-500/30 transition-all flex items-center justify-between group">
+            <div>
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400 block flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                Simulados Online
+              </span>
+              <div className="flex items-baseline gap-2 mt-1">
+                <span className="text-2xl font-black font-mono text-white tabular-nums">
+                  {monthlyStats.totalMocksThisMonth}
+                </span>
+                <span className="text-[11px] text-neutral-500">cadastrados</span>
+              </div>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center group-hover:scale-105 transition-transform">
+              <Laptop className="w-5 h-5" />
+            </div>
+          </div>
+
+          {/* Tarefas e Metas */}
+          <div className="p-4 rounded-2xl bg-neutral-950/60 border border-neutral-800/80 hover:border-amber-500/30 transition-all flex items-center justify-between group">
+            <div>
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400 block flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-amber-400" />
+                Tarefas Pessoais
+              </span>
+              <div className="flex items-baseline gap-2 mt-1">
+                <span className="text-2xl font-black font-mono text-white tabular-nums">
+                  {monthlyStats.pendingUserTasks}
+                </span>
+                <span className="text-[11px] text-neutral-500">pendentes</span>
+              </div>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center group-hover:scale-105 transition-transform">
+              <CheckSquare className="w-5 h-5" />
+            </div>
+          </div>
+
+          {/* Próximo Marco */}
+          <div className="p-4 rounded-2xl bg-neutral-950/60 border border-neutral-800/80 hover:border-sky-500/30 transition-all flex items-center justify-between group">
+            <div className="truncate pr-2">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400 block flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-sky-400" />
+                Próximo Marco
+              </span>
+              {monthlyStats.nextEvent ? (
+                <div className="mt-1 truncate">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-mono font-bold text-sky-400">
+                      {monthlyStats.nextEvent.date?.split('-').reverse().slice(0, 2).join('/')}
+                    </span>
+                    {monthlyStats.daysToNextEvent !== null && (
+                      <span className={`text-[10px] px-1.5 py-0.2 rounded font-bold uppercase ${
+                        monthlyStats.daysToNextEvent === 0 
+                          ? 'bg-rose-500/20 text-rose-300' 
+                          : monthlyStats.daysToNextEvent <= 2 
+                          ? 'bg-amber-500/20 text-amber-300' 
+                          : 'bg-neutral-800 text-neutral-400'
+                      }`}>
+                        {monthlyStats.daysToNextEvent === 0 
+                          ? 'Hoje!' 
+                          : monthlyStats.daysToNextEvent === 1 
+                          ? 'Amanhã' 
+                          : `em ${monthlyStats.daysToNextEvent}d`}
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-xs font-semibold text-neutral-200 truncate block mt-0.5">
+                    {monthlyStats.nextEvent.title}
+                  </span>
+                </div>
+              ) : (
+                <div className="mt-2 text-xs font-semibold text-neutral-400">
+                  Agenda em dia
+                </div>
+              )}
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-sky-500/10 border border-sky-500/20 text-sky-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+              <Compass className="w-5 h-5" />
+            </div>
+          </div>
+
         </div>
       </div>
 
-      {/* Quick Statistics Banner */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="p-3.5 rounded-2xl bg-neutral-900/60 border border-neutral-850 flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400">
-            <Award className="w-4 h-4" />
-          </div>
-          <div>
-            <span className="text-[10px] font-mono uppercase font-bold text-neutral-500 block">Provas do Mês</span>
-            <span className="text-base font-black text-neutral-200 font-mono">{monthlyStats.totalExamsThisMonth}</span>
-          </div>
-        </div>
-
-        <div className="p-3.5 rounded-2xl bg-neutral-900/60 border border-neutral-850 flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-            <Sparkles className="w-4 h-4" />
-          </div>
-          <div>
-            <span className="text-[10px] font-mono uppercase font-bold text-neutral-500 block">Simulados</span>
-            <span className="text-base font-black text-neutral-200 font-mono">{monthlyStats.totalMocksThisMonth}</span>
-          </div>
-        </div>
-
-        <div className="p-3.5 rounded-2xl bg-neutral-900/60 border border-neutral-850 flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400">
-            <CheckSquare className="w-4 h-4" />
-          </div>
-          <div>
-            <span className="text-[10px] font-mono uppercase font-bold text-neutral-500 block">Tarefas Pendentes</span>
-            <span className="text-base font-black text-neutral-200 font-mono">{monthlyStats.pendingUserTasks}</span>
-          </div>
-        </div>
-
-        <div className="p-3.5 rounded-2xl bg-neutral-900/60 border border-neutral-850 flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-sky-500/10 border border-sky-500/20 text-sky-400">
-            <CalendarIcon className="w-4 h-4" />
-          </div>
-          <div>
-            <span className="text-[10px] font-mono uppercase font-bold text-neutral-500 block">Eventos Salvos</span>
-            <span className="text-base font-black text-neutral-200 font-mono">{monthlyStats.totalUserEvents}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Filtering and Month Selector Controls */}
-      <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-neutral-900/40 p-3 rounded-2xl border border-neutral-900">
-        {/* Month Navigator */}
-        <div className="flex items-center gap-2">
+      {/* 3. Modern Control & Filter Toolbar */}
+      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 bg-neutral-900/60 p-3.5 rounded-2xl border border-neutral-800/80 backdrop-blur-md">
+        
+        {/* Month Navigator & Jump to Today */}
+        <div className="flex items-center gap-2.5">
           <button
             type="button"
             onClick={handleGoToToday}
-            className="px-3 py-1.5 bg-neutral-900 hover:bg-neutral-800 text-neutral-300 rounded-xl text-xs font-bold border border-neutral-800 transition-all cursor-pointer active:scale-95"
+            className="px-3.5 py-2 bg-neutral-850 hover:bg-neutral-800 text-neutral-200 hover:text-white rounded-xl text-xs font-bold border border-neutral-750 transition-all shadow-sm active:scale-95 cursor-pointer"
           >
             Hoje
           </button>
-          <div className="flex items-center bg-neutral-900 border border-neutral-800 rounded-xl p-1">
+
+          <div className="flex items-center bg-neutral-950 border border-neutral-800 rounded-xl p-1 shadow-inner">
             <button
               type="button"
               onClick={handlePrevMonth}
-              className="p-1.5 hover:bg-neutral-800 text-neutral-400 hover:text-neutral-100 rounded-lg transition-colors cursor-pointer"
-              title="Mês Anterior"
+              className="p-1.5 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800 transition-colors cursor-pointer"
+              title="Mês anterior"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
-            <span className="px-4 text-xs font-black text-neutral-200 font-mono uppercase tracking-wider select-none">
+            <span className="px-4 text-xs font-bold text-white select-none min-w-[140px] text-center tracking-wide">
               {monthNames[month]} {year}
             </span>
             <button
               type="button"
               onClick={handleNextMonth}
-              className="p-1.5 hover:bg-neutral-800 text-neutral-400 hover:text-neutral-100 rounded-lg transition-colors cursor-pointer"
-              title="Próximo Mês"
+              className="p-1.5 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800 transition-colors cursor-pointer"
+              title="Próximo mês"
             >
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>
         </div>
 
-        {/* Filter Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto p-1">
-          <button
-            type="button"
-            onClick={() => setActiveFilter('all')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-              activeFilter === 'all' ? 'bg-emerald-500 text-neutral-950 shadow-sm' : 'text-neutral-400 hover:text-neutral-200'
-            }`}
-          >
-            Todos
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveFilter('prova')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-              activeFilter === 'prova' ? 'bg-rose-500 text-white shadow-sm' : 'text-neutral-400 hover:text-neutral-200'
-            }`}
-          >
-            Provas
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveFilter('simulado')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-              activeFilter === 'simulado' ? 'bg-teal-500 text-neutral-950 shadow-sm' : 'text-neutral-400 hover:text-neutral-200'
-            }`}
-          >
-            Simulados
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveFilter('evento')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-              activeFilter === 'evento' ? 'bg-sky-500 text-neutral-950 shadow-sm' : 'text-neutral-400 hover:text-neutral-200'
-            }`}
-          >
-            Meus Eventos
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveFilter('tarefa')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-              activeFilter === 'tarefa' ? 'bg-amber-500 text-neutral-950 shadow-sm' : 'text-neutral-400 hover:text-neutral-200'
-            }`}
-          >
-            Tarefas
-          </button>
+        {/* Search & Dynamic Filter Chips */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+          
+          {/* Search Input */}
+          <div className="relative flex-1 sm:w-60">
+            <Search className="w-3.5 h-3.5 text-neutral-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Buscar matéria, título..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-8 pr-7 py-2 bg-neutral-950 border border-neutral-800 rounded-xl text-xs text-neutral-100 placeholder:text-neutral-500 outline-none focus:border-emerald-500/80 transition-colors"
+            />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-200 p-0.5"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+
+          {/* Category Filter Chips with Dynamic Badges */}
+          <div className="inline-flex p-1 bg-neutral-950 border border-neutral-800 rounded-xl overflow-x-auto gap-1">
+            <button
+              type="button"
+              onClick={() => setActiveFilter('all')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap cursor-pointer transition-all flex items-center gap-1.5 ${
+                activeFilter === 'all'
+                  ? 'bg-neutral-800 text-white shadow-sm'
+                  : 'text-neutral-400 hover:text-neutral-200'
+              }`}
+            >
+              <span>Todos</span>
+              <span className="text-[10px] font-mono px-1 rounded bg-neutral-900 text-neutral-400">
+                {filterCounts.all}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveFilter('prova')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap cursor-pointer transition-all flex items-center gap-1.5 ${
+                activeFilter === 'prova'
+                  ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                  : 'text-neutral-400 hover:text-neutral-200'
+              }`}
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
+              <span>Provas</span>
+              {filterCounts.provas > 0 && (
+                <span className="text-[10px] font-mono px-1 rounded bg-rose-950 text-rose-300">
+                  {filterCounts.provas}
+                </span>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveFilter('simulado')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap cursor-pointer transition-all flex items-center gap-1.5 ${
+                activeFilter === 'simulado'
+                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                  : 'text-neutral-400 hover:text-neutral-200'
+              }`}
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+              <span>Simulados</span>
+              {filterCounts.simulados > 0 && (
+                <span className="text-[10px] font-mono px-1 rounded bg-emerald-950 text-emerald-300">
+                  {filterCounts.simulados}
+                </span>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveFilter('tarefa')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap cursor-pointer transition-all flex items-center gap-1.5 ${
+                activeFilter === 'tarefa'
+                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                  : 'text-neutral-400 hover:text-neutral-200'
+              }`}
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+              <span>Tarefas</span>
+              {filterCounts.tarefas > 0 && (
+                <span className="text-[10px] font-mono px-1 rounded bg-amber-950 text-amber-300">
+                  {filterCounts.tarefas}
+                </span>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveFilter('evento')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap cursor-pointer transition-all flex items-center gap-1.5 ${
+                activeFilter === 'evento'
+                  ? 'bg-sky-500/20 text-sky-300 border border-sky-500/30'
+                  : 'text-neutral-400 hover:text-neutral-200'
+              }`}
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
+              <span>Eventos</span>
+              {filterCounts.eventos > 0 && (
+                <span className="text-[10px] font-mono px-1 rounded bg-sky-950 text-sky-300">
+                  {filterCounts.eventos}
+                </span>
+              )}
+            </button>
+          </div>
+
         </div>
       </div>
 
-      {/* Main View Area */}
+      {/* 4. Main Body: MONTH VIEW, WEEK VIEW, OR AGENDA FEED */}
       {viewMode === 'month' ? (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          {/* Calendar Grid (8 cols) */}
-          <div className="lg:col-span-7 space-y-3">
-            {/* Week Days Header */}
-            <div className="grid grid-cols-7 text-center gap-1">
-              {weekDays.map(day => (
-                <span key={day} className="text-[11px] uppercase font-bold tracking-wider text-neutral-500 font-mono py-1.5 select-none">
+          
+          {/* Calendar Month Grid (7 columns on desktop) */}
+          <div className="lg:col-span-7 bg-neutral-900/60 border border-neutral-800/80 rounded-3xl p-4 sm:p-6 shadow-xl backdrop-blur-md">
+            
+            {/* Weekday labels */}
+            <div className="grid grid-cols-7 text-center mb-3">
+              {weekDays.map((day, idx) => (
+                <span 
+                  key={day} 
+                  className={`text-[11px] font-mono font-bold uppercase tracking-wider py-1.5 select-none ${
+                    idx === 0 || idx === 6 ? 'text-neutral-500' : 'text-neutral-400'
+                  }`}
+                >
                   {day}
                 </span>
               ))}
             </div>
 
-            {/* Days Grid */}
-            <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
+            {/* Days Matrix */}
+            <div className="grid grid-cols-7 gap-2">
               {allCalendarDays.map((cell, idx) => {
                 const formattedMonth = String(cell.month + 1).padStart(2, '0');
                 const formattedDay = String(cell.day).padStart(2, '0');
@@ -830,49 +1255,32 @@ export default function AcademicCalendar({
                 const dayEvents = getEventsForDate(cell.year, cell.month, cell.day);
 
                 // Filter logic for counts
-                const hasExams = activeFilter === 'all' || activeFilter === 'prova';
-                const hasMocks = activeFilter === 'all' || activeFilter === 'simulado';
-                const hasEvents = activeFilter === 'all' || activeFilter === 'evento';
-                const hasTasks = activeFilter === 'all' || activeFilter === 'tarefa';
+                const showExams = activeFilter === 'all' || activeFilter === 'prova';
+                const showMocks = activeFilter === 'all' || activeFilter === 'simulado';
+                const showEvents = activeFilter === 'all' || activeFilter === 'evento';
+                const showTasks = activeFilter === 'all' || activeFilter === 'tarefa';
 
-                const showExamsCount = hasExams ? dayEvents.exams.length : 0;
-                const showMocksCount = hasMocks ? dayEvents.mockExams.length : 0;
-                const showUserEventsCount = hasEvents ? dayEvents.userItems.filter(i => i.type !== 'tarefa').length : 0;
-                const showUserTasksCount = hasTasks ? dayEvents.userItems.filter(i => i.type === 'tarefa').length : 0;
-                const totalFilteredEvents = showExamsCount + showMocksCount + showUserEventsCount + showUserTasksCount;
+                const examsCount = showExams ? dayEvents.exams.length : 0;
+                const mocksCount = showMocks ? dayEvents.mockExams.length : 0;
+                const userEventsCount = showEvents ? dayEvents.userItems.filter(i => i.type !== 'tarefa').length : 0;
+                const userTasksCount = showTasks ? dayEvents.userItems.filter(i => i.type === 'tarefa').length : 0;
+                const totalVisible = examsCount + mocksCount + userEventsCount + userTasksCount;
 
-                // Priority style determination
-                const hasExamIndicator = showExamsCount > 0;
-                const hasMockIndicator = showMocksCount > 0 && !hasExamIndicator;
-                const hasEventIndicator = showUserEventsCount > 0 && !hasExamIndicator && !hasMockIndicator;
-                const hasTaskIndicator = showUserTasksCount > 0 && !hasExamIndicator && !hasMockIndicator && !hasEventIndicator;
+                // Categories present
+                const hasExam = examsCount > 0;
+                const hasMock = mocksCount > 0;
+                const hasTask = userTasksCount > 0;
+                const hasEvent = userEventsCount > 0;
 
-                let cellBaseClass = 'bg-neutral-950/40 text-neutral-400 border-neutral-900 hover:bg-neutral-900/60 hover:text-neutral-200';
-                
+                // Base style for the calendar cell
+                let cellStyle = 'bg-neutral-950/50 text-neutral-300 border-neutral-850 hover:border-neutral-700 hover:bg-neutral-900/60 shadow-inner';
+
                 if (!cell.isCurrentMonth) {
-                  cellBaseClass = 'text-neutral-700 border-transparent bg-transparent opacity-25 hover:opacity-40';
+                  cellStyle = 'bg-neutral-950/20 text-neutral-600 border-neutral-900/40 opacity-35 hover:opacity-60';
                 } else if (isSelected) {
-                  if (hasExamIndicator) {
-                    cellBaseClass = 'bg-rose-950/70 text-rose-100 border-rose-400 ring-2 ring-rose-400 shadow-[0_0_20px_rgba(244,63,94,0.35)]';
-                  } else if (hasMockIndicator) {
-                    cellBaseClass = 'bg-emerald-950/70 text-emerald-100 border-emerald-400 ring-2 ring-emerald-400 shadow-[0_0_20px_rgba(30, 185, 150,0.35)]';
-                  } else if (hasEventIndicator) {
-                    cellBaseClass = 'bg-sky-950/70 text-sky-100 border-sky-400 ring-2 ring-sky-400 shadow-[0_0_20px_rgba(56,189,248,0.35)]';
-                  } else if (hasTaskIndicator) {
-                    cellBaseClass = 'bg-amber-950/70 text-amber-100 border-amber-400 ring-2 ring-amber-400 shadow-[0_0_20px_rgba(251,191,36,0.35)]';
-                  } else {
-                    cellBaseClass = 'bg-neutral-850 text-neutral-100 border-neutral-700 ring-2 ring-emerald-400/60 shadow-[0_0_15px_rgba(30, 185, 150,0.15)]';
-                  }
-                } else if (hasExamIndicator) {
-                  cellBaseClass = 'bg-rose-950/30 text-rose-100 border-rose-500/40 hover:bg-rose-900/40 hover:border-rose-400 shadow-[0_0_14px_rgba(244,63,94,0.15)] ring-1 ring-rose-500/20';
-                } else if (hasMockIndicator) {
-                  cellBaseClass = 'bg-emerald-950/30 text-emerald-100 border-emerald-500/40 hover:bg-emerald-900/40 hover:border-emerald-400 shadow-[0_0_14px_rgba(30, 185, 150,0.15)] ring-1 ring-emerald-500/20';
-                } else if (hasEventIndicator) {
-                  cellBaseClass = 'bg-sky-950/30 text-sky-100 border-sky-500/40 hover:bg-sky-900/40 hover:border-sky-400 ring-1 ring-sky-500/20';
-                } else if (hasTaskIndicator) {
-                  cellBaseClass = 'bg-amber-950/30 text-amber-100 border-amber-500/40 hover:bg-amber-900/40 hover:border-amber-400 ring-1 ring-amber-500/20';
+                  cellStyle = 'bg-neutral-850/95 text-white border-emerald-500 ring-2 ring-emerald-500/40 shadow-lg shadow-emerald-950/30';
                 } else if (isToday) {
-                  cellBaseClass = 'bg-neutral-900/90 text-neutral-100 border-emerald-500/40 font-bold';
+                  cellStyle = 'bg-neutral-900/90 text-white border-emerald-500/60';
                 }
 
                 return (
@@ -880,135 +1288,68 @@ export default function AcademicCalendar({
                     key={idx}
                     type="button"
                     onClick={() => setSelectedDayStr(dateStr)}
-                    className={`aspect-square min-h-[58px] sm:min-h-[64px] rounded-2xl flex flex-col justify-between p-2 border transition-all cursor-pointer relative group/cell overflow-hidden ${cellBaseClass}`}
+                    className={`group aspect-square min-h-[68px] sm:min-h-[82px] rounded-2xl p-2 border text-left flex flex-col justify-between transition-all cursor-pointer relative overflow-hidden ${cellStyle}`}
                   >
-                    {/* Top Row: Day number + Main badge */}
-                    <div className="flex items-start justify-between w-full gap-1">
-                      <span className={`text-xs font-mono ${
-                        hasExamIndicator 
-                          ? 'text-rose-300 font-black' 
-                          : hasMockIndicator 
-                          ? 'text-emerald-300 font-black' 
-                          : isToday 
-                          ? 'text-emerald-400 font-black' 
-                          : 'font-bold'
+                    {/* Top Row: Date Number and Category Dot Indicators */}
+                    <div className="flex items-center justify-between w-full">
+                      <span className={`text-xs font-mono tabular-nums leading-none ${
+                        isToday
+                          ? 'px-2 py-0.5 rounded-full bg-emerald-500 text-neutral-950 font-black shadow-sm'
+                          : isSelected
+                          ? 'font-black text-emerald-400'
+                          : 'font-semibold text-neutral-300'
                       }`}>
                         {cell.day}
                       </span>
 
-                      {/* Prominent High-Visibility Event Badge / Pill */}
-                      {cell.isCurrentMonth && (
-                        <div className="flex items-center gap-0.5">
-                          {hasExamIndicator && (
-                            <span 
-                              className="px-1.5 py-0.5 rounded-md bg-rose-500 text-white font-mono text-[9px] font-black uppercase tracking-tight shadow-sm flex items-center gap-0.5 animate-pulse"
-                              title={showExamsCount > 1 ? `${showExamsCount} Provas marcadas` : 'Prova Marcada'}
-                            >
-                              <Award className="w-2.5 h-2.5" />
-                              <span className="hidden sm:inline">{showExamsCount > 1 ? `${showExamsCount} Provas` : 'Prova'}</span>
-                              <span className="sm:hidden">{showExamsCount > 1 ? `${showExamsCount}P` : 'P'}</span>
-                            </span>
-                          )}
-
-                          {hasMockIndicator && (
-                            <span 
-                              className="px-1.5 py-0.5 rounded-md bg-emerald-500 text-neutral-950 font-mono text-[9px] font-black uppercase tracking-tight shadow-sm flex items-center gap-0.5"
-                              title="Simulado Online"
-                            >
-                              <Sparkles className="w-2.5 h-2.5" />
-                              <span className="hidden sm:inline">{showMocksCount > 1 ? `${showMocksCount} Sim.` : 'Simulado'}</span>
-                              <span className="sm:hidden">{showMocksCount > 1 ? `${showMocksCount}S` : 'S'}</span>
-                            </span>
-                          )}
-
-                          {hasEventIndicator && (
-                            <span 
-                              className="px-1.5 py-0.5 rounded-md bg-sky-500/40 text-sky-200 border border-sky-400/40 font-mono text-[9px] font-bold"
-                              title="Evento / Compromisso"
-                            >
-                              <span className="hidden sm:inline">{showUserEventsCount > 1 ? `${showUserEventsCount} Evt.` : 'Evento'}</span>
-                              <span className="sm:hidden">E</span>
-                            </span>
-                          )}
-
-                          {hasTaskIndicator && (
-                            <span 
-                              className="px-1.5 py-0.5 rounded-md bg-amber-500/40 text-amber-200 border border-amber-400/40 font-mono text-[9px] font-bold"
-                              title="Tarefa Pessoal"
-                            >
-                              <span className="hidden sm:inline">{showUserTasksCount > 1 ? `${showUserTasksCount} Tar.` : 'Tarefa'}</span>
-                              <span className="sm:hidden">T</span>
-                            </span>
-                          )}
-
-                          {isToday && totalFilteredEvents === 0 && (
-                            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" title="Hoje" />
-                          )}
+                      {/* Small subtle status indicators */}
+                      {cell.isCurrentMonth && totalVisible > 0 && (
+                        <div className="flex items-center gap-1">
+                          {hasExam && <span className="w-1.5 h-1.5 rounded-full bg-rose-400" title="Prova" />}
+                          {hasMock && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" title="Simulado" />}
+                          {hasTask && <span className="w-1.5 h-1.5 rounded-full bg-amber-400" title="Tarefa" />}
+                          {hasEvent && <span className="w-1.5 h-1.5 rounded-full bg-sky-400" title="Evento" />}
                         </div>
                       )}
                     </div>
 
-                    {/* Middle: Truncated Title Preview on medium+ screens */}
-                    {cell.isCurrentMonth && totalFilteredEvents > 0 && (
-                      <div className="hidden sm:block w-full text-left my-0.5">
-                        {hasExamIndicator && dayEvents.exams[0] && (
-                          <span className="text-[9px] font-bold text-rose-200/90 block truncate leading-tight">
-                            {dayEvents.exams[0].title || dayEvents.exams[0].materia || 'Prova Presencial'}
-                          </span>
+                    {/* Middle: Clean High-End Schedule Chips */}
+                    {cell.isCurrentMonth && totalVisible > 0 && (
+                      <div className="space-y-1 my-auto w-full hidden sm:block">
+                        {showExams && dayEvents.exams[0] && (
+                          <div className="flex items-center gap-1 border-l-2 border-rose-500 bg-rose-500/15 text-rose-200 px-1.5 py-0.5 rounded-r text-[10px] truncate font-medium">
+                            <span className="truncate">{dayEvents.exams[0].materia || dayEvents.exams[0].title}</span>
+                          </div>
                         )}
-                        {hasMockIndicator && dayEvents.mockExams[0] && (
-                          <span className="text-[9px] font-bold text-emerald-200/90 block truncate leading-tight">
-                            {dayEvents.mockExams[0].title || 'Simulado'}
-                          </span>
+                        {showMocks && dayEvents.mockExams[0] && (
+                          <div className="flex items-center gap-1 border-l-2 border-emerald-400 bg-emerald-500/15 text-emerald-200 px-1.5 py-0.5 rounded-r text-[10px] truncate font-medium">
+                            <span className="truncate">{dayEvents.mockExams[0].title}</span>
+                          </div>
                         )}
-                        {hasEventIndicator && dayEvents.userItems[0] && (
-                          <span className="text-[9px] font-medium text-sky-200/90 block truncate leading-tight">
-                            {dayEvents.userItems[0].title}
-                          </span>
+                        {showTasks && dayEvents.userItems.filter(i => i.type === 'tarefa')[0] && (
+                          <div className="flex items-center gap-1 border-l-2 border-amber-400 bg-amber-500/15 text-amber-200 px-1.5 py-0.5 rounded-r text-[10px] truncate font-medium">
+                            <span className="truncate">{dayEvents.userItems.filter(i => i.type === 'tarefa')[0].title}</span>
+                          </div>
                         )}
-                        {hasTaskIndicator && dayEvents.userItems[0] && (
-                          <span className="text-[9px] font-medium text-amber-200/90 block truncate leading-tight">
-                            {dayEvents.userItems[0].title}
+                        {showEvents && dayEvents.userItems.filter(i => i.type !== 'tarefa')[0] && (
+                          <div className="flex items-center gap-1 border-l-2 border-sky-400 bg-sky-500/15 text-sky-200 px-1.5 py-0.5 rounded-r text-[10px] truncate font-medium">
+                            <span className="truncate">{dayEvents.userItems.filter(i => i.type !== 'tarefa')[0].title}</span>
+                          </div>
+                        )}
+                        {totalVisible > 2 && (
+                          <span className="text-[9.5px] text-neutral-400 font-mono font-medium block pl-1">
+                            +{totalVisible - 2} mais
                           </span>
                         )}
                       </div>
                     )}
 
-                    {/* Bottom Indicator Dots & Accent Bar */}
-                    <div className="w-full flex items-end justify-between mt-auto">
-                      {cell.isCurrentMonth && totalFilteredEvents > 0 && (
-                        <div className="flex gap-1 items-center flex-wrap">
-                          {showExamsCount > 0 && (
-                            <span className="h-1.5 w-1.5 rounded-full bg-rose-500 shadow-sm shadow-rose-900" title={`${showExamsCount} Prova(s)`} />
-                          )}
-                          {showMocksCount > 0 && (
-                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-sm shadow-emerald-900" title={`${showMocksCount} Simulado(s)`} />
-                          )}
-                          {showUserEventsCount > 0 && (
-                            <span className="h-1.5 w-1.5 rounded-full bg-sky-400 shadow-sm" title={`${showUserEventsCount} Evento(s)`} />
-                          )}
-                          {showUserTasksCount > 0 && (
-                            <span className="h-1.5 w-1.5 rounded-full bg-amber-400 shadow-sm" title={`${showUserTasksCount} Tarefa(s)`} />
-                          )}
-                        </div>
-                      )}
-
-                      {/* Bottom Accent Bar */}
-                      {cell.isCurrentMonth && (
-                        <>
-                          {hasExamIndicator && (
-                            <span className="absolute bottom-0 left-1 right-1 h-1 rounded-t-full bg-rose-500 shadow-sm shadow-rose-500/80" />
-                          )}
-                          {hasMockIndicator && (
-                            <span className="absolute bottom-0 left-1 right-1 h-1 rounded-t-full bg-emerald-400 shadow-sm shadow-emerald-500/80" />
-                          )}
-                          {hasEventIndicator && (
-                            <span className="absolute bottom-0 left-1 right-1 h-1 rounded-t-full bg-sky-400" />
-                          )}
-                          {hasTaskIndicator && (
-                            <span className="absolute bottom-0 left-1 right-1 h-1 rounded-t-full bg-amber-400" />
-                          )}
-                        </>
+                    {/* Bottom Indicator for Mobile */}
+                    <div className="sm:hidden w-full flex items-center justify-end">
+                      {cell.isCurrentMonth && totalVisible > 0 && (
+                        <span className="text-[10px] font-mono text-emerald-400 font-bold tabular-nums">
+                          {totalVisible}
+                        </span>
                       )}
                     </div>
                   </button>
@@ -1016,429 +1357,797 @@ export default function AcademicCalendar({
               })}
             </div>
 
-            {/* Color Guide Legend */}
-            <div className="flex flex-wrap items-center gap-4 text-[11px] text-neutral-400 pt-3 font-mono border-t border-neutral-900">
-              <div className="flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-md bg-rose-500 shadow-sm shadow-rose-900" />
-                <span className="text-neutral-300 font-semibold">Provas Marcadas</span>
+            {/* Quiet Footer Legend */}
+            <div className="flex flex-wrap items-center justify-between gap-4 text-xs text-neutral-400 pt-5 mt-5 border-t border-neutral-800/80">
+              <div className="flex items-center gap-4 flex-wrap">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-rose-400" />
+                  <span className="font-medium text-neutral-300">Prova Presencial</span>
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
+                  <span className="font-medium text-neutral-300">Simulado Online</span>
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
+                  <span className="font-medium text-neutral-300">Tarefa</span>
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-sky-400" />
+                  <span className="font-medium text-neutral-300">Evento / Lembrete</span>
+                </span>
               </div>
-              <div className="flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-md bg-emerald-400 shadow-sm shadow-emerald-900" />
-                <span>Simulados</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-md bg-sky-400 shadow-sm" />
-                <span>Eventos</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-md bg-amber-400 shadow-sm" />
-                <span>Tarefas</span>
-              </div>
+              <span className="text-xs text-neutral-500 font-mono">
+                {currentMonthDays.length} dias no mês
+              </span>
             </div>
           </div>
 
-          {/* Selected Day Agenda Side Panel (5 cols) */}
-          <div className="lg:col-span-5 h-full">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={selectedDayStr}
-                initial={{ opacity: 0, x: 10 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -10 }}
-                className="bg-neutral-900/50 p-5 rounded-2xl border border-neutral-850 space-y-4 min-h-[380px] flex flex-col justify-between"
+          {/* 5. Selected Day Detail Inspector Panel (5 columns) */}
+          <div className="lg:col-span-5 bg-neutral-900/60 border border-neutral-800/80 rounded-3xl p-5 sm:p-6 space-y-5 shadow-xl backdrop-blur-md">
+            
+            {/* Inspector Header */}
+            <div className="flex items-start justify-between border-b border-neutral-800/80 pb-4 gap-2">
+              <div>
+                <span className="text-[10px] font-mono font-bold text-emerald-400 uppercase tracking-wider block">
+                  Agenda Diária
+                </span>
+                <h3 className="text-base font-black text-white capitalize mt-0.5">
+                  {selectedDayFormattedHeadline}
+                </h3>
+                <span className="text-xs text-neutral-400 font-medium mt-0.5 block">
+                  {selectedDayEvents.totalCount} compromisso(s) registrado(s)
+                </span>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setNewItemDate(selectedDayStr);
+                  setIsModalOpen(true);
+                }}
+                className="px-3 py-1.5 bg-neutral-800 hover:bg-neutral-750 text-white rounded-xl text-xs font-bold border border-neutral-700/80 flex items-center gap-1.5 transition-all shadow-sm active:scale-95 cursor-pointer"
               >
-                <div>
-                  <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
-                    <div>
-                      <span className="text-[10px] font-mono uppercase font-bold text-neutral-500">
-                        Atividades Agendadas:
-                      </span>
-                      <h4 className="text-sm font-extrabold text-neutral-100 font-mono mt-0.5">
-                        {(() => {
-                          if (!selectedDayStr) return '';
-                          const [y, m, d] = selectedDayStr.split('-').map(Number);
-                          return `${String(d).padStart(2, '0')}/${String(m).padStart(2, '0')}/${y}`;
-                        })()}
-                      </h4>
+                <Plus className="w-3.5 h-3.5 text-emerald-400 stroke-[2.5]" />
+                <span>Adicionar</span>
+              </button>
+            </div>
+
+            {/* List of Events for the Day */}
+            <div className="space-y-3.5 max-h-[580px] overflow-y-auto pr-1">
+              
+              {/* Provas Presenciais */}
+              {(activeFilter === 'all' || activeFilter === 'prova') && selectedDayEvents.exams.map((ex, i) => {
+                const dateInfo = formatExamDateDisplay(ex, ex.exam_time, dbNotifs);
+                return (
+                  <div 
+                    key={`ex-${i}`} 
+                    className="p-4 rounded-2xl bg-neutral-950/80 border border-neutral-800 hover:border-rose-500/50 transition-all space-y-3 shadow-md"
+                  >
+                    <div className="flex items-center justify-between gap-2 text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-rose-400" />
+                        <span className="font-bold text-rose-300 font-mono text-[11px] uppercase tracking-wide">
+                          {ex.materia || 'Prova Presencial'}
+                        </span>
+                      </div>
+                      {ex.teacher_name && (
+                        <span className="text-[11px] text-neutral-400 font-mono bg-neutral-900 px-2 py-0.5 rounded-md border border-neutral-800">
+                          Prof. {ex.teacher_name}
+                        </span>
+                      )}
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setNewItemDate(selectedDayStr);
-                        setIsModalOpen(true);
-                      }}
-                      className="px-2.5 py-1.5 bg-neutral-800 hover:bg-neutral-750 text-emerald-400 rounded-xl text-xs font-bold border border-neutral-700 flex items-center gap-1 transition-all cursor-pointer"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>Adicionar</span>
-                    </button>
+                    <div>
+                      <h4 className="text-sm font-bold text-white leading-snug">
+                        {ex.title}
+                      </h4>
+                      {ex.content && (
+                        <p className="text-xs text-neutral-300 mt-1.5 leading-relaxed bg-neutral-900/50 p-2.5 rounded-xl border border-neutral-850">
+                          {cleanExamContent(ex.content)}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2 pt-2 text-xs font-mono text-neutral-400 border-t border-neutral-900">
+                      <span className="flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-neutral-500" />
+                        <span>{dateInfo.fullFormatted || 'Horário de aula'}</span>
+                      </span>
+
+                      {onStudyForExam && (
+                        <button
+                          type="button"
+                          onClick={() => onStudyForExam(ex.title, cleanExamContent(ex.content) || '')}
+                          className="px-3 py-1.5 bg-gradient-to-r from-emerald-500/15 to-teal-500/15 hover:from-emerald-500/25 hover:to-teal-500/25 text-emerald-300 border border-emerald-500/40 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm active:scale-95 cursor-pointer"
+                        >
+                          <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Estudar com IA</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
-                </div>
+                );
+              })}
 
-                {/* Event Items List for selected day */}
-                <div className="flex-1 space-y-3 overflow-y-auto max-h-[340px] pr-1 custom-scrollbar">
-                  {/* Provas */}
-                  {(activeFilter === 'all' || activeFilter === 'prova') && selectedDayEvents.exams.map((ex, i) => {
-                    const dateInfo = formatExamDateDisplay(ex, ex.exam_time, dbNotifs);
-                    return (
-                      <div key={`ex-${i}`} className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/20 space-y-2">
-                        <div className="flex items-start justify-between gap-2">
-                          <span className="px-2 py-0.5 rounded text-[9px] font-mono font-extrabold uppercase bg-rose-500/20 text-rose-300 border border-rose-500/30">
-                            {ex.materia || 'Prova'}
-                          </span>
-                          {ex.teacher_name && (
-                            <span className="text-[10px] text-neutral-400 font-mono">Prof. {ex.teacher_name}</span>
-                          )}
-                        </div>
-
-                        {/* Date and Time Badge */}
-                        <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-rose-300 bg-rose-950/50 px-2.5 py-1 rounded-lg border border-rose-900/40">
-                          <Clock className="w-3.5 h-3.5 text-rose-400 shrink-0" />
-                          <span>{dateInfo.fullFormatted || 'Data marcada'}</span>
-                        </div>
-
-                        <h5 className="text-xs font-bold text-neutral-100 leading-snug">{ex.title}</h5>
-                        {ex.content && (
-                          <p className="text-[11px] text-neutral-300 bg-neutral-950/60 p-2 rounded-xl border border-neutral-850">
-                            <strong>Conteúdo:</strong> {cleanExamContent(ex.content)}
-                          </p>
-                        )}
-                        {cleanExamObservations(ex.observations) && (
-                          <p className="text-[10.5px] text-neutral-400 italic bg-neutral-950/40 p-2 rounded-xl border border-neutral-900">
-                            <strong>Obs:</strong> "{cleanExamObservations(ex.observations)}"
-                          </p>
-                        )}
-                        {onStudyForExam && (
-                          <button
-                            type="button"
-                            onClick={() => onStudyForExam(ex.title, cleanExamContent(ex.content) || '')}
-                            className="w-full py-1.5 bg-emerald-500 text-neutral-950 font-extrabold text-[10px] rounded-lg flex items-center justify-center gap-1 cursor-pointer"
-                          >
-                            <Sparkles className="w-3 h-3" />
-                            <span>Gerar Plano de Estudo com AI</span>
-                          </button>
-                        )}
+              {/* Simulados Online */}
+              {(activeFilter === 'all' || activeFilter === 'simulado') && selectedDayEvents.mockExams.map((me, i) => {
+                const rawDeadline = me.deadline || me.due_date || me.exam_date;
+                const meDateInfo = rawDeadline ? formatExamDateDisplay(rawDeadline) : null;
+                return (
+                  <div 
+                    key={`me-${i}`} 
+                    className="p-4 rounded-2xl bg-neutral-950/80 border border-neutral-800 hover:border-emerald-500/50 transition-all space-y-3 shadow-md"
+                  >
+                    <div className="flex items-center justify-between gap-2 text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
+                        <span className="font-bold text-emerald-300 font-mono text-[11px] uppercase tracking-wide">
+                          Simulado · {me.subject || 'Geral'}
+                        </span>
                       </div>
-                    );
-                  })}
+                      {me.teacher_name && (
+                        <span className="text-[11px] text-neutral-400 font-mono bg-neutral-900 px-2 py-0.5 rounded-md border border-neutral-800">
+                          Prof. {me.teacher_name}
+                        </span>
+                      )}
+                    </div>
 
-                  {/* Simulados */}
-                  {(activeFilter === 'all' || activeFilter === 'simulado') && selectedDayEvents.mockExams.map((me, i) => {
-                    const rawDeadline = me.deadline || me.due_date || me.exam_date;
-                    const meDateInfo = rawDeadline ? formatExamDateDisplay(rawDeadline) : null;
-                    return (
-                      <div key={`me-${i}`} className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 space-y-2">
-                        <div className="flex items-start justify-between gap-2">
-                          <span className="px-2 py-0.5 rounded text-[9px] font-mono font-extrabold uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                            Simulado • {me.subject || 'Geral'}
-                          </span>
-                          {me.teacher_name && (
-                            <span className="text-[10px] text-neutral-400 font-mono">Prof. {me.teacher_name}</span>
-                          )}
-                        </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-white leading-snug">
+                        {me.title}
+                      </h4>
+                      {me.description && (
+                        <p className="text-xs text-neutral-400 mt-1 leading-relaxed">
+                          {me.description}
+                        </p>
+                      )}
+                    </div>
 
-                        <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-emerald-300 bg-emerald-950/50 px-2.5 py-1 rounded-lg border border-emerald-900/40">
-                          <Clock className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                          <span>
-                            {rawDeadline && meDateInfo?.fullFormatted
-                              ? `Prazo: ${meDateInfo.fullFormatted}`
-                              : 'Prazo: Sem prazo (ritmo livre)'}
-                          </span>
-                        </div>
+                    <div className="flex items-center justify-between gap-2 pt-2 text-xs font-mono text-neutral-400 border-t border-neutral-900">
+                      <span className="flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-neutral-500" />
+                        <span>
+                          {rawDeadline && meDateInfo?.fullFormatted 
+                            ? meDateInfo.fullFormatted 
+                            : 'Prazo livre'}
+                        </span>
+                      </span>
 
-                        <h5 className="text-xs font-bold text-neutral-100 leading-snug">{me.title}</h5>
-                        {userRole === 'student' && onTakeMockExam && (
+                      {userRole === 'student' && onTakeMockExam && (
+                        <button
+                          type="button"
+                          onClick={onTakeMockExam}
+                          className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-neutral-950 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-md active:scale-95 cursor-pointer"
+                        >
+                          <span>Iniciar Prova</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+
+                      {userRole === 'teacher' && onViewResults && (
+                        <button
+                          type="button"
+                          onClick={onViewResults}
+                          className="px-3 py-1.5 bg-neutral-800 hover:bg-neutral-750 text-white rounded-xl text-xs font-bold border border-neutral-700 transition-colors cursor-pointer"
+                        >
+                          Ver Resultados
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* User Items: Tarefas & Eventos */}
+              {selectedDayEvents.userItems.map(item => {
+                const isTask = item.type === 'tarefa';
+                const isChecked = item.completed;
+
+                return (
+                  <div
+                    key={item.id}
+                    className={`p-4 rounded-2xl border transition-all space-y-2.5 shadow-md ${
+                      isChecked
+                        ? 'bg-neutral-950/40 border-neutral-850/60 opacity-60'
+                        : 'bg-neutral-950/80 border-neutral-800 hover:border-neutral-700'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2 text-xs">
+                      <div className="flex items-center gap-2">
+                        {isTask && (
                           <button
                             type="button"
-                            onClick={onTakeMockExam}
-                            className="w-full py-1.5 bg-emerald-500 text-neutral-950 font-extrabold text-[10px] rounded-lg flex items-center justify-center gap-1 cursor-pointer"
+                            onClick={() => handleToggleTaskCompleted(item.id)}
+                            className="text-neutral-400 hover:text-emerald-400 transition-colors cursor-pointer"
                           >
-                            <span>Responder Simulado</span>
-                            <ArrowRight className="w-3 h-3" />
-                          </button>
-                        )}
-                        {userRole === 'teacher' && onViewResults && (
-                          <button
-                            type="button"
-                            onClick={onViewResults}
-                            className="w-full py-1.5 bg-neutral-800 text-emerald-400 font-bold text-[10px] rounded-lg flex items-center justify-center gap-1 cursor-pointer border border-neutral-700"
-                          >
-                            <span>Ver Desempenho dos Alunos</span>
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })}
-
-                  {/* User Created Items */}
-                  {selectedDayEvents.userItems.map((item) => {
-                    const isTask = item.type === 'tarefa';
-                    const isChecked = item.completed;
-
-                    return (
-                      <div
-                        key={item.id}
-                        className={`p-3.5 rounded-2xl border transition-all space-y-2 ${
-                          isTask
-                            ? isChecked
-                              ? 'bg-neutral-900/40 border-neutral-800 opacity-60'
-                              : 'bg-amber-500/10 border-amber-500/25'
-                            : 'bg-sky-500/10 border-sky-500/25'
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex items-center gap-2">
-                            {isTask && (
-                              <button
-                                type="button"
-                                onClick={() => handleToggleTaskCompleted(item.id)}
-                                className="text-amber-400 hover:text-amber-300 cursor-pointer"
-                              >
-                                {isChecked ? (
-                                  <CheckSquare className="w-4 h-4 text-emerald-400" />
-                                ) : (
-                                  <Square className="w-4 h-4 text-amber-400" />
-                                )}
-                              </button>
+                            {isChecked ? (
+                              <CheckSquare className="w-4 h-4 text-emerald-400" />
+                            ) : (
+                              <Square className="w-4 h-4 text-neutral-500" />
                             )}
-                            <span className={`px-2 py-0.5 rounded text-[9px] font-mono font-extrabold uppercase ${
-                              isTask ? 'bg-amber-500/20 text-amber-300' : 'bg-sky-500/20 text-sky-300'
+                          </button>
+                        )}
+                        <span className={`w-2.5 h-2.5 rounded-full ${isTask ? 'bg-amber-400' : 'bg-sky-400'}`} />
+                        <span className={`font-mono text-[11px] font-bold uppercase tracking-wide ${
+                          isTask ? 'text-amber-300' : 'text-sky-300'
+                        }`}>
+                          {item.type} {item.subject ? `· ${item.subject}` : ''}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2.5">
+                        {item.time && (
+                          <span className="text-xs text-neutral-400 font-mono bg-neutral-900 px-2 py-0.5 rounded border border-neutral-800">
+                            {item.time}
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => requestDeleteUserItem(item)}
+                          className="text-neutral-500 hover:text-rose-400 transition-colors p-1 cursor-pointer rounded-lg hover:bg-neutral-900"
+                          title="Excluir"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 className={`text-xs sm:text-sm font-semibold text-white ${isChecked ? 'line-through text-neutral-500' : ''}`}>
+                        {item.title}
+                      </h4>
+                      {item.description && (
+                        <p className="text-xs text-neutral-400 mt-1 leading-relaxed">
+                          {item.description}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Empty state for the selected day */}
+              {selectedDayEvents.exams.length === 0 &&
+               selectedDayEvents.mockExams.length === 0 &&
+               selectedDayEvents.userItems.length === 0 && (
+                <div className="py-14 text-center space-y-3 bg-neutral-950/40 rounded-2xl border border-neutral-850 p-6">
+                  <div className="w-12 h-12 rounded-2xl bg-neutral-900 border border-neutral-800 flex items-center justify-center mx-auto text-neutral-500">
+                    <CalendarCheck className="w-6 h-6 text-emerald-500/70" />
+                  </div>
+                  <div>
+                    <h5 className="text-sm font-bold text-neutral-200">
+                      Nenhum compromisso marcado
+                    </h5>
+                    <p className="text-xs text-neutral-400 mt-0.5">
+                      Aproveite este dia livre ou planeje uma meta de estudo personalizada.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewItemDate(selectedDayStr);
+                      setIsModalOpen(true);
+                    }}
+                    className="px-4 py-2 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/30 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Agendar para esta data</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : viewMode === 'week' ? (
+        /* 5. WEEK VIEW (7-DAY COLUMN SCHEDULE) */
+        <div className="bg-neutral-900/60 border border-neutral-800/80 rounded-3xl p-5 sm:p-6 space-y-6 shadow-xl backdrop-blur-md">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-neutral-800/80 pb-4 gap-2">
+            <div>
+              <h3 className="text-base font-black text-white">Visualização Semanal</h3>
+              <p className="text-xs text-neutral-400 mt-0.5">
+                Distribuição dos compromissos e tarefas ao longo dos 7 dias da semana selecionada.
+              </p>
+            </div>
+            <span className="text-xs font-mono text-neutral-400 bg-neutral-950 px-3 py-1.5 rounded-xl border border-neutral-800">
+              Semana de {currentWeekDays[0].dayNumber} a {currentWeekDays[6].dayNumber} de {monthNames[month]}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-7 gap-3">
+            {currentWeekDays.map(weekDay => {
+              const dayEvents = getEventsForDate(
+                weekDay.date.getFullYear(),
+                weekDay.date.getMonth(),
+                weekDay.date.getDate()
+              );
+
+              return (
+                <div 
+                  key={weekDay.dateStr}
+                  onClick={() => setSelectedDayStr(weekDay.dateStr)}
+                  className={`rounded-2xl p-3 border transition-all flex flex-col justify-between min-h-[300px] cursor-pointer ${
+                    weekDay.isSelected
+                      ? 'bg-neutral-900 border-emerald-500/80 ring-2 ring-emerald-500/30 shadow-lg'
+                      : weekDay.isToday
+                      ? 'bg-neutral-950/80 border-emerald-500/50'
+                      : 'bg-neutral-950/50 border-neutral-850 hover:border-neutral-700'
+                  }`}
+                >
+                  <div>
+                    {/* Day Column Header */}
+                    <div className="flex items-center justify-between border-b border-neutral-800 pb-2 mb-2">
+                      <span className="text-[11px] font-mono font-bold uppercase text-neutral-400">
+                        {weekDay.weekdayLabel}
+                      </span>
+                      <span className={`text-xs font-mono tabular-nums ${
+                        weekDay.isToday 
+                          ? 'px-2 py-0.5 rounded-full bg-emerald-500 text-neutral-950 font-black' 
+                          : weekDay.isSelected 
+                          ? 'font-black text-emerald-400' 
+                          : 'font-semibold text-neutral-300'
+                      }`}>
+                        {weekDay.dayNumber}
+                      </span>
+                    </div>
+
+                    {/* Day Events Stack */}
+                    <div className="space-y-2 mt-2">
+                      {dayEvents.exams.map((ex, i) => (
+                        <div key={`we-${i}`} className="p-2 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-200 text-xs">
+                          <span className="font-bold block truncate">{ex.materia || ex.title}</span>
+                          <span className="text-[10px] text-rose-300 block truncate">{ex.title}</span>
+                        </div>
+                      ))}
+
+                      {dayEvents.mockExams.map((me, i) => (
+                        <div key={`wm-${i}`} className="p-2 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-200 text-xs">
+                          <span className="font-bold block truncate">{me.title}</span>
+                          <span className="text-[10px] text-emerald-300 block truncate">{me.subject || 'Simulado'}</span>
+                        </div>
+                      ))}
+
+                      {dayEvents.userItems.map((ui, i) => (
+                        <div key={`wu-${i}`} className={`p-2 rounded-xl border text-xs ${
+                          ui.type === 'tarefa'
+                            ? 'bg-amber-500/15 border-amber-500/30 text-amber-200'
+                            : 'bg-sky-500/15 border-sky-500/30 text-sky-200'
+                        }`}>
+                          <span className="font-bold block truncate">{ui.title}</span>
+                          {ui.time && <span className="text-[10px] font-mono text-neutral-400">{ui.time}</span>}
+                        </div>
+                      ))}
+
+                      {dayEvents.totalCount === 0 && (
+                        <span className="text-[11px] text-neutral-600 block text-center py-6">
+                          Sem atividades
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setNewItemDate(weekDay.dateStr);
+                      setSelectedDayStr(weekDay.dateStr);
+                      setIsModalOpen(true);
+                    }}
+                    className="w-full mt-3 py-1.5 bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-white rounded-xl text-[11px] font-bold border border-neutral-800 transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>Adicionar</span>
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+        /* 6. AGENDA FEED VIEW (CHRONOLOGICAL TIMELINE) */
+        <div className="bg-neutral-900/60 border border-neutral-800/80 rounded-3xl p-5 sm:p-7 space-y-6 shadow-xl backdrop-blur-md">
+          <div className="flex items-center justify-between border-b border-neutral-800/80 pb-4">
+            <div>
+              <h3 className="text-base font-black text-white">Linha do Tempo de Atividades</h3>
+              <p className="text-xs text-neutral-400 mt-0.5">
+                Visualização cronológica contínua de todas as provas, simulados e tarefas acadêmicas.
+              </p>
+            </div>
+            <span className="text-xs font-mono text-neutral-400 bg-neutral-950 px-3 py-1 rounded-xl border border-neutral-800">
+              {allChronologicalItems.length} registros encontrados
+            </span>
+          </div>
+
+          {agendaGroupedByDate.length === 0 ? (
+            <div className="py-20 text-center space-y-3">
+              <div className="w-12 h-12 rounded-2xl bg-neutral-950 border border-neutral-800 flex items-center justify-center mx-auto text-neutral-500">
+                <CalendarRange className="w-6 h-6 text-neutral-400" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-neutral-200">
+                  Nenhum compromisso encontrado para os filtros atuais.
+                </p>
+                <p className="text-xs text-neutral-500 mt-0.5">
+                  Tente alterar os filtros ou adicione uma nova entrada na agenda.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveFilter('all');
+                  setSearchTerm('');
+                }}
+                className="text-xs text-emerald-400 hover:underline font-bold cursor-pointer"
+              >
+                Limpar filtros e busca
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {agendaGroupedByDate.map(([dateKey, items]) => {
+                let dateDisplay = dateKey;
+                try {
+                  const [y, m, d] = dateKey.split('-').map(Number);
+                  dateDisplay = new Intl.DateTimeFormat('pt-BR', {
+                    weekday: 'short',
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric'
+                  }).format(new Date(y, m - 1, d));
+                } catch {
+                  // ignore
+                }
+
+                const isToday = (() => {
+                  const today = new Date().toISOString().slice(0, 10);
+                  return today === dateKey;
+                })();
+
+                return (
+                  <div key={dateKey} className="space-y-3">
+                    {/* Date Divider Header */}
+                    <div className="flex items-center gap-3">
+                      <span className={`text-xs font-mono font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg ${
+                        isToday 
+                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' 
+                          : 'bg-neutral-950 text-neutral-300 border border-neutral-800'
+                      }`}>
+                        {dateDisplay} {isToday && '· Hoje'}
+                      </span>
+                      <div className="flex-1 h-px bg-neutral-800/80" />
+                    </div>
+
+                    {/* Cards for this date */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 pl-3 border-l-2 border-neutral-800/80">
+                      {items.map(item => (
+                        <div
+                          key={item.id}
+                          className="p-4 bg-neutral-950/80 border border-neutral-800 rounded-2xl space-y-2.5 hover:border-neutral-700 transition-all shadow-md"
+                        >
+                          <div className="flex items-center justify-between text-xs">
+                            <span className={`inline-flex items-center gap-1.5 font-mono text-[11px] font-bold uppercase ${
+                              item.category === 'prova'
+                                ? 'text-rose-300'
+                                : item.category === 'simulado'
+                                ? 'text-emerald-300'
+                                : item.category === 'tarefa'
+                                ? 'text-amber-300'
+                                : 'text-sky-300'
                             }`}>
-                              {item.type}
+                              <span className={`w-2 h-2 rounded-full ${
+                                item.category === 'prova'
+                                  ? 'bg-rose-400'
+                                  : item.category === 'simulado'
+                                  ? 'bg-emerald-400'
+                                  : item.category === 'tarefa'
+                                  ? 'bg-amber-400'
+                                  : 'bg-sky-400'
+                              }`} />
+                              <span>{item.category} {item.subject ? `· ${item.subject}` : ''}</span>
                             </span>
-                            {item.time && (
-                              <span className="text-[10px] text-neutral-400 font-mono flex items-center gap-1">
-                                <Clock className="w-3 h-3" />
-                                {item.time}
+
+                            {item.timeStr && (
+                              <span className="font-mono text-xs text-neutral-400 bg-neutral-900 px-2 py-0.5 rounded border border-neutral-800">
+                                {item.timeStr}
                               </span>
                             )}
                           </div>
 
-                          <button
-                            type="button"
-                            onClick={() => requestDeleteUserItem(item)}
-                            className="text-neutral-500 hover:text-red-400 transition-colors p-1 cursor-pointer"
-                            title="Excluir"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          <h4 className="text-sm font-bold text-white">
+                            {item.title}
+                          </h4>
+
+                          {item.description && (
+                            <p className="text-xs text-neutral-400 leading-relaxed">
+                              {item.description}
+                            </p>
+                          )}
+
+                          {item.category === 'tarefa' && (
+                            <div className="pt-2.5 border-t border-neutral-900 flex items-center justify-between">
+                              <button
+                                type="button"
+                                onClick={() => handleToggleTaskCompleted(item.id)}
+                                className="flex items-center gap-2 text-xs font-semibold text-neutral-300 hover:text-emerald-400 cursor-pointer"
+                              >
+                                {item.completed ? (
+                                  <>
+                                    <CheckSquare className="w-4 h-4 text-emerald-400" />
+                                    <span className="text-neutral-500 line-through">Concluída</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Square className="w-4 h-4" />
+                                    <span>Concluir tarefa</span>
+                                  </>
+                                )}
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => requestDeleteUserItem(item.rawObject)}
+                                className="text-neutral-500 hover:text-rose-400 p-1 cursor-pointer rounded hover:bg-neutral-900"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          )}
+
+                          {item.category === 'prova' && onStudyForExam && (
+                            <div className="pt-2.5 border-t border-neutral-900 flex justify-end">
+                              <button
+                                type="button"
+                                onClick={() => onStudyForExam(item.title, item.content || '')}
+                                className="px-3 py-1.5 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                              >
+                                <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                                <span>Gerar Plano com IA</span>
+                              </button>
+                            </div>
+                          )}
+
+                          {item.category === 'simulado' && userRole === 'student' && onTakeMockExam && (
+                            <div className="pt-2.5 border-t border-neutral-900 flex justify-end">
+                              <button
+                                type="button"
+                                onClick={onTakeMockExam}
+                                className="px-3.5 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-neutral-950 font-bold rounded-xl text-xs flex items-center gap-1.5 cursor-pointer shadow-md"
+                              >
+                                <span>Responder Simulado</span>
+                                <ArrowRight className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          )}
                         </div>
-
-                        <h5 className={`text-xs font-bold text-neutral-100 ${isChecked ? 'line-through text-neutral-400' : ''}`}>
-                          {item.title}
-                        </h5>
-
-                        {item.description && (
-                          <p className="text-[11px] text-neutral-300 bg-neutral-950/50 p-2 rounded-xl">
-                            {item.description}
-                          </p>
-                        )}
-                      </div>
-                    );
-                  })}
-
-                  {selectedDayEvents.exams.length === 0 &&
-                   selectedDayEvents.mockExams.length === 0 &&
-                   selectedDayEvents.userItems.length === 0 && (
-                    <div className="py-12 text-center space-y-2">
-                      <div className="w-10 h-10 rounded-2xl bg-neutral-900 flex items-center justify-center mx-auto text-neutral-500">
-                        <BookOpen className="w-5 h-5" />
-                      </div>
-                      <p className="text-xs font-bold text-neutral-400">Nenhum evento para esta data</p>
-                      <p className="text-[11px] text-neutral-500">Clique em "+ Adicionar" para agendar uma tarefa ou lembrete.</p>
-                    </div>
-                  )}
-                </div>
-              </motion.div>
-            </AnimatePresence>
-          </div>
-        </div>
-      ) : (
-        /* Agenda View / Task Manager List */
-        <div className="space-y-4">
-          <div className="p-4 rounded-2xl bg-neutral-900/50 border border-neutral-850 space-y-3">
-            <h3 className="text-sm font-extrabold text-neutral-100 flex items-center gap-2">
-              <CheckSquare className="w-4 h-4 text-emerald-400" />
-              <span>Gerenciador Pessoal de Tarefas e Lembretes</span>
-            </h3>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-              {userItems.map(item => (
-                <div
-                  key={item.id}
-                  className={`p-4 rounded-2xl border transition-all space-y-2.5 ${
-                    item.completed
-                      ? 'bg-neutral-900/30 border-neutral-850 opacity-60'
-                      : 'bg-neutral-900/80 border-neutral-800'
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="px-2 py-0.5 rounded text-[9px] font-mono font-extrabold uppercase bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
-                      {item.type} • {item.date}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => requestDeleteUserItem(item)}
-                      className="text-neutral-500 hover:text-red-400 p-1 cursor-pointer"
-                      title="Excluir"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-
-                  <div className="flex items-start gap-2.5">
-                    {item.type === 'tarefa' && (
-                      <button
-                        type="button"
-                        onClick={() => handleToggleTaskCompleted(item.id)}
-                        className="mt-0.5 text-emerald-400 cursor-pointer"
-                      >
-                        {item.completed ? (
-                          <CheckSquare className="w-4 h-4 text-emerald-400" />
-                        ) : (
-                          <Square className="w-4 h-4 text-neutral-500" />
-                        )}
-                      </button>
-                    )}
-                    <div>
-                      <h4 className={`text-xs font-bold text-neutral-100 ${item.completed ? 'line-through text-neutral-400' : ''}`}>
-                        {item.title}
-                      </h4>
-                      {item.description && (
-                        <p className="text-[11px] text-neutral-400 mt-1">{item.description}</p>
-                      )}
+                      ))}
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
-          </div>
+          )}
         </div>
       )}
 
-      {/* Modal Criar Evento / Tarefa */}
+      {/* 7. Modal Criar Evento / Tarefa com Design Modernizado */}
       <AnimatePresence>
         {isModalOpen && (
           <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
             <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-lg bg-neutral-950 border border-emerald-500/30 rounded-3xl p-6 space-y-5 shadow-2xl relative"
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="w-full max-w-lg bg-neutral-900 border border-neutral-800 rounded-3xl p-6 sm:p-7 space-y-5 shadow-2xl relative"
             >
-              <div className="flex items-center justify-between border-b border-neutral-900 pb-4">
-                <div className="flex items-center gap-2.5">
-                  <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400">
-                    <Plus className="w-5 h-5" />
+              <div className="flex items-center justify-between border-b border-neutral-800 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-500/20 to-teal-400/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center">
+                    <Plus className="w-5 h-5 stroke-[2.5]" />
                   </div>
-                  <h3 className="text-base font-extrabold text-neutral-100">Criar Novo Evento ou Tarefa</h3>
+                  <div>
+                    <h3 className="text-base font-black text-white">
+                      Novo Registro na Agenda
+                    </h3>
+                    <p className="text-xs text-neutral-400 mt-0.5">
+                      Adicione eventos, lembretes ou tarefas ao seu cronograma pessoal.
+                    </p>
+                  </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="p-2 rounded-xl bg-neutral-900 text-neutral-400 hover:text-white"
+                  className="p-2 rounded-xl text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors cursor-pointer"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="w-5 h-5" />
                 </button>
               </div>
 
-              <form onSubmit={handleCreateItem} noValidate className="space-y-4">
+              <form onSubmit={handleCreateItem} className="space-y-4">
+                {/* Visual Category Selector Cards */}
                 <div>
-                  <label className="text-xs font-bold text-neutral-300 block mb-1">Título do Agendamento *</label>
+                  <label className="text-xs font-bold uppercase tracking-wider text-neutral-400 block mb-2">
+                    Tipo de Registro
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setNewItemType('evento')}
+                      className={`p-2.5 rounded-2xl border text-center transition-all cursor-pointer flex flex-col items-center gap-1.5 ${
+                        newItemType === 'evento'
+                          ? 'bg-sky-500/20 border-sky-500/60 text-white shadow-sm ring-1 ring-sky-500/40'
+                          : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:border-neutral-700'
+                      }`}
+                    >
+                      <CalendarIcon className="w-4 h-4 text-sky-400" />
+                      <span className="text-[11px] font-bold">Evento</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setNewItemType('tarefa')}
+                      className={`p-2.5 rounded-2xl border text-center transition-all cursor-pointer flex flex-col items-center gap-1.5 ${
+                        newItemType === 'tarefa'
+                          ? 'bg-amber-500/20 border-amber-500/60 text-white shadow-sm ring-1 ring-amber-500/40'
+                          : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:border-neutral-700'
+                      }`}
+                    >
+                      <CheckSquare className="w-4 h-4 text-amber-400" />
+                      <span className="text-[11px] font-bold">Tarefa</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setNewItemType('estudo')}
+                      className={`p-2.5 rounded-2xl border text-center transition-all cursor-pointer flex flex-col items-center gap-1.5 ${
+                        newItemType === 'estudo'
+                          ? 'bg-emerald-500/20 border-emerald-500/60 text-white shadow-sm ring-1 ring-emerald-500/40'
+                          : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:border-neutral-700'
+                      }`}
+                    >
+                      <BookOpen className="w-4 h-4 text-emerald-400" />
+                      <span className="text-[11px] font-bold">Estudo</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setNewItemType('lembrete')}
+                      className={`p-2.5 rounded-2xl border text-center transition-all cursor-pointer flex flex-col items-center gap-1.5 ${
+                        newItemType === 'lembrete'
+                          ? 'bg-purple-500/20 border-purple-500/60 text-white shadow-sm ring-1 ring-purple-500/40'
+                          : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:border-neutral-700'
+                      }`}
+                    >
+                      <Bell className="w-4 h-4 text-purple-400" />
+                      <span className="text-[11px] font-bold">Lembrete</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-wider text-neutral-400 block mb-1.5">
+                    Título *
+                  </label>
                   <input
                     type="text"
                     required
-                    placeholder="Ex: Estudar Matemática, Reunião de Pais..."
+                    placeholder="Ex: Revisar Bioquímica, Entregar trabalho..."
                     value={newItemTitle}
                     onChange={(e) => setNewItemTitle(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-neutral-900 border border-neutral-800 rounded-xl text-xs text-neutral-100 outline-none focus:border-emerald-500"
+                    className="w-full px-3.5 py-2.5 bg-neutral-950 border border-neutral-800 rounded-2xl text-xs text-white outline-none focus:border-emerald-500/80 transition-colors"
                   />
-                  {!newItemTitle.trim() && (
-                    <p className="text-[10px] text-amber-400/90 mt-1 flex items-center gap-1">
-                      <AlertCircle className="w-3 h-3" />
-                      Por favor, preencha o título do agendamento.
-                    </p>
-                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs font-bold text-neutral-300 block mb-1">Tipo</label>
-                    <select
-                      value={newItemType}
-                      onChange={(e) => setNewItemType(e.target.value as any)}
-                      className="w-full px-3.5 py-2.5 bg-neutral-900 border border-neutral-800 rounded-xl text-xs text-neutral-100 outline-none focus:border-emerald-500"
-                    >
-                      <option value="evento">Evento / Compromisso</option>
-                      <option value="tarefa">Tarefa / To-do</option>
-                      <option value="estudo">Sessão de Estudo</option>
-                      <option value="lembrete">Lembrete</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-bold text-neutral-300 block mb-1">Data *</label>
+                    <label className="text-xs font-bold uppercase tracking-wider text-neutral-400 block mb-1.5">
+                      Data *
+                    </label>
                     <input
                       type="date"
                       required
                       value={newItemDate}
                       onChange={(e) => setNewItemDate(e.target.value)}
-                      className="w-full px-3.5 py-2.5 bg-neutral-900 border border-neutral-800 rounded-xl text-xs text-neutral-100 outline-none focus:border-emerald-500"
+                      className="w-full px-3.5 py-2.5 bg-neutral-950 border border-neutral-800 rounded-2xl text-xs text-white outline-none focus:border-emerald-500/80 transition-colors font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold uppercase tracking-wider text-neutral-400 block mb-1.5">
+                      Horário
+                    </label>
+                    <input
+                      type="time"
+                      value={newItemTime}
+                      onChange={(e) => setNewItemTime(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-neutral-950 border border-neutral-800 rounded-2xl text-xs text-white outline-none focus:border-emerald-500/80 transition-colors font-mono"
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs font-bold text-neutral-300 block mb-1">Horário</label>
-                    <input
-                      type="time"
-                      value={newItemTime}
-                      onChange={(e) => setNewItemTime(e.target.value)}
-                      className="w-full px-3.5 py-2.5 bg-neutral-900 border border-neutral-800 rounded-xl text-xs text-neutral-100 outline-none focus:border-emerald-500"
-                    />
+                    <label className="text-xs font-bold uppercase tracking-wider text-neutral-400 block mb-1.5">
+                      Prioridade
+                    </label>
+                    <div className="grid grid-cols-3 gap-1 bg-neutral-950 p-1 rounded-2xl border border-neutral-800">
+                      <button
+                        type="button"
+                        onClick={() => setNewItemPriority('baixa')}
+                        className={`py-1.5 rounded-xl text-[11px] font-bold transition-all cursor-pointer ${
+                          newItemPriority === 'baixa'
+                            ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40'
+                            : 'text-neutral-400 hover:text-white'
+                        }`}
+                      >
+                        Baixa
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setNewItemPriority('media')}
+                        className={`py-1.5 rounded-xl text-[11px] font-bold transition-all cursor-pointer ${
+                          newItemPriority === 'media'
+                            ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                            : 'text-neutral-400 hover:text-white'
+                        }`}
+                      >
+                        Média
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setNewItemPriority('alta')}
+                        className={`py-1.5 rounded-xl text-[11px] font-bold transition-all cursor-pointer ${
+                          newItemPriority === 'alta'
+                            ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                            : 'text-neutral-400 hover:text-white'
+                        }`}
+                      >
+                        Alta
+                      </button>
+                    </div>
                   </div>
 
                   <div>
-                    <label className="text-xs font-bold text-neutral-300 block mb-1">Prioridade</label>
-                    <select
-                      value={newItemPriority}
-                      onChange={(e) => setNewItemPriority(e.target.value as any)}
-                      className="w-full px-3.5 py-2.5 bg-neutral-900 border border-neutral-800 rounded-xl text-xs text-neutral-100 outline-none focus:border-emerald-500"
-                    >
-                      <option value="baixa">Baixa</option>
-                      <option value="media">Média</option>
-                      <option value="alta">Alta</option>
-                    </select>
+                    <label className="text-xs font-bold uppercase tracking-wider text-neutral-400 block mb-1.5">
+                      Disciplina / Matéria
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ex: Biologia..."
+                      value={newItemSubject}
+                      onChange={(e) => setNewItemSubject(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-neutral-950 border border-neutral-800 rounded-2xl text-xs text-white outline-none focus:border-emerald-500/80 transition-colors"
+                    />
                   </div>
                 </div>
 
                 <div>
-                  <label className="text-xs font-bold text-neutral-300 block mb-1">Descrição / Anotações</label>
+                  <label className="text-xs font-bold uppercase tracking-wider text-neutral-400 block mb-1.5">
+                    Observações / Anotações
+                  </label>
                   <textarea
                     rows={3}
-                    placeholder="Detalhes adicionais ou instruções..."
+                    placeholder="Detalhes adicionais, orientações ou páginas do conteúdo..."
                     value={newItemDescription}
                     onChange={(e) => setNewItemDescription(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-neutral-900 border border-neutral-800 rounded-xl text-xs text-neutral-100 outline-none focus:border-emerald-500 resize-none"
+                    className="w-full px-3.5 py-2.5 bg-neutral-950 border border-neutral-800 rounded-2xl text-xs text-white outline-none focus:border-emerald-500/80 transition-colors resize-none leading-relaxed"
                   />
                 </div>
 
-                <div className="flex items-center justify-end gap-2 pt-2">
+                <div className="flex items-center justify-end gap-3 pt-3 border-t border-neutral-800">
                   <button
                     type="button"
                     onClick={() => setIsModalOpen(false)}
-                    className="px-4 py-2 bg-neutral-900 hover:bg-neutral-800 text-neutral-300 text-xs font-bold rounded-xl cursor-pointer"
+                    className="px-4 py-2.5 bg-neutral-800 hover:bg-neutral-750 text-neutral-300 text-xs font-bold rounded-2xl transition-colors cursor-pointer"
                   >
                     Cancelar
                   </button>
                   <button
                     type="submit"
                     disabled={!newItemTitle.trim() || !newItemDate.trim()}
-                    className="px-5 py-2 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed text-neutral-950 text-xs font-extrabold rounded-xl shadow-lg shadow-emerald-500/20 cursor-pointer"
+                    className="px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 disabled:opacity-50 text-neutral-950 text-xs font-black rounded-2xl transition-all shadow-md active:scale-95 cursor-pointer"
                   >
-                    Salvar no Calendário
+                    Salvar Registro
                   </button>
                 </div>
               </form>
@@ -1447,45 +2156,42 @@ export default function AcademicCalendar({
         )}
       </AnimatePresence>
 
-      {/* Modal: Confirmar Exclusão de Evento (P2-02) */}
+      {/* 8. Modal Confirmar Exclusão */}
       <AnimatePresence>
         {itemToDelete && (
-          <div className="fixed inset-0 bg-neutral-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
               className="bg-neutral-900 border border-neutral-800 rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl"
               role="alertdialog"
-              aria-labelledby="delete-dialog-title"
-              aria-describedby="delete-dialog-desc"
             >
-              <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400 mx-auto">
+              <div className="w-12 h-12 rounded-2xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-400 mx-auto">
                 <Trash2 className="w-6 h-6" />
               </div>
-              <div className="text-center space-y-1">
-                <h3 id="delete-dialog-title" className="text-base font-bold text-neutral-100">
-                  Excluir Evento?
+              <div className="text-center space-y-1.5">
+                <h3 className="text-base font-black text-white">
+                  Remover compromisso?
                 </h3>
-                <p id="delete-dialog-desc" className="text-xs text-neutral-400 leading-relaxed">
-                  Tem certeza que deseja excluir o evento <strong className="text-neutral-200">"{itemToDelete.title}"</strong>? Esta ação removerá o lembrete da sua agenda.
+                <p className="text-xs text-neutral-400 leading-relaxed">
+                  Confirma a exclusão de <strong className="text-neutral-200">"{itemToDelete.title}"</strong> da sua agenda?
                 </p>
               </div>
               <div className="grid grid-cols-2 gap-2.5 pt-2">
                 <button
                   type="button"
                   onClick={() => setItemToDelete(null)}
-                  className="py-2.5 px-4 rounded-xl bg-neutral-800 hover:bg-neutral-750 text-neutral-300 text-xs font-bold transition-all cursor-pointer"
+                  className="py-2.5 px-4 rounded-2xl bg-neutral-800 hover:bg-neutral-750 text-neutral-300 text-xs font-bold cursor-pointer"
                 >
-                  Cancelar
+                  Voltar
                 </button>
                 <button
                   type="button"
                   onClick={confirmDeleteUserItem}
-                  className="py-2.5 px-4 rounded-xl bg-red-500 hover:bg-red-600 text-white text-xs font-bold transition-all shadow-lg shadow-red-500/20 cursor-pointer flex items-center justify-center gap-1.5"
+                  className="py-2.5 px-4 rounded-2xl bg-rose-500 hover:bg-rose-600 text-white text-xs font-black cursor-pointer shadow-md"
                 >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>Excluir</span>
+                  Remover
                 </button>
               </div>
             </motion.div>
@@ -1493,37 +2199,25 @@ export default function AcademicCalendar({
         )}
       </AnimatePresence>
 
-      {/* Toast Feedback Notification com opção de Desfazer (Undo) */}
+      {/* 9. Toast Feedback com Desfazer (Undo) */}
       <AnimatePresence>
         {toastFeedback && (
           <motion.div
-            initial={{ opacity: 0, y: 20, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-2xl border shadow-2xl text-xs backdrop-blur-md ${
-              toastFeedback.type === 'success'
-                ? 'bg-neutral-900/95 border-neutral-800 text-neutral-200'
-                : 'bg-red-950/90 border-red-800/60 text-red-200'
-            }`}
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 15 }}
+            className="fixed bottom-6 right-6 z-50 flex items-center gap-3.5 px-5 py-3 rounded-2xl border border-neutral-800 bg-neutral-900/95 text-white shadow-2xl text-xs backdrop-blur-xl"
           >
             <div className="flex items-center gap-2">
-              {toastFeedback.type === 'success' ? (
-                <div className="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
-                  <Check className="w-3.5 h-3.5" />
-                </div>
-              ) : (
-                <div className="w-6 h-6 rounded-full bg-red-500/20 text-red-400 flex items-center justify-center">
-                  <AlertCircle className="w-3.5 h-3.5" />
-                </div>
-              )}
-              <span>{toastFeedback.message}</span>
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
+              <span className="font-medium">{toastFeedback.message}</span>
             </div>
 
             {undoItem && (
               <button
                 type="button"
                 onClick={handleUndoDelete}
-                className="ml-2 px-3 py-1 bg-emerald-500 hover:bg-emerald-400 text-neutral-950 font-bold rounded-lg text-xs flex items-center gap-1 cursor-pointer transition-all shadow-md"
+                className="ml-2 px-3 py-1 bg-emerald-500 hover:bg-emerald-400 text-neutral-950 font-black rounded-xl text-xs flex items-center gap-1.5 cursor-pointer transition-colors shadow-sm"
               >
                 <Undo2 className="w-3.5 h-3.5" />
                 <span>Desfazer</span>
@@ -1533,13 +2227,14 @@ export default function AcademicCalendar({
             <button
               type="button"
               onClick={() => setToastFeedback(null)}
-              className="text-neutral-400 hover:text-white p-1 ml-1 cursor-pointer"
+              className="text-neutral-500 hover:text-white p-1 cursor-pointer ml-1"
             >
               <X className="w-3.5 h-3.5" />
             </button>
           </motion.div>
         )}
       </AnimatePresence>
+
     </div>
   );
 }

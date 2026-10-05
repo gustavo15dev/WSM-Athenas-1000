@@ -901,8 +901,8 @@ Se você precisa de ajuda com o seu próprio acesso ou esqueceu sua senha, por f
           parts: [{ text: rawAnswer }]
         });
 
-        // Push Tavily search results back to the model
-        const sourcesSummary = formatSourcesForGemini(roundSources);
+        // Push Tavily search results back to the model with cumulative offset
+        const sourcesSummary = formatSourcesForGemini(roundSources, allSources.length - roundSources.length);
         conversationContents.push({
           role: 'user',
           parts: [{
@@ -910,7 +910,7 @@ Se você precisa de ajuda com o seu próprio acesso ou esqueceu sua senha, por f
               `Instruções para o próximo passo:\n` +
               `1. Avalie cuidadosamente as fontes acima.\n` +
               `2. Se as informações forem suficientes para responder com alta qualidade pedagógica: Elabore a resposta final completa, aprofundada, dividida em tópicos com formatação rica.\n` +
-              `   No final dos parágrafos onde usar as fontes, insira a tag da fonte no formato: [Nome da Fonte](URL).\n` +
+              `   Ao citar as informações das fontes, insira a tag da fonte no formato [Fonte 1], [Fonte 2], etc. (ou [Fonte 1, Fonte 8] quando combinar fontes). O sistema converterá automaticamente em tags interativas e clicáveis para o usuário.\n` +
               `   NÃO inclua a chave {web: ...} na resposta final.\n` +
               `3. Se AINDA PRECISAR pesquisar mais alguma coisa essencial que faltou: Escreva um novo parágrafo explicativo e uma nova chave {web: "próximo assunto"}.`
           }]

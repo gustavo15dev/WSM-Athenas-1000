@@ -10,7 +10,7 @@ import {
   AlertTriangle, Info, Sparkles, CheckCircle2, XCircle, 
   Target, Quote, ExternalLink, Globe, Loader2 
 } from 'lucide-react';
-import { WebSource, extractDomain } from '../utils/tavilyAgent';
+import { WebSource, extractDomain, extractSiteName } from '../utils/tavilyAgent';
 
 const EXTENSION_MAP: Record<string, string> = {
   js: 'js',
@@ -77,29 +77,108 @@ export function preprocessMarkdown(text: string, sources?: WebSource[]): string 
     .replace(/áôÁêâôÁê/g, '')
     .replace(/[\uFFFD]/g, '');
 
-  // Split content by code blocks so we NEVER modify code blocks with markdown regexes
-  const parts = normalized.split(/(```[\s\S]*?```)/g);
+  // Split content by code blocks and inline code so we NEVER modify code blocks with markdown regexes
+  const parts = normalized.split(/(```[\s\S]*?```|`[^`\n]+`)/g);
 
   const processedParts = parts.map((part, index) => {
-    // Odd index is inside triple-backtick code block - leave unchanged
+    // Odd index is inside triple-backtick code block or inline backticks - leave unchanged
     if (index % 2 === 1) {
       return part;
     }
 
     let segment = part;
 
-    // 0. Auto-convert numbered citations like [1], [2], [[1]] if sources are provided
-    if (sources && sources.length > 0) {
-      segment = segment.replace(/(?<!\[)\[\[?(\d{1,2})\]?\](?!\()/g, (match, numStr) => {
-        const idx = parseInt(numStr, 10) - 1;
-        if (idx >= 0 && idx < sources.length) {
+    // 0. Auto-convert citations like [Fonte 9], [Fonte 1, Fonte 8], [Fontes 1, 8], [1], [1, 8] into interactive markdown links with site names
+    // Pattern A: Brackets explicitly containing "Fonte", "Fontes", "Source", "Sources", "Web", "Ref" followed by numbers
+    segment = segment.replace(/(?<![!\[])\[\[?\s*(?:fontes?|sources?|web|ref)\s*:?\s*([^\]\(\n]+)\]?\](?!\()/gi, (fullMatch, inner) => {
+      const numbers = inner.match(/\d+/g);
+      if (!numbers || numbers.length === 0) return fullMatch;
+
+      return numbers.map(numStr => {
+        const num = parseInt(numStr, 10);
+        const idx = num - 1;
+        let targetUrl = `source:${num}`;
+        let label = `Fonte ${num}`;
+
+        if (sources && idx >= 0 && idx < sources.length && sources[idx]) {
           const src = sources[idx];
-          const tagLabel = src.domain || src.title || `Fonte ${numStr}`;
-          return `[${tagLabel}](${src.url})`;
+          if (src.url) {
+            targetUrl = src.url;
+          }
+          const siteName = extractSiteName(src.domain || src.url, src.title);
+          if (siteName && siteName !== 'Fonte') {
+            label = siteName;
+          }
         }
-        return match;
+
+        return `[${label}](${targetUrl})`;
+      }).join(' ');
+    });
+
+    // Pattern B: Parentheses explicitly containing "Fonte", "Fontes", "Source"
+    segment = segment.replace(/(?<![\]\w])\(\s*(?:fontes?|sources?|ref)\s*:?\s*([^\)\(\n]+)\)/gi, (fullMatch, inner) => {
+      const numbers = inner.match(/\d+/g);
+      if (!numbers || numbers.length === 0) return fullMatch;
+
+      return numbers.map(numStr => {
+        const num = parseInt(numStr, 10);
+        const idx = num - 1;
+        let targetUrl = `source:${num}`;
+        let label = `Fonte ${num}`;
+
+        if (sources && idx >= 0 && idx < sources.length && sources[idx]) {
+          const src = sources[idx];
+          if (src.url) {
+            targetUrl = src.url;
+          }
+          const siteName = extractSiteName(src.domain || src.url, src.title);
+          if (siteName && siteName !== 'Fonte') {
+            label = siteName;
+          }
+        }
+
+        return `[${label}](${targetUrl})`;
+      }).join(' ');
+    });
+
+    // Pattern C: Brackets with pure numbers [1], [1, 2], [1, 8], [[1]]
+    segment = segment.replace(/(?<![!\[])\[\[?\s*(\d+(?:\s*(?:,|e|and|&|;)\s*\d+)*)\s*\]?\](?!\()/gi, (fullMatch, inner) => {
+      const numbers = inner.match(/\d+/g);
+      if (!numbers || numbers.length === 0) return fullMatch;
+
+      // Filter reasonable citation numbers (1 to 50)
+      const validCitations = numbers.filter(n => {
+        const val = parseInt(n, 10);
+        return val >= 1 && val <= 50;
       });
-    }
+
+      if (validCitations.length === 0) return fullMatch;
+
+      // If no sources exist and it's a single digit > 10, keep as is to avoid matching math indices
+      if ((!sources || sources.length === 0) && validCitations.length === 1 && parseInt(validCitations[0], 10) > 10) {
+        return fullMatch;
+      }
+
+      return validCitations.map(numStr => {
+        const num = parseInt(numStr, 10);
+        const idx = num - 1;
+        let targetUrl = `source:${num}`;
+        let label = `Fonte ${num}`;
+
+        if (sources && idx >= 0 && idx < sources.length && sources[idx]) {
+          const src = sources[idx];
+          if (src.url) {
+            targetUrl = src.url;
+          }
+          const siteName = extractSiteName(src.domain || src.url, src.title);
+          if (siteName && siteName !== 'Fonte') {
+            label = siteName;
+          }
+        }
+
+        return `[${label}](${targetUrl})`;
+      }).join(' ');
+    });
 
     // 0.1 Transform [[PESQUISOU:X]] into search step badge
     segment = segment.replace(/\[\[PESQUISOU:(\d+)\]\]/g, (_match, numStr) => {
@@ -617,27 +696,53 @@ export default function AthenasMarkdownRenderer({
             const childText = extractTextFromNodes(children).trim();
             
             // Check if this link corresponds to a web source or a citation tag
-            const matchingSource = sources?.find(s => {
+            const numMatch = href?.match(/(?:source:|#fonte-?)(\d+)/i) || childText.match(/(?:fonte|source)\s*(\d+)/i);
+            const sourceIdx = numMatch ? parseInt(numMatch[1], 10) - 1 : -1;
+
+            let matchingSource = sources?.find(s => {
               if (!href) return false;
               if (s.url && (href === s.url || href.replace(/\/$/, '') === s.url.replace(/\/$/, ''))) return true;
               if (s.domain && href.toLowerCase().includes(s.domain.toLowerCase())) return true;
               return false;
             });
 
+            if (!matchingSource && sourceIdx >= 0 && sources && sourceIdx < sources.length) {
+              matchingSource = sources[sourceIdx];
+            }
+
+            const isFontePattern = /^(?:fonte|source)\s*\d+/i.test(childText) || /^\d+$/.test(childText);
+
             const isExplicitSourceTag = Boolean(
+              isFontePattern ||
               childText.toLowerCase().startsWith('fonte') ||
-              /^\d+$/.test(childText) ||
-              /^\d+[:\s]/.test(childText) ||
-              childText.toLowerCase().includes('tavily')
+              childText.toLowerCase().includes('tavily') ||
+              href?.startsWith('source:') ||
+              href?.startsWith('#fonte')
             );
 
             const isSourceTag = Boolean(matchingSource || isExplicitSourceTag);
 
             if (isSourceTag) {
-              const rawDomain = matchingSource?.domain || extractDomain(href || '');
+              const rawDomain = matchingSource?.domain || extractDomain(href && !href.startsWith('source:') && !href.startsWith('#') ? href : '');
               const isValidDomain = Boolean(rawDomain && rawDomain.includes('.') && rawDomain.length > 3 && !rawDomain.includes('/'));
-              const domain = isValidDomain ? rawDomain : 'web';
-              const sourceTitle = matchingSource?.title || childText || domain || 'Fonte';
+              const domain = isValidDomain ? rawDomain : (matchingSource?.title ? 'web' : '');
+              
+              // Determine display label: Prefer the clean site name (e.g. "Toda Matéria", "Brasil Escola", "Wikipédia", "SciELO")
+              let siteName = '';
+              if (matchingSource) {
+                siteName = extractSiteName(matchingSource.domain || matchingSource.url, matchingSource.title);
+              } else if (href && !href.startsWith('source:') && !href.startsWith('#')) {
+                siteName = extractSiteName(href);
+              }
+
+              let displayLabel = siteName && siteName !== 'Fonte' ? siteName : childText;
+              if (!displayLabel || displayLabel === href) {
+                displayLabel = isFontePattern ? childText : (matchingSource?.domain || 'Fonte');
+              }
+
+              const tooltipTitle = matchingSource 
+                ? `${displayLabel}: ${matchingSource.title} (${domain || 'web'}) - Clique para ver detalhes`
+                : `${displayLabel} - Fonte consultada pela IA`;
 
               return (
                 <button
@@ -646,12 +751,14 @@ export default function AthenasMarkdownRenderer({
                     e.stopPropagation();
                     if (onSelectSource && matchingSource) {
                       onSelectSource(matchingSource);
-                    } else if (href) {
+                    } else if (href && !href.startsWith('source:') && !href.startsWith('#')) {
                       window.open(href, '_blank', 'noopener,noreferrer');
+                    } else if (matchingSource?.url) {
+                      window.open(matchingSource.url, '_blank', 'noopener,noreferrer');
                     }
                   }}
-                  className="inline-flex items-center gap-1.5 px-2 py-0.5 mx-1 my-0.5 rounded-full text-[11px] font-medium bg-neutral-900/95 text-emerald-300 hover:text-emerald-200 border border-emerald-500/30 hover:border-emerald-400 hover:bg-emerald-950/60 transition-all cursor-pointer select-none align-middle shadow-xs group/tag"
-                  title={`Fonte consultada: ${sourceTitle} (${domain}) - Clique para ver detalhes`}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-0.5 mx-1 my-0.5 rounded-full text-[11px] font-semibold bg-neutral-900/95 text-emerald-300 hover:text-emerald-200 border border-emerald-500/40 hover:border-emerald-400 hover:bg-emerald-950/70 transition-all cursor-pointer select-none align-middle shadow-xs group/tag active:scale-95"
+                  title={tooltipTitle}
                 >
                   {isValidDomain ? (
                     <img
@@ -663,7 +770,7 @@ export default function AthenasMarkdownRenderer({
                   ) : (
                     <Globe className="w-3 h-3 text-emerald-400 shrink-0" />
                   )}
-                  <span className="truncate max-w-[140px] font-mono">{sourceTitle}</span>
+                  <span className="truncate max-w-[150px] font-mono">{displayLabel}</span>
                   <span className="text-[10px] text-emerald-400/80 group-hover/tag:translate-x-0.5 group-hover/tag:-translate-y-0.5 transition-transform">
                     ↗
                   </span>

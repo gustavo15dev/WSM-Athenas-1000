@@ -80,6 +80,106 @@ export function extractDomain(urlStr: string): string {
   }
 }
 
+const KNOWN_SITE_NAMES: Record<string, string> = {
+  'brasilescola.uol.com.br': 'Brasil Escola',
+  'brasilescola.com': 'Brasil Escola',
+  'todamateria.com.br': 'Toda Matéria',
+  'mundoeducacao.uol.com.br': 'Mundo Educação',
+  'mundoeducacao.com': 'Mundo Educação',
+  'wikipedia.org': 'Wikipédia',
+  'pt.wikipedia.org': 'Wikipédia',
+  'en.wikipedia.org': 'Wikipedia',
+  'scielo.br': 'SciELO',
+  'scielo.org': 'SciELO',
+  'embrapa.br': 'Embrapa',
+  'ibge.gov.br': 'IBGE',
+  'inep.gov.br': 'INEP',
+  'mec.gov.br': 'MEC',
+  'fiocruz.br': 'Fiocruz',
+  'g1.globo.com': 'G1',
+  'globo.com': 'Globo',
+  'ge.globo.com': 'ge',
+  'uol.com.br': 'UOL',
+  'educacao.uol.com.br': 'UOL Educação',
+  'noticias.uol.com.br': 'UOL Notícias',
+  'folha.uol.com.br': 'Folha de S.Paulo',
+  'estadao.com.br': 'Estadão',
+  'cnnbrasil.com.br': 'CNN Brasil',
+  'bbc.com': 'BBC News',
+  'bbc.co.uk': 'BBC',
+  'khanacademy.org': 'Khan Academy',
+  'pt.khanacademy.org': 'Khan Academy',
+  'novaescola.org.br': 'Nova Escola',
+  'infoescola.com': 'InfoEscola',
+  'guiadoestudante.abril.com.br': 'Guia do Estudante',
+  'super.abril.com.br': 'Superinteressante',
+  'abril.com.br': 'Abril',
+  'nature.com': 'Nature',
+  'science.org': 'Science',
+  'nationalgeographic.com': 'National Geographic',
+  'nationalgeographicbrasil.com': 'NatGeo Brasil',
+  'unesco.org': 'UNESCO',
+  'un.org': 'ONU',
+  'nacoesunidas.org': 'ONU Brasil',
+  'who.int': 'OMS',
+  'paho.org': 'OPAS / OMS',
+  'mma.gov.br': 'MMA Gov',
+  'gov.br': 'Gov.br',
+  'ipea.gov.br': 'IPEA',
+  'saude.gov.br': 'Ministério da Saúde',
+  'canaltech.com.br': 'Canaltech',
+  'tecmundo.com.br': 'TecMundo',
+  'olhardigital.com.br': 'Olhar Digital',
+  'ted.com': 'TED',
+  'youtube.com': 'YouTube',
+  'github.com': 'GitHub',
+  'stackoverflow.com': 'Stack Overflow'
+};
+
+/**
+ * Extracts a concise, friendly site name from domain or title (e.g. 'Toda Matéria', 'Brasil Escola', 'Wikipédia')
+ */
+export function extractSiteName(domainOrUrl?: string, title?: string): string {
+  const raw = domainOrUrl || '';
+  const domain = extractDomain(raw).toLowerCase().replace(/^www\./i, '').trim();
+
+  // 1. Direct or partial match in curated registry
+  if (domain && KNOWN_SITE_NAMES[domain]) {
+    return KNOWN_SITE_NAMES[domain];
+  }
+  for (const [key, val] of Object.entries(KNOWN_SITE_NAMES)) {
+    if (domain.endsWith(key) || domain.includes(key)) {
+      return val;
+    }
+  }
+
+  // 2. Extract brand from title delimiter if available (e.g. "Sustentabilidade - Toda Matéria" -> "Toda Matéria")
+  if (title) {
+    const brandMatch = title.match(/(?:[-–—|•·:]\s*)([A-Z0-9À-Úa-z0-9à-ú\s.&]{2,30})$/);
+    if (brandMatch && brandMatch[1]) {
+      const candidate = brandMatch[1].trim();
+      if (candidate.length >= 2 && candidate.length <= 25 && !/^(artigo|pdf|capítulo|página|home|início)$/i.test(candidate)) {
+        return candidate;
+      }
+    }
+  }
+
+  // 3. Clean fallback from hostname parts
+  if (domain) {
+    const hostParts = domain.split('.');
+    let mainPart = hostParts[0];
+    if (['pt', 'en', 'es', 'm', 'blog', 'noticias', 'educacao', 'portal'].includes(mainPart) && hostParts.length > 1) {
+      mainPart = hostParts[1];
+    }
+    if (mainPart && mainPart.length >= 2) {
+      return mainPart.charAt(0).toUpperCase() + mainPart.slice(1);
+    }
+    return domain;
+  }
+
+  return 'Fonte';
+}
+
 /**
  * Execute search via Tavily Search API with required parameters:
  * search_depth: "basic"
@@ -195,13 +295,13 @@ async function getFallbackSources(query: string): Promise<WebSource[]> {
 /**
  * Format sources list for the subsequent Gemini prompt
  */
-export function formatSourcesForGemini(sources: WebSource[]): string {
+export function formatSourcesForGemini(sources: WebSource[], offset: number = 0): string {
   if (!sources || sources.length === 0) {
     return 'Nenhum resultado retornado da pesquisa na web.';
   }
 
   return sources.map((s, i) => {
-    const idx = i + 1;
+    const idx = offset + i + 1;
     return `[FONTE ${idx}]:
 - Título: ${s.title}
 - Domínio: ${s.domain}
