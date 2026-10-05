@@ -6,43 +6,25 @@ import {
   ChevronLeft, 
   ChevronRight, 
   Plus, 
-  Check, 
   X, 
   Sparkles, 
   Clock, 
   BookOpen, 
   ArrowRight, 
-  AlertCircle, 
   CheckSquare, 
   Square, 
   Trash2, 
-  Tag, 
-  Filter, 
   Search, 
-  Layers, 
-  FileText, 
-  Award,
-  ListTodo,
-  CalendarDays,
-  UserCheck,
-  Undo2,
-  CalendarRange,
-  Flame,
+  CalendarDays, 
+  Undo2, 
+  CalendarClock, 
   CheckCircle2,
-  ChevronDown,
-  CalendarCheck,
-  CalendarClock,
-  Pin,
-  GraduationCap,
-  Bell,
-  CheckCircle,
-  Clock3,
-  Compass,
-  Laptop
+  CalendarCheck2,
+  Tag,
+  AlertCircle
 } from 'lucide-react';
 import { parseExamSettings, cleanExamContent, formatExamDateDisplay, cleanExamObservations, extractExamTime } from '../utils/examSettings';
 import { matchesStudentTarget, matchesStudentExam } from '../utils/targetMatcher';
-import { areTurmasMatching } from '../utils/profileDb';
 
 export interface UserCalendarItem {
   id: string;
@@ -93,9 +75,9 @@ export default function AcademicCalendar({
   });
 
   // Filter and Search states
-  const [activeFilter, setActiveFilter] = useState<'all' | 'prova' | 'simulado' | 'evento' | 'tarefa'>('all');
+  const [activeFilter, setActiveFilter] = useState<'all' | 'prova' | 'simulado' | 'tarefa'>('all');
   const [searchTerm, setSearchTerm] = useState('');
-  const [viewMode, setViewMode] = useState<'month' | 'week' | 'agenda'>('month');
+  const [viewMode, setViewMode] = useState<'month' | 'agenda'>('month');
 
   // Custom User Items state (stored in localStorage & Supabase)
   const [userItems, setUserItems] = useState<UserCalendarItem[]>(() => {
@@ -112,7 +94,7 @@ export default function AcademicCalendar({
   // Modal State for Creating Event/Task
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newItemTitle, setNewItemTitle] = useState('');
-  const [newItemType, setNewItemType] = useState<'evento' | 'tarefa' | 'estudo' | 'lembrete'>('evento');
+  const [newItemType, setNewItemType] = useState<'evento' | 'tarefa' | 'estudo' | 'lembrete'>('tarefa');
   const [newItemDate, setNewItemDate] = useState(selectedDayStr);
   const [newItemTime, setNewItemTime] = useState('09:00');
   const [newItemPriority, setNewItemPriority] = useState<'baixa' | 'media' | 'alta'>('media');
@@ -287,7 +269,7 @@ export default function AcademicCalendar({
           const mapped: UserCalendarItem[] = data.map((row: any) => ({
             id: row.id,
             title: row.title,
-            type: row.type || 'evento',
+            type: row.type || 'tarefa',
             date: row.event_date || row.date,
             time: row.event_time || row.time || '09:00',
             priority: row.priority || 'media',
@@ -299,7 +281,7 @@ export default function AcademicCalendar({
 
           setUserItems(mapped);
         }
-      } catch (err) {
+      } catch {
         // Table might not exist yet, fallback silently to localStorage
       }
     };
@@ -464,84 +446,76 @@ export default function AcademicCalendar({
         event_date: newItem.date,
         event_time: newItem.time,
         priority: newItem.priority,
-        subject: newItem.subject || null,
-        description: newItem.description || null,
+        subject: newItem.subject,
+        description: newItem.description,
         completed: false
       });
     } catch {
-      // Ignored - fallback to LocalStorage
+      // Fallback already saved in localStorage
     }
 
+    setToastFeedback({ type: 'success', message: 'Item adicionado com sucesso!' });
+    setTimeout(() => setToastFeedback(null), 3500);
+
+    // Reset fields
     setNewItemTitle('');
-    setNewItemDescription('');
     setNewItemSubject('');
+    setNewItemDescription('');
   };
 
+  // Toggle task completed
   const handleToggleTaskCompleted = async (itemId: string) => {
-    let nextState = false;
-
     setUserItems(prev => prev.map(item => {
       if (item.id === itemId) {
-        nextState = !item.completed;
-        return { ...item, completed: nextState };
+        const nextCompleted = !item.completed;
+        // update supabase
+        supabase.from('user_calendar_events')
+          .update({ completed: nextCompleted })
+          .eq('id', itemId)
+          .then();
+        return { ...item, completed: nextCompleted };
       }
       return item;
     }));
-
-    try {
-      await supabase
-        .from('user_calendar_events')
-        .update({ completed: nextState })
-        .eq('id', itemId);
-    } catch {
-      // Ignored
-    }
   };
 
+  // Delete item with Undo capability
   const requestDeleteUserItem = (item: UserCalendarItem) => {
     setItemToDelete(item);
   };
 
-  const confirmDeleteUserItem = async () => {
+  const confirmDeleteUserItem = () => {
     if (!itemToDelete) return;
-    const target = itemToDelete;
+    const toDelete = itemToDelete;
     setItemToDelete(null);
 
+    // Remove from state
+    setUserItems(prev => prev.filter(i => i.id !== toDelete.id));
+
+    // Supabase delete
+    supabase.from('user_calendar_events').delete().eq('id', toDelete.id).then();
+
+    // Prepare Undo
+    setUndoItem(toDelete);
     if (undoTimer) clearTimeout(undoTimer);
-
-    setUserItems(prev => prev.filter(item => item.id !== target.id));
-    setUndoItem(target);
-
-    setToastFeedback({
-      type: 'success',
-      message: `Compromisso "${target.title}" removido.`
-    });
-
-    const timer = setTimeout(async () => {
+    const timer = setTimeout(() => {
       setUndoItem(null);
-      try {
-        await supabase
-          .from('user_calendar_events')
-          .delete()
-          .eq('id', target.id);
-      } catch (err) {
-        console.warn('Falha na exclusão remota:', err);
-      }
-    }, 8000);
-
+      setToastFeedback(null);
+    }, 6000);
     setUndoTimer(timer);
+
+    setToastFeedback({ type: 'success', message: `"${toDelete.title}" removido.` });
   };
 
   const handleUndoDelete = async () => {
     if (!undoItem) return;
-    if (undoTimer) clearTimeout(undoTimer);
     const restored = undoItem;
-    setUndoItem(null);
-
     setUserItems(prev => [restored, ...prev]);
+    setUndoItem(null);
+    if (undoTimer) clearTimeout(undoTimer);
 
     try {
-      await supabase.from('user_calendar_events').upsert({
+      await supabase.from('user_calendar_events').insert({
         id: restored.id,
         user_email: userEmail.toLowerCase().trim(),
         title: restored.title,
@@ -549,123 +523,50 @@ export default function AcademicCalendar({
         event_date: restored.date,
         event_time: restored.time,
         priority: restored.priority,
-        subject: restored.subject || null,
-        description: restored.description || null,
-        completed: restored.completed || false
+        subject: restored.subject,
+        description: restored.description,
+        completed: restored.completed
       });
-    } catch (err) {
-      console.warn('Erro ao restaurar no Supabase:', err);
+    } catch {
+      // ignore
     }
 
-    setToastFeedback({
-      type: 'success',
-      message: `"${restored.title}" foi restaurado.`
-    });
+    setToastFeedback({ type: 'success', message: 'Exclusão desfeita com sucesso!' });
+    setTimeout(() => setToastFeedback(null), 3000);
   };
 
-  // Selected day items filtered
+  // Events for selected day
   const selectedDayEvents = useMemo(() => {
-    if (!selectedDayStr) return { exams: [], mockExams: [], userItems: [], totalCount: 0 };
+    if (!selectedDayStr) {
+      return { exams: [], mockExams: [], userItems: [] };
+    }
     const [y, m, d] = selectedDayStr.split('-').map(Number);
-    const events = getEventsForDate(y, m - 1, d);
+    const dayData = getEventsForDate(y, m - 1, d);
 
-    // Apply search filter if typed
+    // Apply search filter if active
     if (searchTerm.trim()) {
       const q = searchTerm.toLowerCase().trim();
       return {
-        exams: events.exams.filter(ex => 
+        exams: dayData.exams.filter(ex => 
           (ex.title && ex.title.toLowerCase().includes(q)) || 
           (ex.materia && ex.materia.toLowerCase().includes(q)) ||
-          (ex.content && ex.content.toLowerCase().includes(q))
+          (ex.content && cleanExamContent(ex.content).toLowerCase().includes(q))
         ),
-        mockExams: events.mockExams.filter(me => 
-          (me.title && me.title.toLowerCase().includes(q)) || 
-          (me.subject && me.subject.toLowerCase().includes(q))
+        mockExams: dayData.mockExams.filter(me => 
+          (me.title && me.title.toLowerCase().includes(q)) ||
+          (me.subject && me.subject.toLowerCase().includes(q)) ||
+          (me.description && me.description.toLowerCase().includes(q))
         ),
-        userItems: events.userItems.filter(ui => 
-          (ui.title && ui.title.toLowerCase().includes(q)) || 
-          (ui.description && ui.description.toLowerCase().includes(q)) ||
-          (ui.subject && ui.subject.toLowerCase().includes(q))
-        ),
-        totalCount: events.totalCount
+        userItems: dayData.userItems.filter(ui => 
+          (ui.title && ui.title.toLowerCase().includes(q)) ||
+          (ui.subject && ui.subject.toLowerCase().includes(q)) ||
+          (ui.description && ui.description.toLowerCase().includes(q))
+        )
       };
     }
 
-    return events;
+    return dayData;
   }, [selectedDayStr, getEventsForDate, searchTerm]);
-
-  // Overall statistics for the month
-  const monthlyStats = useMemo(() => {
-    const currentYearMonth = `${year}-${String(month + 1).padStart(2, '0')}`;
-    
-    const totalExamsThisMonth = effectiveExams.filter(ex => {
-      const d = extractDateStr(ex.exam_date || ex.date || ex.data_prova || ex.data);
-      return d && d.startsWith(currentYearMonth);
-    }).length;
-    
-    const totalMocksThisMonth = effectiveMockExams.filter(me => {
-      const rawDeadline = me.deadline || me.due_date || me.exam_date;
-      if (!rawDeadline) return false;
-      const d = extractDateStr(rawDeadline);
-      return d && d.startsWith(currentYearMonth);
-    }).length;
-
-    const totalTasksThisMonth = userItems.filter(i => {
-      const d = extractDateStr(i.date || i.event_date);
-      return i.type === 'tarefa' && d && d.startsWith(currentYearMonth);
-    }).length;
-
-    const completedTasksThisMonth = userItems.filter(i => {
-      const d = extractDateStr(i.date || i.event_date);
-      return i.type === 'tarefa' && i.completed && d && d.startsWith(currentYearMonth);
-    }).length;
-
-    const pendingUserTasks = userItems.filter(i => {
-      return i.type === 'tarefa' && !i.completed;
-    }).length;
-
-    // Nearest upcoming exam or mock
-    const todayIso = new Date().toISOString().slice(0, 10);
-    const allUpcoming = [
-      ...effectiveExams.map(e => ({
-        title: e.title,
-        materia: e.materia || 'Geral',
-        type: 'Prova Presencial',
-        date: extractDateStr(e.exam_date || e.date || e.data_prova || e.data),
-        color: 'rose'
-      })),
-      ...effectiveMockExams.map(m => ({
-        title: m.title,
-        materia: m.subject || 'Simulado',
-        type: 'Simulado Online',
-        date: extractDateStr(m.deadline || m.due_date || m.exam_date),
-        color: 'emerald'
-      }))
-    ]
-      .filter(item => item.date && item.date >= todayIso)
-      .sort((a, b) => (a.date! > b.date! ? 1 : -1));
-
-    const nextEvent = allUpcoming[0] || null;
-
-    // Days difference to next event
-    let daysToNextEvent = null;
-    if (nextEvent?.date) {
-      const todayDate = new Date(todayIso);
-      const nextDate = new Date(nextEvent.date);
-      const diffTime = nextDate.getTime() - todayDate.getTime();
-      daysToNextEvent = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    }
-
-    return {
-      totalExamsThisMonth,
-      totalMocksThisMonth,
-      totalTasksThisMonth,
-      completedTasksThisMonth,
-      pendingUserTasks,
-      nextEvent,
-      daysToNextEvent
-    };
-  }, [effectiveExams, effectiveMockExams, userItems, year, month, extractDateStr]);
 
   // Formatted date string for selected day headline
   const selectedDayFormattedHeadline = useMemo(() => {
@@ -673,73 +574,68 @@ export default function AcademicCalendar({
     try {
       const [y, m, d] = selectedDayStr.split('-').map(Number);
       const dateObj = new Date(y, m - 1, d);
-      return new Intl.DateTimeFormat('pt-BR', {
-        weekday: 'long',
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric'
+      return new Intl.DateTimeFormat('pt-BR', { 
+        weekday: 'long', 
+        day: 'numeric', 
+        month: 'long', 
+        year: 'numeric' 
       }).format(dateObj);
     } catch {
       return selectedDayStr;
     }
   }, [selectedDayStr]);
 
-  // All chronological events for Agenda view
+  // All chronological items for the Agenda list view
   const allChronologicalItems = useMemo(() => {
-    const list: {
+    const list: Array<{
       id: string;
       title: string;
-      category: 'prova' | 'simulado' | 'evento' | 'tarefa' | 'estudo' | 'lembrete';
+      category: 'prova' | 'simulado' | 'tarefa' | 'evento' | 'estudo' | 'lembrete';
       dateStr: string;
       timeStr?: string;
       subject?: string;
-      teacherName?: string;
       description?: string;
       content?: string;
+      teacherName?: string;
       completed?: boolean;
-      priority?: 'baixa' | 'media' | 'alta';
+      priority?: string;
       rawObject: any;
-    }[] = [];
+    }> = [];
 
-    // Provas
     effectiveExams.forEach(ex => {
       const d = extractDateStr(ex.exam_date || ex.date || ex.data_prova || ex.data);
       if (d) {
         list.push({
-          id: `ex-${ex.id || ex.title}-${d}`,
+          id: ex.id || `ex-${ex.title}-${d}`,
           title: ex.title,
           category: 'prova',
           dateStr: d,
           timeStr: ex.exam_time || undefined,
-          subject: ex.materia || 'Geral',
-          teacherName: ex.teacher_name,
+          subject: ex.materia,
           content: cleanExamContent(ex.content),
-          description: cleanExamObservations(ex.observations),
+          teacherName: ex.teacher_name,
           rawObject: ex
         });
       }
     });
 
-    // Simulados
     effectiveMockExams.forEach(me => {
       const rawDeadline = me.deadline || me.due_date || me.exam_date;
       const d = extractDateStr(rawDeadline);
       if (d) {
         list.push({
-          id: `me-${me.id || me.title}-${d}`,
+          id: me.id || `me-${me.title}-${d}`,
           title: me.title,
           category: 'simulado',
           dateStr: d,
-          timeStr: undefined,
-          subject: me.subject || 'Simulado',
-          teacherName: me.teacher_name,
+          subject: me.subject,
           description: me.description,
+          teacherName: me.teacher_name,
           rawObject: me
         });
       }
     });
 
-    // User Items
     userItems.forEach(ui => {
       const d = extractDateStr(ui.date || ui.event_date);
       if (d) {
@@ -758,20 +654,18 @@ export default function AcademicCalendar({
       }
     });
 
-    // Filter by category
     let filtered = list;
     if (activeFilter === 'prova') filtered = filtered.filter(i => i.category === 'prova');
     if (activeFilter === 'simulado') filtered = filtered.filter(i => i.category === 'simulado');
-    if (activeFilter === 'evento') filtered = filtered.filter(i => i.category === 'evento' || i.category === 'estudo' || i.category === 'lembrete');
-    if (activeFilter === 'tarefa') filtered = filtered.filter(i => i.category === 'tarefa');
+    if (activeFilter === 'tarefa') filtered = filtered.filter(i => i.category === 'tarefa' || i.category === 'evento' || i.category === 'estudo' || i.category === 'lembrete');
 
-    // Filter by search
     if (searchTerm.trim()) {
       const q = searchTerm.toLowerCase().trim();
       filtered = filtered.filter(i => 
         i.title.toLowerCase().includes(q) ||
         (i.subject && i.subject.toLowerCase().includes(q)) ||
-        (i.description && i.description.toLowerCase().includes(q))
+        (i.description && i.description.toLowerCase().includes(q)) ||
+        (i.content && i.content.toLowerCase().includes(q))
       );
     }
 
@@ -790,49 +684,10 @@ export default function AcademicCalendar({
     return Object.entries(groups).sort(([dateA], [dateB]) => dateA.localeCompare(dateB));
   }, [allChronologicalItems]);
 
-  // Current week days calculation for Week View
-  const currentWeekDays = useMemo(() => {
-    const [y, m, d] = selectedDayStr.split('-').map(Number);
-    const selectedDate = new Date(y, m - 1, d);
-    const dayOfWeek = selectedDate.getDay(); // 0 is Sunday
-    const weekStart = new Date(selectedDate);
-    weekStart.setDate(selectedDate.getDate() - dayOfWeek);
-
-    const days = [];
-    for (let i = 0; i < 7; i++) {
-      const dayDate = new Date(weekStart);
-      dayDate.setDate(weekStart.getDate() + i);
-      const dy = dayDate.getFullYear();
-      const dm = String(dayDate.getMonth() + 1).padStart(2, '0');
-      const dd = String(dayDate.getDate()).padStart(2, '0');
-      const dateStr = `${dy}-${dm}-${dd}`;
-
-      days.push({
-        date: dayDate,
-        dateStr,
-        dayNumber: dayDate.getDate(),
-        weekdayLabel: weekDays[i],
-        isToday: (() => {
-          const today = new Date();
-          return today.getDate() === dayDate.getDate() && 
-                 today.getMonth() === dayDate.getMonth() && 
-                 today.getFullYear() === dayDate.getFullYear();
-        })(),
-        isSelected: dateStr === selectedDayStr
-      });
-    }
-    return days;
-  }, [selectedDayStr, weekDays]);
-
-  // Dynamic counts for quick filter tags
+  // Counts for filter pills
   const filterCounts = useMemo(() => {
-    const today = new Date();
     const currYearMonth = `${year}-${String(month + 1).padStart(2, '0')}`;
-
-    let provas = 0;
-    let simulados = 0;
-    let tarefas = 0;
-    let eventos = 0;
+    let provas = 0, simulados = 0, tarefas = 0;
 
     effectiveExams.forEach(ex => {
       const d = extractDateStr(ex.exam_date || ex.date || ex.data_prova || ex.data);
@@ -848,68 +703,46 @@ export default function AcademicCalendar({
     userItems.forEach(ui => {
       const d = extractDateStr(ui.date || ui.event_date);
       if (d && d.startsWith(currYearMonth)) {
-        if (ui.type === 'tarefa') tarefas++;
-        else eventos++;
+        tarefas++;
       }
     });
 
-    return {
-      all: provas + simulados + tarefas + eventos,
-      provas,
-      simulados,
-      tarefas,
-      eventos
-    };
+    return { all: provas + simulados + tarefas, provas, simulados, tarefas };
   }, [effectiveExams, effectiveMockExams, userItems, year, month, extractDateStr]);
 
   return (
-    <div className="space-y-6">
+    <div className="w-full space-y-6">
       
-      {/* 1. Header Banner & Executive Metric Strip */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-neutral-900/90 via-neutral-900/70 to-neutral-950/90 border border-neutral-800/80 p-6 md:p-8 backdrop-blur-xl shadow-2xl shadow-black/40">
-        {/* Subtle decorative glow circles */}
-        <div className="absolute -top-24 -right-24 w-80 h-80 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-24 -left-24 w-80 h-80 rounded-full bg-teal-500/10 blur-3xl pointer-events-none" />
-
-        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-          
-          {/* Brand & Contextual Headline */}
-          <div className="flex items-start gap-4">
-            <div className="relative">
-              <div className="w-13 h-13 rounded-2xl bg-gradient-to-tr from-emerald-600/30 to-teal-400/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center shadow-lg shadow-emerald-950/40">
-                <CalendarIcon className="w-6 h-6" />
-              </div>
-              <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+      {/* 1. Header Toolbar: Clean, open, not box-in-a-box */}
+      <div className="space-y-4">
+        
+        {/* Top line: Title & Primary Action */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-neutral-800">
+          <div>
+            <div className="flex items-center gap-2.5">
+              <h2 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
+                <CalendarIcon className="w-5 h-5 text-emerald-400" />
+                <span>Calendário Acadêmico</span>
+              </h2>
+              <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 font-medium border border-emerald-500/20">
+                {userTurma ? `${userTurma} · ` : ''}{userRole === 'teacher' ? 'Docente' : 'Estudante'}
               </span>
             </div>
-            <div>
-              <div className="flex items-center gap-2.5 flex-wrap">
-                <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-                  Calendário Acadêmico
-                </h1>
-                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold tracking-wide uppercase bg-emerald-500/15 border border-emerald-500/30 text-emerald-400">
-                  {userTurma ? `${userTurma} · ` : ''}{userRole === 'teacher' ? 'Docente' : 'Estudante'}
-                </span>
-              </div>
-              <p className="text-xs sm:text-sm text-neutral-400 mt-1 max-w-xl font-normal leading-relaxed">
-                Gestão centralizada de avaliações, simulados online e cronograma individual de estudos.
-              </p>
-            </div>
+            <p className="text-xs text-neutral-400 mt-1">
+              Cronograma organizado de provas, simulados e tarefas.
+            </p>
           </div>
 
-          {/* Top Actions: View Mode Switcher + New Item */}
-          <div className="flex items-center gap-3 self-start lg:self-center flex-wrap">
-            {/* View Mode Segmented Control */}
-            <div className="inline-flex p-1 bg-neutral-950/90 border border-neutral-800 rounded-2xl shadow-inner">
+          <div className="flex items-center gap-2 self-start sm:self-center">
+            {/* View Switcher: Mês / Lista */}
+            <div className="flex items-center bg-neutral-900 rounded-xl p-1 border border-neutral-800">
               <button
                 type="button"
                 onClick={() => setViewMode('month')}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
                   viewMode === 'month'
-                    ? 'bg-neutral-800 text-white shadow-md border border-neutral-700/60'
-                    : 'text-neutral-400 hover:text-neutral-200'
+                    ? 'bg-neutral-800 text-white shadow-sm'
+                    : 'text-neutral-400 hover:text-white'
                 }`}
               >
                 <CalendarDays className="w-3.5 h-3.5 text-emerald-400" />
@@ -917,38 +750,26 @@ export default function AcademicCalendar({
               </button>
               <button
                 type="button"
-                onClick={() => setViewMode('week')}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                  viewMode === 'week'
-                    ? 'bg-neutral-800 text-white shadow-md border border-neutral-700/60'
-                    : 'text-neutral-400 hover:text-neutral-200'
-                }`}
-              >
-                <CalendarRange className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Semana</span>
-              </button>
-              <button
-                type="button"
                 onClick={() => setViewMode('agenda')}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
                   viewMode === 'agenda'
-                    ? 'bg-neutral-800 text-white shadow-md border border-neutral-700/60'
-                    : 'text-neutral-400 hover:text-neutral-200'
+                    ? 'bg-neutral-800 text-white shadow-sm'
+                    : 'text-neutral-400 hover:text-white'
                 }`}
               >
                 <CalendarClock className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Agenda</span>
+                <span>Lista</span>
               </button>
             </div>
 
-            {/* Create Item Button */}
+            {/* Novo Registro button */}
             <button
               type="button"
               onClick={() => {
                 setNewItemDate(selectedDayStr);
                 setIsModalOpen(true);
               }}
-              className="px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-neutral-950 font-bold text-xs rounded-2xl flex items-center gap-2 transition-all shadow-lg shadow-emerald-500/20 active:scale-95 cursor-pointer"
+              className="px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-neutral-950 font-bold text-xs rounded-xl flex items-center gap-1.5 transition-all shadow-sm active:scale-95 cursor-pointer"
             >
               <Plus className="w-4 h-4 stroke-[2.5]" />
               <span>Novo Registro</span>
@@ -956,280 +777,138 @@ export default function AcademicCalendar({
           </div>
         </div>
 
-        {/* 2. Structured Executive KPI Metric Strip */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 pt-6 mt-6 border-t border-neutral-800/80">
+        {/* Navigation & Filters row */}
+        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
           
-          {/* Provas Presenciais */}
-          <div className="p-4 rounded-2xl bg-neutral-950/60 border border-neutral-800/80 hover:border-rose-500/30 transition-all flex items-center justify-between group">
-            <div>
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400 block flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-rose-400 animate-pulse" />
-                Provas Presenciais
-              </span>
-              <div className="flex items-baseline gap-2 mt-1">
-                <span className="text-2xl font-black font-mono text-white tabular-nums">
-                  {monthlyStats.totalExamsThisMonth}
-                </span>
-                <span className="text-[11px] text-neutral-500">neste mês</span>
-              </div>
-            </div>
-            <div className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center group-hover:scale-105 transition-transform">
-              <FileText className="w-5 h-5" />
-            </div>
-          </div>
-
-          {/* Simulados Online */}
-          <div className="p-4 rounded-2xl bg-neutral-950/60 border border-neutral-800/80 hover:border-emerald-500/30 transition-all flex items-center justify-between group">
-            <div>
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400 block flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                Simulados Online
-              </span>
-              <div className="flex items-baseline gap-2 mt-1">
-                <span className="text-2xl font-black font-mono text-white tabular-nums">
-                  {monthlyStats.totalMocksThisMonth}
-                </span>
-                <span className="text-[11px] text-neutral-500">cadastrados</span>
-              </div>
-            </div>
-            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center group-hover:scale-105 transition-transform">
-              <Laptop className="w-5 h-5" />
-            </div>
-          </div>
-
-          {/* Tarefas e Metas */}
-          <div className="p-4 rounded-2xl bg-neutral-950/60 border border-neutral-800/80 hover:border-amber-500/30 transition-all flex items-center justify-between group">
-            <div>
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400 block flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-amber-400" />
-                Tarefas Pessoais
-              </span>
-              <div className="flex items-baseline gap-2 mt-1">
-                <span className="text-2xl font-black font-mono text-white tabular-nums">
-                  {monthlyStats.pendingUserTasks}
-                </span>
-                <span className="text-[11px] text-neutral-500">pendentes</span>
-              </div>
-            </div>
-            <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center group-hover:scale-105 transition-transform">
-              <CheckSquare className="w-5 h-5" />
-            </div>
-          </div>
-
-          {/* Próximo Marco */}
-          <div className="p-4 rounded-2xl bg-neutral-950/60 border border-neutral-800/80 hover:border-sky-500/30 transition-all flex items-center justify-between group">
-            <div className="truncate pr-2">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400 block flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-sky-400" />
-                Próximo Marco
-              </span>
-              {monthlyStats.nextEvent ? (
-                <div className="mt-1 truncate">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-mono font-bold text-sky-400">
-                      {monthlyStats.nextEvent.date?.split('-').reverse().slice(0, 2).join('/')}
-                    </span>
-                    {monthlyStats.daysToNextEvent !== null && (
-                      <span className={`text-[10px] px-1.5 py-0.2 rounded font-bold uppercase ${
-                        monthlyStats.daysToNextEvent === 0 
-                          ? 'bg-rose-500/20 text-rose-300' 
-                          : monthlyStats.daysToNextEvent <= 2 
-                          ? 'bg-amber-500/20 text-amber-300' 
-                          : 'bg-neutral-800 text-neutral-400'
-                      }`}>
-                        {monthlyStats.daysToNextEvent === 0 
-                          ? 'Hoje!' 
-                          : monthlyStats.daysToNextEvent === 1 
-                          ? 'Amanhã' 
-                          : `em ${monthlyStats.daysToNextEvent}d`}
-                      </span>
-                    )}
-                  </div>
-                  <span className="text-xs font-semibold text-neutral-200 truncate block mt-0.5">
-                    {monthlyStats.nextEvent.title}
-                  </span>
-                </div>
-              ) : (
-                <div className="mt-2 text-xs font-semibold text-neutral-400">
-                  Agenda em dia
-                </div>
-              )}
-            </div>
-            <div className="w-10 h-10 rounded-xl bg-sky-500/10 border border-sky-500/20 text-sky-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-              <Compass className="w-5 h-5" />
-            </div>
-          </div>
-
-        </div>
-      </div>
-
-      {/* 3. Modern Control & Filter Toolbar */}
-      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 bg-neutral-900/60 p-3.5 rounded-2xl border border-neutral-800/80 backdrop-blur-md">
-        
-        {/* Month Navigator & Jump to Today */}
-        <div className="flex items-center gap-2.5">
-          <button
-            type="button"
-            onClick={handleGoToToday}
-            className="px-3.5 py-2 bg-neutral-850 hover:bg-neutral-800 text-neutral-200 hover:text-white rounded-xl text-xs font-bold border border-neutral-750 transition-all shadow-sm active:scale-95 cursor-pointer"
-          >
-            Hoje
-          </button>
-
-          <div className="flex items-center bg-neutral-950 border border-neutral-800 rounded-xl p-1 shadow-inner">
+          {/* Month Stepper */}
+          <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={handlePrevMonth}
-              className="p-1.5 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800 transition-colors cursor-pointer"
-              title="Mês anterior"
+              onClick={handleGoToToday}
+              className="px-3 py-1.5 bg-neutral-900 hover:bg-neutral-850 text-neutral-300 hover:text-white rounded-lg text-xs font-medium border border-neutral-800 transition-colors cursor-pointer"
             >
-              <ChevronLeft className="w-4 h-4" />
+              Hoje
             </button>
-            <span className="px-4 text-xs font-bold text-white select-none min-w-[140px] text-center tracking-wide">
-              {monthNames[month]} {year}
-            </span>
-            <button
-              type="button"
-              onClick={handleNextMonth}
-              className="p-1.5 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800 transition-colors cursor-pointer"
-              title="Próximo mês"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
 
-        {/* Search & Dynamic Filter Chips */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
-          
-          {/* Search Input */}
-          <div className="relative flex-1 sm:w-60">
-            <Search className="w-3.5 h-3.5 text-neutral-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              type="text"
-              placeholder="Buscar matéria, título..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-8 pr-7 py-2 bg-neutral-950 border border-neutral-800 rounded-xl text-xs text-neutral-100 placeholder:text-neutral-500 outline-none focus:border-emerald-500/80 transition-colors"
-            />
-            {searchTerm && (
+            <div className="flex items-center bg-neutral-900 border border-neutral-800 rounded-lg p-0.5">
               <button
                 type="button"
-                onClick={() => setSearchTerm('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-200 p-0.5"
+                onClick={handlePrevMonth}
+                className="p-1 text-neutral-400 hover:text-white rounded transition-colors cursor-pointer"
+                title="Mês anterior"
               >
-                <X className="w-3 h-3" />
+                <ChevronLeft className="w-4 h-4" />
               </button>
-            )}
+              <span className="px-3 text-xs font-bold text-neutral-200 select-none min-w-[130px] text-center">
+                {monthNames[month]} {year}
+              </span>
+              <button
+                type="button"
+                onClick={handleNextMonth}
+                className="p-1 text-neutral-400 hover:text-white rounded transition-colors cursor-pointer"
+                title="Próximo mês"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
           </div>
 
-          {/* Category Filter Chips with Dynamic Badges */}
-          <div className="inline-flex p-1 bg-neutral-950 border border-neutral-800 rounded-xl overflow-x-auto gap-1">
-            <button
-              type="button"
-              onClick={() => setActiveFilter('all')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap cursor-pointer transition-all flex items-center gap-1.5 ${
-                activeFilter === 'all'
-                  ? 'bg-neutral-800 text-white shadow-sm'
-                  : 'text-neutral-400 hover:text-neutral-200'
-              }`}
-            >
-              <span>Todos</span>
-              <span className="text-[10px] font-mono px-1 rounded bg-neutral-900 text-neutral-400">
-                {filterCounts.all}
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveFilter('prova')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap cursor-pointer transition-all flex items-center gap-1.5 ${
-                activeFilter === 'prova'
-                  ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
-                  : 'text-neutral-400 hover:text-neutral-200'
-              }`}
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
-              <span>Provas</span>
-              {filterCounts.provas > 0 && (
-                <span className="text-[10px] font-mono px-1 rounded bg-rose-950 text-rose-300">
-                  {filterCounts.provas}
-                </span>
+          {/* Search & Category Filter Pills */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+            {/* Search */}
+            <div className="relative flex-1 sm:w-56">
+              <Search className="w-3.5 h-3.5 text-neutral-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Buscar prova, simulado..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-8 pr-7 py-1.5 bg-neutral-900 border border-neutral-800 rounded-lg text-xs text-neutral-200 placeholder:text-neutral-500 outline-none focus:border-emerald-500/80 transition-colors"
+              />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => setSearchTerm('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-200 p-0.5"
+                >
+                  <X className="w-3 h-3" />
+                </button>
               )}
-            </button>
+            </div>
 
-            <button
-              type="button"
-              onClick={() => setActiveFilter('simulado')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap cursor-pointer transition-all flex items-center gap-1.5 ${
-                activeFilter === 'simulado'
-                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                  : 'text-neutral-400 hover:text-neutral-200'
-              }`}
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-              <span>Simulados</span>
-              {filterCounts.simulados > 0 && (
-                <span className="text-[10px] font-mono px-1 rounded bg-emerald-950 text-emerald-300">
-                  {filterCounts.simulados}
-                </span>
-              )}
-            </button>
+            {/* Filter Pills */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+              <button
+                type="button"
+                onClick={() => setActiveFilter('all')}
+                className={`px-3 py-1 rounded-lg text-xs font-medium cursor-pointer transition-colors whitespace-nowrap ${
+                  activeFilter === 'all'
+                    ? 'bg-neutral-800 text-white font-bold'
+                    : 'text-neutral-400 hover:text-white'
+                }`}
+              >
+                Todos ({filterCounts.all})
+              </button>
 
-            <button
-              type="button"
-              onClick={() => setActiveFilter('tarefa')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap cursor-pointer transition-all flex items-center gap-1.5 ${
-                activeFilter === 'tarefa'
-                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                  : 'text-neutral-400 hover:text-neutral-200'
-              }`}
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-              <span>Tarefas</span>
-              {filterCounts.tarefas > 0 && (
-                <span className="text-[10px] font-mono px-1 rounded bg-amber-950 text-amber-300">
-                  {filterCounts.tarefas}
-                </span>
-              )}
-            </button>
+              <button
+                type="button"
+                onClick={() => setActiveFilter('prova')}
+                className={`px-3 py-1 rounded-lg text-xs font-medium cursor-pointer transition-colors flex items-center gap-1.5 whitespace-nowrap ${
+                  activeFilter === 'prova'
+                    ? 'bg-rose-500/20 text-rose-300 font-bold border border-rose-500/40'
+                    : 'text-neutral-400 hover:text-rose-300'
+                }`}
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
+                <span>Provas ({filterCounts.provas})</span>
+              </button>
 
-            <button
-              type="button"
-              onClick={() => setActiveFilter('evento')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap cursor-pointer transition-all flex items-center gap-1.5 ${
-                activeFilter === 'evento'
-                  ? 'bg-sky-500/20 text-sky-300 border border-sky-500/30'
-                  : 'text-neutral-400 hover:text-neutral-200'
-              }`}
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
-              <span>Eventos</span>
-              {filterCounts.eventos > 0 && (
-                <span className="text-[10px] font-mono px-1 rounded bg-sky-950 text-sky-300">
-                  {filterCounts.eventos}
-                </span>
-              )}
-            </button>
+              <button
+                type="button"
+                onClick={() => setActiveFilter('simulado')}
+                className={`px-3 py-1 rounded-lg text-xs font-medium cursor-pointer transition-colors flex items-center gap-1.5 whitespace-nowrap ${
+                  activeFilter === 'simulado'
+                    ? 'bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40'
+                    : 'text-neutral-400 hover:text-emerald-300'
+                }`}
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                <span>Simulados ({filterCounts.simulados})</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveFilter('tarefa')}
+                className={`px-3 py-1 rounded-lg text-xs font-medium cursor-pointer transition-colors flex items-center gap-1.5 whitespace-nowrap ${
+                  activeFilter === 'tarefa'
+                    ? 'bg-amber-500/20 text-amber-300 font-bold border border-amber-500/40'
+                    : 'text-neutral-400 hover:text-amber-300'
+                }`}
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                <span>Tarefas ({filterCounts.tarefas})</span>
+              </button>
+            </div>
           </div>
 
         </div>
+
       </div>
 
-      {/* 4. Main Body: MONTH VIEW, WEEK VIEW, OR AGENDA FEED */}
+      {/* 2. Main View Mode: Mês or Lista */}
       {viewMode === 'month' ? (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        <div className="space-y-6">
           
-          {/* Calendar Month Grid (7 columns on desktop) */}
-          <div className="lg:col-span-7 bg-neutral-900/60 border border-neutral-800/80 rounded-3xl p-4 sm:p-6 shadow-xl backdrop-blur-md">
+          {/* Calendar Month Grid: Clean, flat table layout, NOT heavy nested boxes */}
+          <div className="border border-neutral-800 rounded-2xl overflow-hidden bg-neutral-900/30">
             
-            {/* Weekday labels */}
-            <div className="grid grid-cols-7 text-center mb-3">
+            {/* Weekday headers */}
+            <div className="grid grid-cols-7 text-center border-b border-neutral-800/80 bg-neutral-900/60 py-2.5">
               {weekDays.map((day, idx) => (
                 <span 
                   key={day} 
-                  className={`text-[11px] font-mono font-bold uppercase tracking-wider py-1.5 select-none ${
-                    idx === 0 || idx === 6 ? 'text-neutral-500' : 'text-neutral-400'
+                  className={`text-xs font-mono font-semibold uppercase tracking-wider select-none ${
+                    idx === 0 || idx === 6 ? 'text-neutral-500' : 'text-neutral-300'
                   }`}
                 >
                   {day}
@@ -1237,8 +916,8 @@ export default function AcademicCalendar({
               ))}
             </div>
 
-            {/* Days Matrix */}
-            <div className="grid grid-cols-7 gap-2">
+            {/* Days Grid: Hairline dividers, clean and open */}
+            <div className="grid grid-cols-7 divide-x divide-y divide-neutral-800/60">
               {allCalendarDays.map((cell, idx) => {
                 const formattedMonth = String(cell.month + 1).padStart(2, '0');
                 const formattedDay = String(cell.day).padStart(2, '0');
@@ -1254,33 +933,23 @@ export default function AcademicCalendar({
 
                 const dayEvents = getEventsForDate(cell.year, cell.month, cell.day);
 
-                // Filter logic for counts
                 const showExams = activeFilter === 'all' || activeFilter === 'prova';
                 const showMocks = activeFilter === 'all' || activeFilter === 'simulado';
-                const showEvents = activeFilter === 'all' || activeFilter === 'evento';
                 const showTasks = activeFilter === 'all' || activeFilter === 'tarefa';
 
                 const examsCount = showExams ? dayEvents.exams.length : 0;
                 const mocksCount = showMocks ? dayEvents.mockExams.length : 0;
-                const userEventsCount = showEvents ? dayEvents.userItems.filter(i => i.type !== 'tarefa').length : 0;
-                const userTasksCount = showTasks ? dayEvents.userItems.filter(i => i.type === 'tarefa').length : 0;
-                const totalVisible = examsCount + mocksCount + userEventsCount + userTasksCount;
+                const userItemsCount = showTasks ? dayEvents.userItems.length : 0;
+                const totalVisible = examsCount + mocksCount + userItemsCount;
 
-                // Categories present
-                const hasExam = examsCount > 0;
-                const hasMock = mocksCount > 0;
-                const hasTask = userTasksCount > 0;
-                const hasEvent = userEventsCount > 0;
-
-                // Base style for the calendar cell
-                let cellStyle = 'bg-neutral-950/50 text-neutral-300 border-neutral-850 hover:border-neutral-700 hover:bg-neutral-900/60 shadow-inner';
+                let cellClass = 'bg-transparent text-neutral-300 hover:bg-neutral-800/40';
 
                 if (!cell.isCurrentMonth) {
-                  cellStyle = 'bg-neutral-950/20 text-neutral-600 border-neutral-900/40 opacity-35 hover:opacity-60';
+                  cellClass = 'text-neutral-600 opacity-30 hover:opacity-50 cursor-pointer';
                 } else if (isSelected) {
-                  cellStyle = 'bg-neutral-850/95 text-white border-emerald-500 ring-2 ring-emerald-500/40 shadow-lg shadow-emerald-950/30';
+                  cellClass = 'bg-emerald-500/10 text-white ring-2 ring-inset ring-emerald-500';
                 } else if (isToday) {
-                  cellStyle = 'bg-neutral-900/90 text-white border-emerald-500/60';
+                  cellClass = 'bg-neutral-850/60 text-white font-semibold';
                 }
 
                 return (
@@ -1288,66 +957,60 @@ export default function AcademicCalendar({
                     key={idx}
                     type="button"
                     onClick={() => setSelectedDayStr(dateStr)}
-                    className={`group aspect-square min-h-[68px] sm:min-h-[82px] rounded-2xl p-2 border text-left flex flex-col justify-between transition-all cursor-pointer relative overflow-hidden ${cellStyle}`}
+                    className={`min-h-[75px] sm:min-h-[96px] p-2 text-left flex flex-col justify-between transition-colors relative cursor-pointer ${cellClass}`}
                   >
-                    {/* Top Row: Date Number and Category Dot Indicators */}
+                    {/* Top Row: Day number & dots */}
                     <div className="flex items-center justify-between w-full">
-                      <span className={`text-xs font-mono tabular-nums leading-none ${
+                      <span className={`text-xs font-mono ${
                         isToday
-                          ? 'px-2 py-0.5 rounded-full bg-emerald-500 text-neutral-950 font-black shadow-sm'
+                          ? 'w-5 h-5 rounded-full bg-emerald-500 text-neutral-950 font-black flex items-center justify-center'
                           : isSelected
                           ? 'font-black text-emerald-400'
-                          : 'font-semibold text-neutral-300'
+                          : 'font-medium text-neutral-400'
                       }`}>
                         {cell.day}
                       </span>
 
-                      {/* Small subtle status indicators */}
+                      {/* Event indicator dots */}
                       {cell.isCurrentMonth && totalVisible > 0 && (
                         <div className="flex items-center gap-1">
-                          {hasExam && <span className="w-1.5 h-1.5 rounded-full bg-rose-400" title="Prova" />}
-                          {hasMock && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" title="Simulado" />}
-                          {hasTask && <span className="w-1.5 h-1.5 rounded-full bg-amber-400" title="Tarefa" />}
-                          {hasEvent && <span className="w-1.5 h-1.5 rounded-full bg-sky-400" title="Evento" />}
+                          {examsCount > 0 && <span className="w-1.5 h-1.5 rounded-full bg-rose-400" title="Prova marcada" />}
+                          {mocksCount > 0 && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" title="Simulado online" />}
+                          {userItemsCount > 0 && <span className="w-1.5 h-1.5 rounded-full bg-amber-400" title="Tarefa de estudo" />}
                         </div>
                       )}
                     </div>
 
-                    {/* Middle: Clean High-End Schedule Chips */}
+                    {/* Middle: Clean compact event tags (hidden on very small screens, visible on tablet/desktop) */}
                     {cell.isCurrentMonth && totalVisible > 0 && (
-                      <div className="space-y-1 my-auto w-full hidden sm:block">
+                      <div className="space-y-1 my-1 w-full hidden sm:block">
                         {showExams && dayEvents.exams[0] && (
-                          <div className="flex items-center gap-1 border-l-2 border-rose-500 bg-rose-500/15 text-rose-200 px-1.5 py-0.5 rounded-r text-[10px] truncate font-medium">
-                            <span className="truncate">{dayEvents.exams[0].materia || dayEvents.exams[0].title}</span>
+                          <div className="px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-300 text-[10px] truncate font-medium">
+                            {dayEvents.exams[0].materia || dayEvents.exams[0].title}
                           </div>
                         )}
                         {showMocks && dayEvents.mockExams[0] && (
-                          <div className="flex items-center gap-1 border-l-2 border-emerald-400 bg-emerald-500/15 text-emerald-200 px-1.5 py-0.5 rounded-r text-[10px] truncate font-medium">
-                            <span className="truncate">{dayEvents.mockExams[0].title}</span>
+                          <div className="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300 text-[10px] truncate font-medium">
+                            {dayEvents.mockExams[0].title}
                           </div>
                         )}
-                        {showTasks && dayEvents.userItems.filter(i => i.type === 'tarefa')[0] && (
-                          <div className="flex items-center gap-1 border-l-2 border-amber-400 bg-amber-500/15 text-amber-200 px-1.5 py-0.5 rounded-r text-[10px] truncate font-medium">
-                            <span className="truncate">{dayEvents.userItems.filter(i => i.type === 'tarefa')[0].title}</span>
-                          </div>
-                        )}
-                        {showEvents && dayEvents.userItems.filter(i => i.type !== 'tarefa')[0] && (
-                          <div className="flex items-center gap-1 border-l-2 border-sky-400 bg-sky-500/15 text-sky-200 px-1.5 py-0.5 rounded-r text-[10px] truncate font-medium">
-                            <span className="truncate">{dayEvents.userItems.filter(i => i.type !== 'tarefa')[0].title}</span>
+                        {showTasks && dayEvents.userItems[0] && (
+                          <div className="px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 text-[10px] truncate font-medium">
+                            {dayEvents.userItems[0].title}
                           </div>
                         )}
                         {totalVisible > 2 && (
-                          <span className="text-[9.5px] text-neutral-400 font-mono font-medium block pl-1">
+                          <span className="text-[9px] text-neutral-500 font-mono pl-1 block">
                             +{totalVisible - 2} mais
                           </span>
                         )}
                       </div>
                     )}
 
-                    {/* Bottom Indicator for Mobile */}
+                    {/* Mobile counter */}
                     <div className="sm:hidden w-full flex items-center justify-end">
                       {cell.isCurrentMonth && totalVisible > 0 && (
-                        <span className="text-[10px] font-mono text-emerald-400 font-bold tabular-nums">
+                        <span className="text-[10px] font-mono text-emerald-400 font-bold">
                           {totalVisible}
                         </span>
                       )}
@@ -1357,47 +1020,42 @@ export default function AcademicCalendar({
               })}
             </div>
 
-            {/* Quiet Footer Legend */}
-            <div className="flex flex-wrap items-center justify-between gap-4 text-xs text-neutral-400 pt-5 mt-5 border-t border-neutral-800/80">
+            {/* Footer Legend */}
+            <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-neutral-400 px-4 py-3 bg-neutral-900/50 border-t border-neutral-800">
               <div className="flex items-center gap-4 flex-wrap">
                 <span className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-rose-400" />
-                  <span className="font-medium text-neutral-300">Prova Presencial</span>
+                  <span className="w-2 h-2 rounded-full bg-rose-400" />
+                  <span>Prova Presencial</span>
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
-                  <span className="font-medium text-neutral-300">Simulado Online</span>
+                  <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                  <span>Simulado Online</span>
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
-                  <span className="font-medium text-neutral-300">Tarefa</span>
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-sky-400" />
-                  <span className="font-medium text-neutral-300">Evento / Lembrete</span>
+                  <span className="w-2 h-2 rounded-full bg-amber-400" />
+                  <span>Tarefa / Estudo</span>
                 </span>
               </div>
-              <span className="text-xs text-neutral-500 font-mono">
-                {currentMonthDays.length} dias no mês
+              <span className="text-neutral-500 text-[11px]">
+                Selecione um dia para ver os compromissos
               </span>
             </div>
+
           </div>
 
-          {/* 5. Selected Day Detail Inspector Panel (5 columns) */}
-          <div className="lg:col-span-5 bg-neutral-900/60 border border-neutral-800/80 rounded-3xl p-5 sm:p-6 space-y-5 shadow-xl backdrop-blur-md">
+          {/* Section: Commitments of the Selected Day */}
+          {/* CRITICAL: "CARD EM BAIXO DE CARD" (Stacked vertically in a single spacious column, NOT squeezed side by side) */}
+          <div className="space-y-3 pt-2">
             
-            {/* Inspector Header */}
-            <div className="flex items-start justify-between border-b border-neutral-800/80 pb-4 gap-2">
+            {/* Header: Date title & Add button */}
+            <div className="flex items-center justify-between gap-3 pb-1 border-b border-neutral-800">
               <div>
-                <span className="text-[10px] font-mono font-bold text-emerald-400 uppercase tracking-wider block">
-                  Agenda Diária
+                <span className="text-[11px] font-mono uppercase tracking-wider text-emerald-400 font-bold block">
+                  Compromissos para esta data
                 </span>
-                <h3 className="text-base font-black text-white capitalize mt-0.5">
+                <h3 className="text-base sm:text-lg font-bold text-white capitalize mt-0.5">
                   {selectedDayFormattedHeadline}
                 </h3>
-                <span className="text-xs text-neutral-400 font-medium mt-0.5 block">
-                  {selectedDayEvents.totalCount} compromisso(s) registrado(s)
-                </span>
               </div>
 
               <button
@@ -1406,15 +1064,15 @@ export default function AcademicCalendar({
                   setNewItemDate(selectedDayStr);
                   setIsModalOpen(true);
                 }}
-                className="px-3 py-1.5 bg-neutral-800 hover:bg-neutral-750 text-white rounded-xl text-xs font-bold border border-neutral-700/80 flex items-center gap-1.5 transition-all shadow-sm active:scale-95 cursor-pointer"
+                className="px-3.5 py-1.5 bg-neutral-900 hover:bg-neutral-800 text-white rounded-xl text-xs font-semibold border border-neutral-800 flex items-center gap-1.5 transition-all cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5 text-emerald-400 stroke-[2.5]" />
-                <span>Adicionar</span>
+                <span>Adicionar Compromisso</span>
               </button>
             </div>
 
-            {/* List of Events for the Day */}
-            <div className="space-y-3.5 max-h-[580px] overflow-y-auto pr-1">
+            {/* Vertical Stack: "card em baixo de card", 100% width, generous breathing room */}
+            <div className="flex flex-col space-y-3.5 w-full">
               
               {/* Provas Presenciais */}
               {(activeFilter === 'all' || activeFilter === 'prova') && selectedDayEvents.exams.map((ex, i) => {
@@ -1422,50 +1080,62 @@ export default function AcademicCalendar({
                 return (
                   <div 
                     key={`ex-${i}`} 
-                    className="p-4 rounded-2xl bg-neutral-950/80 border border-neutral-800 hover:border-rose-500/50 transition-all space-y-3 shadow-md"
+                    className="w-full p-4 sm:p-5 rounded-2xl bg-neutral-900/60 border border-neutral-800 border-l-4 border-l-rose-500 space-y-3 transition-colors hover:border-neutral-700"
                   >
-                    <div className="flex items-center justify-between gap-2 text-xs">
-                      <div className="flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 rounded-full bg-rose-400" />
-                        <span className="font-bold text-rose-300 font-mono text-[11px] uppercase tracking-wide">
-                          {ex.materia || 'Prova Presencial'}
+                    {/* Header Row */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="px-2.5 py-0.5 rounded-full bg-rose-500/15 text-rose-300 text-[11px] font-bold uppercase tracking-wide">
+                          Prova Presencial
                         </span>
+                        {ex.materia && (
+                          <span className="text-xs text-neutral-200 font-bold">
+                            {ex.materia}
+                          </span>
+                        )}
+                        {ex.teacher_name && (
+                          <span className="text-xs text-neutral-400">
+                            · Prof. {ex.teacher_name}
+                          </span>
+                        )}
                       </div>
-                      {ex.teacher_name && (
-                        <span className="text-[11px] text-neutral-400 font-mono bg-neutral-900 px-2 py-0.5 rounded-md border border-neutral-800">
-                          Prof. {ex.teacher_name}
-                        </span>
-                      )}
+
+                      <div className="flex items-center gap-1.5 text-xs text-neutral-400 font-mono">
+                        <Clock className="w-3.5 h-3.5 text-neutral-500" />
+                        <span>{dateInfo.fullFormatted || 'Horário de aula'}</span>
+                      </div>
                     </div>
 
+                    {/* Title & Content (Clean text, NO nested bordered box!) */}
                     <div>
-                      <h4 className="text-sm font-bold text-white leading-snug">
+                      <h4 className="text-base font-bold text-white">
                         {ex.title}
                       </h4>
                       {ex.content && (
-                        <p className="text-xs text-neutral-300 mt-1.5 leading-relaxed bg-neutral-900/50 p-2.5 rounded-xl border border-neutral-850">
+                        <p className="text-xs text-neutral-300 mt-2 leading-relaxed whitespace-pre-line">
                           {cleanExamContent(ex.content)}
+                        </p>
+                      )}
+                      {ex.observations && cleanExamObservations(ex.observations) && (
+                        <p className="text-xs text-neutral-400 italic mt-1.5">
+                          "{cleanExamObservations(ex.observations)}"
                         </p>
                       )}
                     </div>
 
-                    <div className="flex items-center justify-between gap-2 pt-2 text-xs font-mono text-neutral-400 border-t border-neutral-900">
-                      <span className="flex items-center gap-1.5">
-                        <Clock className="w-3.5 h-3.5 text-neutral-500" />
-                        <span>{dateInfo.fullFormatted || 'Horário de aula'}</span>
-                      </span>
-
-                      {onStudyForExam && (
+                    {/* Action button: INTEGRATED CLEANLY INSIDE THE CARD */}
+                    {onStudyForExam && (
+                      <div className="pt-2 flex items-center justify-end border-t border-neutral-800/60">
                         <button
                           type="button"
                           onClick={() => onStudyForExam(ex.title, cleanExamContent(ex.content) || '')}
-                          className="px-3 py-1.5 bg-gradient-to-r from-emerald-500/15 to-teal-500/15 hover:from-emerald-500/25 hover:to-teal-500/25 text-emerald-300 border border-emerald-500/40 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm active:scale-95 cursor-pointer"
+                          className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-neutral-950 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-all shadow-sm active:scale-95 cursor-pointer"
                         >
-                          <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-                          <span>Estudar com IA</span>
+                          <Sparkles className="w-3.5 h-3.5" />
+                          <span>Estudar com IA Athenas</span>
                         </button>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -1477,50 +1147,53 @@ export default function AcademicCalendar({
                 return (
                   <div 
                     key={`me-${i}`} 
-                    className="p-4 rounded-2xl bg-neutral-950/80 border border-neutral-800 hover:border-emerald-500/50 transition-all space-y-3 shadow-md"
+                    className="w-full p-4 sm:p-5 rounded-2xl bg-neutral-900/60 border border-neutral-800 border-l-4 border-l-emerald-500 space-y-3 transition-colors hover:border-neutral-700"
                   >
-                    <div className="flex items-center justify-between gap-2 text-xs">
-                      <div className="flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
-                        <span className="font-bold text-emerald-300 font-mono text-[11px] uppercase tracking-wide">
-                          Simulado · {me.subject || 'Geral'}
+                    {/* Header Row */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 text-[11px] font-bold uppercase tracking-wide">
+                          Simulado Online
                         </span>
+                        {me.subject && (
+                          <span className="text-xs text-neutral-200 font-bold">
+                            {me.subject}
+                          </span>
+                        )}
+                        {me.teacher_name && (
+                          <span className="text-xs text-neutral-400">
+                            · Prof. {me.teacher_name}
+                          </span>
+                        )}
                       </div>
-                      {me.teacher_name && (
-                        <span className="text-[11px] text-neutral-400 font-mono bg-neutral-900 px-2 py-0.5 rounded-md border border-neutral-800">
-                          Prof. {me.teacher_name}
-                        </span>
-                      )}
+
+                      <div className="flex items-center gap-1.5 text-xs text-neutral-400 font-mono">
+                        <Clock className="w-3.5 h-3.5 text-neutral-500" />
+                        <span>{rawDeadline && meDateInfo?.fullFormatted ? meDateInfo.fullFormatted : 'Prazo livre'}</span>
+                      </div>
                     </div>
 
+                    {/* Title & Description */}
                     <div>
-                      <h4 className="text-sm font-bold text-white leading-snug">
+                      <h4 className="text-base font-bold text-white">
                         {me.title}
                       </h4>
                       {me.description && (
-                        <p className="text-xs text-neutral-400 mt-1 leading-relaxed">
+                        <p className="text-xs text-neutral-300 mt-2 leading-relaxed">
                           {me.description}
                         </p>
                       )}
                     </div>
 
-                    <div className="flex items-center justify-between gap-2 pt-2 text-xs font-mono text-neutral-400 border-t border-neutral-900">
-                      <span className="flex items-center gap-1.5">
-                        <Clock className="w-3.5 h-3.5 text-neutral-500" />
-                        <span>
-                          {rawDeadline && meDateInfo?.fullFormatted 
-                            ? meDateInfo.fullFormatted 
-                            : 'Prazo livre'}
-                        </span>
-                      </span>
-
+                    {/* Action buttons: INTEGRATED CLEANLY INSIDE THE CARD */}
+                    <div className="pt-2 flex items-center justify-end gap-2 border-t border-neutral-800/60">
                       {userRole === 'student' && onTakeMockExam && (
                         <button
                           type="button"
                           onClick={onTakeMockExam}
-                          className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-neutral-950 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-md active:scale-95 cursor-pointer"
+                          className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-neutral-950 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-all shadow-sm active:scale-95 cursor-pointer"
                         >
-                          <span>Iniciar Prova</span>
+                          <span>Iniciar Simulado</span>
                           <ArrowRight className="w-3.5 h-3.5" />
                         </button>
                       )}
@@ -1529,9 +1202,9 @@ export default function AcademicCalendar({
                         <button
                           type="button"
                           onClick={onViewResults}
-                          className="px-3 py-1.5 bg-neutral-800 hover:bg-neutral-750 text-white rounded-xl text-xs font-bold border border-neutral-700 transition-colors cursor-pointer"
+                          className="px-4 py-2 bg-neutral-800 hover:bg-neutral-750 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
                         >
-                          Ver Resultados
+                          Ver Resultados da Turma
                         </button>
                       )}
                     </div>
@@ -1539,27 +1212,26 @@ export default function AcademicCalendar({
                 );
               })}
 
-              {/* User Items: Tarefas & Eventos */}
-              {selectedDayEvents.userItems.map(item => {
+              {/* User Items: Tarefas & Eventos Pessoais */}
+              {(activeFilter === 'all' || activeFilter === 'tarefa') && selectedDayEvents.userItems.map(item => {
                 const isTask = item.type === 'tarefa';
                 const isChecked = item.completed;
 
                 return (
                   <div
                     key={item.id}
-                    className={`p-4 rounded-2xl border transition-all space-y-2.5 shadow-md ${
-                      isChecked
-                        ? 'bg-neutral-950/40 border-neutral-850/60 opacity-60'
-                        : 'bg-neutral-950/80 border-neutral-800 hover:border-neutral-700'
-                    }`}
+                    className={`w-full p-4 sm:p-5 rounded-2xl bg-neutral-900/60 border border-neutral-800 transition-colors hover:border-neutral-700 space-y-3 ${
+                      isTask ? 'border-l-4 border-l-amber-500' : 'border-l-4 border-l-sky-500'
+                    } ${isChecked ? 'opacity-60' : ''}`}
                   >
-                    <div className="flex items-center justify-between gap-2 text-xs">
-                      <div className="flex items-center gap-2">
+                    {/* Header Row */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         {isTask && (
                           <button
                             type="button"
                             onClick={() => handleToggleTaskCompleted(item.id)}
-                            className="text-neutral-400 hover:text-emerald-400 transition-colors cursor-pointer"
+                            className="text-neutral-400 hover:text-emerald-400 transition-colors cursor-pointer flex items-center gap-1.5"
                           >
                             {isChecked ? (
                               <CheckSquare className="w-4 h-4 text-emerald-400" />
@@ -1568,24 +1240,32 @@ export default function AcademicCalendar({
                             )}
                           </button>
                         )}
-                        <span className={`w-2.5 h-2.5 rounded-full ${isTask ? 'bg-amber-400' : 'bg-sky-400'}`} />
-                        <span className={`font-mono text-[11px] font-bold uppercase tracking-wide ${
-                          isTask ? 'text-amber-300' : 'text-sky-300'
+                        <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wide ${
+                          isTask ? 'bg-amber-500/15 text-amber-300' : 'bg-sky-500/15 text-sky-300'
                         }`}>
                           {item.type} {item.subject ? `· ${item.subject}` : ''}
                         </span>
+                        {item.priority && (
+                          <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${
+                            item.priority === 'alta' ? 'bg-rose-500/20 text-rose-300' :
+                            item.priority === 'media' ? 'bg-amber-500/20 text-amber-300' :
+                            'bg-neutral-800 text-neutral-300'
+                          }`}>
+                            {item.priority}
+                          </span>
+                        )}
                       </div>
 
                       <div className="flex items-center gap-2.5">
                         {item.time && (
-                          <span className="text-xs text-neutral-400 font-mono bg-neutral-900 px-2 py-0.5 rounded border border-neutral-800">
+                          <span className="text-xs text-neutral-400 font-mono">
                             {item.time}
                           </span>
                         )}
                         <button
                           type="button"
                           onClick={() => requestDeleteUserItem(item)}
-                          className="text-neutral-500 hover:text-rose-400 transition-colors p-1 cursor-pointer rounded-lg hover:bg-neutral-900"
+                          className="text-neutral-500 hover:text-rose-400 transition-colors p-1.5 cursor-pointer rounded-lg hover:bg-neutral-800"
                           title="Excluir"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -1593,12 +1273,13 @@ export default function AcademicCalendar({
                       </div>
                     </div>
 
+                    {/* Title & Description */}
                     <div>
-                      <h4 className={`text-xs sm:text-sm font-semibold text-white ${isChecked ? 'line-through text-neutral-500' : ''}`}>
+                      <h4 className={`text-base font-bold text-white ${isChecked ? 'line-through text-neutral-500' : ''}`}>
                         {item.title}
                       </h4>
                       {item.description && (
-                        <p className="text-xs text-neutral-400 mt-1 leading-relaxed">
+                        <p className="text-xs text-neutral-300 mt-1.5 leading-relaxed">
                           {item.description}
                         </p>
                       )}
@@ -1607,20 +1288,20 @@ export default function AcademicCalendar({
                 );
               })}
 
-              {/* Empty state for the selected day */}
+              {/* Empty state for selected date */}
               {selectedDayEvents.exams.length === 0 &&
                selectedDayEvents.mockExams.length === 0 &&
                selectedDayEvents.userItems.length === 0 && (
-                <div className="py-14 text-center space-y-3 bg-neutral-950/40 rounded-2xl border border-neutral-850 p-6">
-                  <div className="w-12 h-12 rounded-2xl bg-neutral-900 border border-neutral-800 flex items-center justify-center mx-auto text-neutral-500">
-                    <CalendarCheck className="w-6 h-6 text-emerald-500/70" />
+                <div className="w-full py-12 text-center border border-dashed border-neutral-800 rounded-2xl p-6 space-y-3">
+                  <div className="w-10 h-10 rounded-full bg-neutral-900 border border-neutral-800 flex items-center justify-center mx-auto text-neutral-400">
+                    <CalendarCheck2 className="w-5 h-5 text-emerald-400" />
                   </div>
                   <div>
-                    <h5 className="text-sm font-bold text-neutral-200">
-                      Nenhum compromisso marcado
-                    </h5>
-                    <p className="text-xs text-neutral-400 mt-0.5">
-                      Aproveite este dia livre ou planeje uma meta de estudo personalizada.
+                    <h4 className="text-sm font-bold text-neutral-200">
+                      Nenhum compromisso marcado para este dia
+                    </h4>
+                    <p className="text-xs text-neutral-400 max-w-sm mx-auto mt-1">
+                      Você está livre nesta data. Deseja adicionar uma meta de estudos ou tarefa pessoal?
                     </p>
                   </div>
                   <button
@@ -1629,149 +1310,41 @@ export default function AcademicCalendar({
                       setNewItemDate(selectedDayStr);
                       setIsModalOpen(true);
                     }}
-                    className="px-4 py-2 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/30 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+                    className="px-4 py-2 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/30 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-all cursor-pointer mt-1"
                   >
                     <Plus className="w-3.5 h-3.5" />
-                    <span>Agendar para esta data</span>
+                    <span>Adicionar tarefa para esta data</span>
                   </button>
                 </div>
               )}
+
             </div>
           </div>
-        </div>
-      ) : viewMode === 'week' ? (
-        /* 5. WEEK VIEW (7-DAY COLUMN SCHEDULE) */
-        <div className="bg-neutral-900/60 border border-neutral-800/80 rounded-3xl p-5 sm:p-6 space-y-6 shadow-xl backdrop-blur-md">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-neutral-800/80 pb-4 gap-2">
-            <div>
-              <h3 className="text-base font-black text-white">Visualização Semanal</h3>
-              <p className="text-xs text-neutral-400 mt-0.5">
-                Distribuição dos compromissos e tarefas ao longo dos 7 dias da semana selecionada.
-              </p>
-            </div>
-            <span className="text-xs font-mono text-neutral-400 bg-neutral-950 px-3 py-1.5 rounded-xl border border-neutral-800">
-              Semana de {currentWeekDays[0].dayNumber} a {currentWeekDays[6].dayNumber} de {monthNames[month]}
-            </span>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-7 gap-3">
-            {currentWeekDays.map(weekDay => {
-              const dayEvents = getEventsForDate(
-                weekDay.date.getFullYear(),
-                weekDay.date.getMonth(),
-                weekDay.date.getDate()
-              );
-
-              return (
-                <div 
-                  key={weekDay.dateStr}
-                  onClick={() => setSelectedDayStr(weekDay.dateStr)}
-                  className={`rounded-2xl p-3 border transition-all flex flex-col justify-between min-h-[300px] cursor-pointer ${
-                    weekDay.isSelected
-                      ? 'bg-neutral-900 border-emerald-500/80 ring-2 ring-emerald-500/30 shadow-lg'
-                      : weekDay.isToday
-                      ? 'bg-neutral-950/80 border-emerald-500/50'
-                      : 'bg-neutral-950/50 border-neutral-850 hover:border-neutral-700'
-                  }`}
-                >
-                  <div>
-                    {/* Day Column Header */}
-                    <div className="flex items-center justify-between border-b border-neutral-800 pb-2 mb-2">
-                      <span className="text-[11px] font-mono font-bold uppercase text-neutral-400">
-                        {weekDay.weekdayLabel}
-                      </span>
-                      <span className={`text-xs font-mono tabular-nums ${
-                        weekDay.isToday 
-                          ? 'px-2 py-0.5 rounded-full bg-emerald-500 text-neutral-950 font-black' 
-                          : weekDay.isSelected 
-                          ? 'font-black text-emerald-400' 
-                          : 'font-semibold text-neutral-300'
-                      }`}>
-                        {weekDay.dayNumber}
-                      </span>
-                    </div>
-
-                    {/* Day Events Stack */}
-                    <div className="space-y-2 mt-2">
-                      {dayEvents.exams.map((ex, i) => (
-                        <div key={`we-${i}`} className="p-2 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-200 text-xs">
-                          <span className="font-bold block truncate">{ex.materia || ex.title}</span>
-                          <span className="text-[10px] text-rose-300 block truncate">{ex.title}</span>
-                        </div>
-                      ))}
-
-                      {dayEvents.mockExams.map((me, i) => (
-                        <div key={`wm-${i}`} className="p-2 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-200 text-xs">
-                          <span className="font-bold block truncate">{me.title}</span>
-                          <span className="text-[10px] text-emerald-300 block truncate">{me.subject || 'Simulado'}</span>
-                        </div>
-                      ))}
-
-                      {dayEvents.userItems.map((ui, i) => (
-                        <div key={`wu-${i}`} className={`p-2 rounded-xl border text-xs ${
-                          ui.type === 'tarefa'
-                            ? 'bg-amber-500/15 border-amber-500/30 text-amber-200'
-                            : 'bg-sky-500/15 border-sky-500/30 text-sky-200'
-                        }`}>
-                          <span className="font-bold block truncate">{ui.title}</span>
-                          {ui.time && <span className="text-[10px] font-mono text-neutral-400">{ui.time}</span>}
-                        </div>
-                      ))}
-
-                      {dayEvents.totalCount === 0 && (
-                        <span className="text-[11px] text-neutral-600 block text-center py-6">
-                          Sem atividades
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setNewItemDate(weekDay.dateStr);
-                      setSelectedDayStr(weekDay.dateStr);
-                      setIsModalOpen(true);
-                    }}
-                    className="w-full mt-3 py-1.5 bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-white rounded-xl text-[11px] font-bold border border-neutral-800 transition-colors flex items-center justify-center gap-1 cursor-pointer"
-                  >
-                    <Plus className="w-3 h-3" />
-                    <span>Adicionar</span>
-                  </button>
-                </div>
-              );
-            })}
-          </div>
         </div>
       ) : (
-        /* 6. AGENDA FEED VIEW (CHRONOLOGICAL TIMELINE) */
-        <div className="bg-neutral-900/60 border border-neutral-800/80 rounded-3xl p-5 sm:p-7 space-y-6 shadow-xl backdrop-blur-md">
-          <div className="flex items-center justify-between border-b border-neutral-800/80 pb-4">
+        /* Agenda / Lista View: 100% "card em baixo de card", continuous vertical timeline */
+        <div className="space-y-6">
+          <div className="flex items-center justify-between pb-3 border-b border-neutral-800">
             <div>
-              <h3 className="text-base font-black text-white">Linha do Tempo de Atividades</h3>
+              <h3 className="text-base font-bold text-white">Cronograma Completo de Atividades</h3>
               <p className="text-xs text-neutral-400 mt-0.5">
-                Visualização cronológica contínua de todas as provas, simulados e tarefas acadêmicas.
+                Visualização contínua de todos os compromissos em ordem de data.
               </p>
             </div>
-            <span className="text-xs font-mono text-neutral-400 bg-neutral-950 px-3 py-1 rounded-xl border border-neutral-800">
+            <span className="text-xs font-mono text-neutral-400">
               {allChronologicalItems.length} registros encontrados
             </span>
           </div>
 
           {agendaGroupedByDate.length === 0 ? (
-            <div className="py-20 text-center space-y-3">
-              <div className="w-12 h-12 rounded-2xl bg-neutral-950 border border-neutral-800 flex items-center justify-center mx-auto text-neutral-500">
-                <CalendarRange className="w-6 h-6 text-neutral-400" />
+            <div className="py-16 text-center space-y-2 border border-dashed border-neutral-800 rounded-2xl">
+              <div className="w-10 h-10 rounded-xl bg-neutral-900 border border-neutral-800 flex items-center justify-center mx-auto text-neutral-500">
+                <CalendarIcon className="w-5 h-5 text-neutral-400" />
               </div>
-              <div>
-                <p className="text-sm font-bold text-neutral-200">
-                  Nenhum compromisso encontrado para os filtros atuais.
-                </p>
-                <p className="text-xs text-neutral-500 mt-0.5">
-                  Tente alterar os filtros ou adicione uma nova entrada na agenda.
-                </p>
-              </div>
+              <p className="text-sm font-bold text-neutral-200">
+                Nenhum compromisso encontrado para os filtros atuais.
+              </p>
               <button
                 type="button"
                 onClick={() => {
@@ -1806,70 +1379,99 @@ export default function AcademicCalendar({
 
                 return (
                   <div key={dateKey} className="space-y-3">
-                    {/* Date Divider Header */}
-                    <div className="flex items-center gap-3">
-                      <span className={`text-xs font-mono font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg ${
+                    {/* Date Header */}
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xs font-mono font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-md ${
                         isToday 
                           ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' 
-                          : 'bg-neutral-950 text-neutral-300 border border-neutral-800'
+                          : 'text-neutral-400 font-semibold'
                       }`}>
                         {dateDisplay} {isToday && '· Hoje'}
                       </span>
-                      <div className="flex-1 h-px bg-neutral-800/80" />
+                      <div className="flex-1 h-px bg-neutral-800" />
                     </div>
 
-                    {/* Cards for this date */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 pl-3 border-l-2 border-neutral-800/80">
+                    {/* Cards Stacked Vertically ("card em baixo de card") */}
+                    <div className="flex flex-col space-y-3 w-full">
                       {items.map(item => (
                         <div
                           key={item.id}
-                          className="p-4 bg-neutral-950/80 border border-neutral-800 rounded-2xl space-y-2.5 hover:border-neutral-700 transition-all shadow-md"
+                          className="w-full p-4 sm:p-5 bg-neutral-900/60 border border-neutral-800 rounded-2xl space-y-3 hover:border-neutral-700 transition-colors"
                         >
-                          <div className="flex items-center justify-between text-xs">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-xs">
                             <span className={`inline-flex items-center gap-1.5 font-mono text-[11px] font-bold uppercase ${
                               item.category === 'prova'
                                 ? 'text-rose-300'
                                 : item.category === 'simulado'
                                 ? 'text-emerald-300'
-                                : item.category === 'tarefa'
-                                ? 'text-amber-300'
-                                : 'text-sky-300'
+                                : 'text-amber-300'
                             }`}>
                               <span className={`w-2 h-2 rounded-full ${
                                 item.category === 'prova'
                                   ? 'bg-rose-400'
                                   : item.category === 'simulado'
                                   ? 'bg-emerald-400'
-                                  : item.category === 'tarefa'
-                                  ? 'bg-amber-400'
-                                  : 'bg-sky-400'
+                                  : 'bg-amber-400'
                               }`} />
                               <span>{item.category} {item.subject ? `· ${item.subject}` : ''}</span>
                             </span>
 
                             {item.timeStr && (
-                              <span className="font-mono text-xs text-neutral-400 bg-neutral-900 px-2 py-0.5 rounded border border-neutral-800">
+                              <span className="font-mono text-xs text-neutral-400">
                                 {item.timeStr}
                               </span>
                             )}
                           </div>
 
-                          <h4 className="text-sm font-bold text-white">
+                          <h4 className="text-base font-bold text-white">
                             {item.title}
                           </h4>
 
                           {item.description && (
-                            <p className="text-xs text-neutral-400 leading-relaxed">
+                            <p className="text-xs text-neutral-300 leading-relaxed">
                               {item.description}
                             </p>
                           )}
 
+                          {item.content && (
+                            <p className="text-xs text-neutral-300 leading-relaxed">
+                              {item.content}
+                            </p>
+                          )}
+
+                          {/* Action inside card */}
+                          {item.category === 'prova' && onStudyForExam && (
+                            <div className="pt-2 flex justify-end border-t border-neutral-800/60">
+                              <button
+                                type="button"
+                                onClick={() => onStudyForExam(item.title, item.content || '')}
+                                className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-neutral-950 font-bold rounded-xl text-xs inline-flex items-center gap-1.5 cursor-pointer shadow-sm"
+                              >
+                                <Sparkles className="w-3.5 h-3.5" />
+                                <span>Estudar com IA Athenas</span>
+                              </button>
+                            </div>
+                          )}
+
+                          {item.category === 'simulado' && userRole === 'student' && onTakeMockExam && (
+                            <div className="pt-2 flex justify-end border-t border-neutral-800/60">
+                              <button
+                                type="button"
+                                onClick={onTakeMockExam}
+                                className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-neutral-950 font-bold rounded-xl text-xs inline-flex items-center gap-1.5 cursor-pointer shadow-sm"
+                              >
+                                <span>Iniciar Simulado</span>
+                                <ArrowRight className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          )}
+
                           {item.category === 'tarefa' && (
-                            <div className="pt-2.5 border-t border-neutral-900 flex items-center justify-between">
+                            <div className="pt-2 flex items-center justify-between border-t border-neutral-800/60">
                               <button
                                 type="button"
                                 onClick={() => handleToggleTaskCompleted(item.id)}
-                                className="flex items-center gap-2 text-xs font-semibold text-neutral-300 hover:text-emerald-400 cursor-pointer"
+                                className="flex items-center gap-2 text-xs font-medium text-neutral-300 hover:text-emerald-400 cursor-pointer"
                               >
                                 {item.completed ? (
                                   <>
@@ -1887,35 +1489,9 @@ export default function AcademicCalendar({
                               <button
                                 type="button"
                                 onClick={() => requestDeleteUserItem(item.rawObject)}
-                                className="text-neutral-500 hover:text-rose-400 p-1 cursor-pointer rounded hover:bg-neutral-900"
+                                className="text-neutral-500 hover:text-rose-400 p-1.5 cursor-pointer rounded-lg hover:bg-neutral-800"
                               >
                                 <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          )}
-
-                          {item.category === 'prova' && onStudyForExam && (
-                            <div className="pt-2.5 border-t border-neutral-900 flex justify-end">
-                              <button
-                                type="button"
-                                onClick={() => onStudyForExam(item.title, item.content || '')}
-                                className="px-3 py-1.5 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer"
-                              >
-                                <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-                                <span>Gerar Plano com IA</span>
-                              </button>
-                            </div>
-                          )}
-
-                          {item.category === 'simulado' && userRole === 'student' && onTakeMockExam && (
-                            <div className="pt-2.5 border-t border-neutral-900 flex justify-end">
-                              <button
-                                type="button"
-                                onClick={onTakeMockExam}
-                                className="px-3.5 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-neutral-950 font-bold rounded-xl text-xs flex items-center gap-1.5 cursor-pointer shadow-md"
-                              >
-                                <span>Responder Simulado</span>
-                                <ArrowRight className="w-3.5 h-3.5" />
                               </button>
                             </div>
                           )}
@@ -1930,117 +1506,106 @@ export default function AcademicCalendar({
         </div>
       )}
 
-      {/* 7. Modal Criar Evento / Tarefa com Design Modernizado */}
+      {/* 3. Modal: Criar Registro */}
       <AnimatePresence>
         {isModalOpen && (
-          <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              className="w-full max-w-lg bg-neutral-900 border border-neutral-800 rounded-3xl p-6 sm:p-7 space-y-5 shadow-2xl relative"
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.96 }}
+              className="w-full max-w-lg bg-neutral-900 border border-neutral-800 rounded-2xl p-5 sm:p-6 space-y-4 shadow-2xl relative"
             >
-              <div className="flex items-center justify-between border-b border-neutral-800 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-500/20 to-teal-400/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center">
-                    <Plus className="w-5 h-5 stroke-[2.5]" />
+              <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
+                    <Plus className="w-4 h-4" />
                   </div>
                   <div>
-                    <h3 className="text-base font-black text-white">
+                    <h3 className="text-sm sm:text-base font-bold text-white">
                       Novo Registro na Agenda
                     </h3>
-                    <p className="text-xs text-neutral-400 mt-0.5">
-                      Adicione eventos, lembretes ou tarefas ao seu cronograma pessoal.
-                    </p>
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="p-2 rounded-xl text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors cursor-pointer"
+                  className="p-1 rounded-lg text-neutral-400 hover:text-white transition-colors cursor-pointer"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-4 h-4" />
                 </button>
               </div>
 
-              <form onSubmit={handleCreateItem} className="space-y-4">
-                {/* Visual Category Selector Cards */}
+              <form onSubmit={handleCreateItem} className="space-y-3.5">
                 <div>
-                  <label className="text-xs font-bold uppercase tracking-wider text-neutral-400 block mb-2">
+                  <label className="text-xs font-semibold text-neutral-300 block mb-1">
                     Tipo de Registro
                   </label>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setNewItemType('evento')}
-                      className={`p-2.5 rounded-2xl border text-center transition-all cursor-pointer flex flex-col items-center gap-1.5 ${
-                        newItemType === 'evento'
-                          ? 'bg-sky-500/20 border-sky-500/60 text-white shadow-sm ring-1 ring-sky-500/40'
-                          : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:border-neutral-700'
-                      }`}
-                    >
-                      <CalendarIcon className="w-4 h-4 text-sky-400" />
-                      <span className="text-[11px] font-bold">Evento</span>
-                    </button>
-
+                  <div className="grid grid-cols-4 gap-2">
                     <button
                       type="button"
                       onClick={() => setNewItemType('tarefa')}
-                      className={`p-2.5 rounded-2xl border text-center transition-all cursor-pointer flex flex-col items-center gap-1.5 ${
+                      className={`p-2 rounded-xl border text-center transition-all cursor-pointer ${
                         newItemType === 'tarefa'
-                          ? 'bg-amber-500/20 border-amber-500/60 text-white shadow-sm ring-1 ring-amber-500/40'
-                          : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:border-neutral-700'
+                          ? 'bg-amber-500/20 border-amber-500/60 text-white font-bold'
+                          : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-white'
                       }`}
                     >
-                      <CheckSquare className="w-4 h-4 text-amber-400" />
-                      <span className="text-[11px] font-bold">Tarefa</span>
+                      <span className="text-xs">Tarefa</span>
                     </button>
-
                     <button
                       type="button"
                       onClick={() => setNewItemType('estudo')}
-                      className={`p-2.5 rounded-2xl border text-center transition-all cursor-pointer flex flex-col items-center gap-1.5 ${
+                      className={`p-2 rounded-xl border text-center transition-all cursor-pointer ${
                         newItemType === 'estudo'
-                          ? 'bg-emerald-500/20 border-emerald-500/60 text-white shadow-sm ring-1 ring-emerald-500/40'
-                          : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:border-neutral-700'
+                          ? 'bg-emerald-500/20 border-emerald-500/60 text-white font-bold'
+                          : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-white'
                       }`}
                     >
-                      <BookOpen className="w-4 h-4 text-emerald-400" />
-                      <span className="text-[11px] font-bold">Estudo</span>
+                      <span className="text-xs">Estudo</span>
                     </button>
-
+                    <button
+                      type="button"
+                      onClick={() => setNewItemType('evento')}
+                      className={`p-2 rounded-xl border text-center transition-all cursor-pointer ${
+                        newItemType === 'evento'
+                          ? 'bg-sky-500/20 border-sky-500/60 text-white font-bold'
+                          : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-white'
+                      }`}
+                    >
+                      <span className="text-xs">Evento</span>
+                    </button>
                     <button
                       type="button"
                       onClick={() => setNewItemType('lembrete')}
-                      className={`p-2.5 rounded-2xl border text-center transition-all cursor-pointer flex flex-col items-center gap-1.5 ${
+                      className={`p-2 rounded-xl border text-center transition-all cursor-pointer ${
                         newItemType === 'lembrete'
-                          ? 'bg-purple-500/20 border-purple-500/60 text-white shadow-sm ring-1 ring-purple-500/40'
-                          : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:border-neutral-700'
+                          ? 'bg-purple-500/20 border-purple-500/60 text-white font-bold'
+                          : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-white'
                       }`}
                     >
-                      <Bell className="w-4 h-4 text-purple-400" />
-                      <span className="text-[11px] font-bold">Lembrete</span>
+                      <span className="text-xs">Lembrete</span>
                     </button>
                   </div>
                 </div>
 
                 <div>
-                  <label className="text-xs font-bold uppercase tracking-wider text-neutral-400 block mb-1.5">
+                  <label className="text-xs font-semibold text-neutral-300 block mb-1">
                     Título *
                   </label>
                   <input
                     type="text"
                     required
-                    placeholder="Ex: Revisar Bioquímica, Entregar trabalho..."
+                    placeholder="Ex: Revisar Bioquímica, Entregar lista..."
                     value={newItemTitle}
                     onChange={(e) => setNewItemTitle(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-neutral-950 border border-neutral-800 rounded-2xl text-xs text-white outline-none focus:border-emerald-500/80 transition-colors"
+                    className="w-full px-3 py-2 bg-neutral-950 border border-neutral-800 rounded-xl text-xs text-white outline-none focus:border-emerald-500/80 transition-colors"
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs font-bold uppercase tracking-wider text-neutral-400 block mb-1.5">
+                    <label className="text-xs font-semibold text-neutral-300 block mb-1">
                       Data *
                     </label>
                     <input
@@ -2048,67 +1613,41 @@ export default function AcademicCalendar({
                       required
                       value={newItemDate}
                       onChange={(e) => setNewItemDate(e.target.value)}
-                      className="w-full px-3.5 py-2.5 bg-neutral-950 border border-neutral-800 rounded-2xl text-xs text-white outline-none focus:border-emerald-500/80 transition-colors font-mono"
+                      className="w-full px-3 py-2 bg-neutral-950 border border-neutral-800 rounded-xl text-xs text-white outline-none focus:border-emerald-500/80 font-mono"
                     />
                   </div>
 
                   <div>
-                    <label className="text-xs font-bold uppercase tracking-wider text-neutral-400 block mb-1.5">
+                    <label className="text-xs font-semibold text-neutral-300 block mb-1">
                       Horário
                     </label>
                     <input
                       type="time"
                       value={newItemTime}
                       onChange={(e) => setNewItemTime(e.target.value)}
-                      className="w-full px-3.5 py-2.5 bg-neutral-950 border border-neutral-800 rounded-2xl text-xs text-white outline-none focus:border-emerald-500/80 transition-colors font-mono"
+                      className="w-full px-3 py-2 bg-neutral-950 border border-neutral-800 rounded-xl text-xs text-white outline-none focus:border-emerald-500/80 font-mono"
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs font-bold uppercase tracking-wider text-neutral-400 block mb-1.5">
+                    <label className="text-xs font-semibold text-neutral-300 block mb-1">
                       Prioridade
                     </label>
-                    <div className="grid grid-cols-3 gap-1 bg-neutral-950 p-1 rounded-2xl border border-neutral-800">
-                      <button
-                        type="button"
-                        onClick={() => setNewItemPriority('baixa')}
-                        className={`py-1.5 rounded-xl text-[11px] font-bold transition-all cursor-pointer ${
-                          newItemPriority === 'baixa'
-                            ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40'
-                            : 'text-neutral-400 hover:text-white'
-                        }`}
-                      >
-                        Baixa
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setNewItemPriority('media')}
-                        className={`py-1.5 rounded-xl text-[11px] font-bold transition-all cursor-pointer ${
-                          newItemPriority === 'media'
-                            ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-                            : 'text-neutral-400 hover:text-white'
-                        }`}
-                      >
-                        Média
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setNewItemPriority('alta')}
-                        className={`py-1.5 rounded-xl text-[11px] font-bold transition-all cursor-pointer ${
-                          newItemPriority === 'alta'
-                            ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
-                            : 'text-neutral-400 hover:text-white'
-                        }`}
-                      >
-                        Alta
-                      </button>
-                    </div>
+                    <select
+                      value={newItemPriority}
+                      onChange={(e) => setNewItemPriority(e.target.value as any)}
+                      className="w-full px-3 py-2 bg-neutral-950 border border-neutral-800 rounded-xl text-xs text-white outline-none focus:border-emerald-500/80"
+                    >
+                      <option value="baixa">Baixa</option>
+                      <option value="media">Média</option>
+                      <option value="alta">Alta</option>
+                    </select>
                   </div>
 
                   <div>
-                    <label className="text-xs font-bold uppercase tracking-wider text-neutral-400 block mb-1.5">
+                    <label className="text-xs font-semibold text-neutral-300 block mb-1">
                       Disciplina / Matéria
                     </label>
                     <input
@@ -2116,36 +1655,36 @@ export default function AcademicCalendar({
                       placeholder="Ex: Biologia..."
                       value={newItemSubject}
                       onChange={(e) => setNewItemSubject(e.target.value)}
-                      className="w-full px-3.5 py-2.5 bg-neutral-950 border border-neutral-800 rounded-2xl text-xs text-white outline-none focus:border-emerald-500/80 transition-colors"
+                      className="w-full px-3 py-2 bg-neutral-950 border border-neutral-800 rounded-xl text-xs text-white outline-none focus:border-emerald-500/80"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="text-xs font-bold uppercase tracking-wider text-neutral-400 block mb-1.5">
+                  <label className="text-xs font-semibold text-neutral-300 block mb-1">
                     Observações / Anotações
                   </label>
                   <textarea
                     rows={3}
-                    placeholder="Detalhes adicionais, orientações ou páginas do conteúdo..."
+                    placeholder="Detalhes adicionais..."
                     value={newItemDescription}
                     onChange={(e) => setNewItemDescription(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-neutral-950 border border-neutral-800 rounded-2xl text-xs text-white outline-none focus:border-emerald-500/80 transition-colors resize-none leading-relaxed"
+                    className="w-full px-3 py-2 bg-neutral-950 border border-neutral-800 rounded-xl text-xs text-white outline-none focus:border-emerald-500/80 resize-none leading-relaxed"
                   />
                 </div>
 
-                <div className="flex items-center justify-end gap-3 pt-3 border-t border-neutral-800">
+                <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-neutral-800">
                   <button
                     type="button"
                     onClick={() => setIsModalOpen(false)}
-                    className="px-4 py-2.5 bg-neutral-800 hover:bg-neutral-750 text-neutral-300 text-xs font-bold rounded-2xl transition-colors cursor-pointer"
+                    className="px-4 py-2 bg-neutral-800 hover:bg-neutral-750 text-neutral-300 text-xs font-medium rounded-xl transition-colors cursor-pointer"
                   >
                     Cancelar
                   </button>
                   <button
                     type="submit"
                     disabled={!newItemTitle.trim() || !newItemDate.trim()}
-                    className="px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 disabled:opacity-50 text-neutral-950 text-xs font-black rounded-2xl transition-all shadow-md active:scale-95 cursor-pointer"
+                    className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-neutral-950 text-xs font-bold rounded-xl transition-all shadow-sm cursor-pointer"
                   >
                     Salvar Registro
                   </button>
@@ -2156,40 +1695,40 @@ export default function AcademicCalendar({
         )}
       </AnimatePresence>
 
-      {/* 8. Modal Confirmar Exclusão */}
+      {/* 4. Modal Confirmar Exclusão */}
       <AnimatePresence>
         {itemToDelete && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
+              initial={{ opacity: 0, scale: 0.96 }}
               animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-neutral-900 border border-neutral-800 rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl"
+              exit={{ opacity: 0, scale: 0.96 }}
+              className="bg-neutral-900 border border-neutral-800 rounded-2xl p-5 max-w-sm w-full space-y-3 shadow-2xl"
               role="alertdialog"
             >
-              <div className="w-12 h-12 rounded-2xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-400 mx-auto">
-                <Trash2 className="w-6 h-6" />
+              <div className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 mx-auto">
+                <Trash2 className="w-5 h-5" />
               </div>
-              <div className="text-center space-y-1.5">
-                <h3 className="text-base font-black text-white">
+              <div className="text-center space-y-1">
+                <h3 className="text-sm font-bold text-neutral-100">
                   Remover compromisso?
                 </h3>
                 <p className="text-xs text-neutral-400 leading-relaxed">
                   Confirma a exclusão de <strong className="text-neutral-200">"{itemToDelete.title}"</strong> da sua agenda?
                 </p>
               </div>
-              <div className="grid grid-cols-2 gap-2.5 pt-2">
+              <div className="grid grid-cols-2 gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setItemToDelete(null)}
-                  className="py-2.5 px-4 rounded-2xl bg-neutral-800 hover:bg-neutral-750 text-neutral-300 text-xs font-bold cursor-pointer"
+                  className="py-2 px-3 rounded-xl bg-neutral-800 hover:bg-neutral-750 text-neutral-300 text-xs font-medium cursor-pointer"
                 >
                   Voltar
                 </button>
                 <button
                   type="button"
                   onClick={confirmDeleteUserItem}
-                  className="py-2.5 px-4 rounded-2xl bg-rose-500 hover:bg-rose-600 text-white text-xs font-black cursor-pointer shadow-md"
+                  className="py-2 px-3 rounded-xl bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold cursor-pointer"
                 >
                   Remover
                 </button>
@@ -2199,25 +1738,25 @@ export default function AcademicCalendar({
         )}
       </AnimatePresence>
 
-      {/* 9. Toast Feedback com Desfazer (Undo) */}
+      {/* 5. Toast Feedback com Desfazer (Undo) */}
       <AnimatePresence>
         {toastFeedback && (
           <motion.div
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 15 }}
-            className="fixed bottom-6 right-6 z-50 flex items-center gap-3.5 px-5 py-3 rounded-2xl border border-neutral-800 bg-neutral-900/95 text-white shadow-2xl text-xs backdrop-blur-xl"
+            className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-2.5 rounded-xl border border-neutral-800 bg-neutral-900/95 text-neutral-200 shadow-2xl text-xs backdrop-blur-md"
           >
             <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
-              <span className="font-medium">{toastFeedback.message}</span>
+              <span className="w-2 h-2 rounded-full bg-emerald-400" />
+              <span>{toastFeedback.message}</span>
             </div>
 
             {undoItem && (
               <button
                 type="button"
                 onClick={handleUndoDelete}
-                className="ml-2 px-3 py-1 bg-emerald-500 hover:bg-emerald-400 text-neutral-950 font-black rounded-xl text-xs flex items-center gap-1.5 cursor-pointer transition-colors shadow-sm"
+                className="ml-2 px-2.5 py-1 bg-emerald-500 hover:bg-emerald-400 text-neutral-950 font-bold rounded-lg text-xs flex items-center gap-1 cursor-pointer transition-colors"
               >
                 <Undo2 className="w-3.5 h-3.5" />
                 <span>Desfazer</span>
@@ -2227,7 +1766,7 @@ export default function AcademicCalendar({
             <button
               type="button"
               onClick={() => setToastFeedback(null)}
-              className="text-neutral-500 hover:text-white p-1 cursor-pointer ml-1"
+              className="text-neutral-500 hover:text-neutral-200 p-0.5 cursor-pointer ml-1"
             >
               <X className="w-3.5 h-3.5" />
             </button>
