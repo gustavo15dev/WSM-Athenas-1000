@@ -232,30 +232,30 @@ export default function StudentVirtualClasses({
 
   const loadClassmates = async (className: string) => {
     try {
-      // If it's the official class, fetch users by turma
+      // If it's the official class, fetch users by turma (public display fields only)
       if (className === officialTurma) {
         const { data, error } = await supabase
           .from("wsm_user_profiles")
-          .select("*")
+          .select("id, nome_completo, numero_chamada")
           .eq("role", "student")
           .eq("turma", officialTurma)
           .order("nome_completo", { ascending: true });
         
         if (error) throw error;
-        setClassmates(data || []);
+        setClassmates((data || []) as any);
       } else {
-        // If virtual class, fetch users by student_emails array
+        // If virtual class, fetch users by student_emails array (public display fields only)
         const vClass = virtualClasses.find(c => c.name === className);
         if (vClass && vClass.student_emails) {
           const { data, error } = await supabase
             .from("wsm_user_profiles")
-            .select("*")
+            .select("id, nome_completo, numero_chamada")
             .eq("role", "student")
             .in("email", vClass.student_emails)
             .order("nome_completo", { ascending: true });
             
           if (error) throw error;
-          setClassmates(data || []);
+          setClassmates((data || []) as any);
         } else {
           setClassmates([]);
         }

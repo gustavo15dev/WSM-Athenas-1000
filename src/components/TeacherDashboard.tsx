@@ -455,8 +455,7 @@ export default function TeacherDashboard({
       const directUpdatePayload: any = {
         nome_completo: cleanName,
         materia: cleanMateria,
-        anos_lecionados: cleanAnos,
-        ...(setPassword.trim().length >= 6 ? { senha_plana: setPassword.trim() } : {})
+        anos_lecionados: cleanAnos
       };
 
       if (profile?.id) {

@@ -124,15 +124,26 @@ export default function App() {
     };
   }, []);
 
-  const handleAdminPasswordSubmit = (e: React.FormEvent) => {
+  const handleAdminPasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (adminPasswordValue === '3473') {
-      setScreen('ADMIN_PORTAL');
-      setShowAdminPasswordPortal(false);
-      setAdminPasswordValue('');
-      setAdminErrorMsg('');
-    } else {
-      setAdminErrorMsg('Acesso negado. Token de segurança incorreto.');
+    try {
+      const res = await fetch('/api/admin/verify-access', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: adminPasswordValue })
+      });
+      const data = await res.json();
+      if (data?.authorized) {
+        setScreen('ADMIN_PORTAL');
+        setShowAdminPasswordPortal(false);
+        setAdminPasswordValue('');
+        setAdminErrorMsg('');
+      } else {
+        setAdminErrorMsg(data?.message || 'Acesso negado. Token de segurança incorreto.');
+        setAdminPasswordValue('');
+      }
+    } catch {
+      setAdminErrorMsg('Falha ao validar credencial administrativa.');
       setAdminPasswordValue('');
     }
   };

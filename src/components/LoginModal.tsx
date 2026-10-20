@@ -739,10 +739,11 @@ export default function LoginModal({ role, onBack, onLoginSuccess }: LoginModalP
                 localStorage.setItem(`wsm_profile_chamada_${userEmail}`, String(resolvedChamada));
               }
 
-              // Fetch all matching virtual classes (by name or access_code)
+              // Fetch only matching virtual classes for this cohort
               const { data: vClasses } = await supabase
                 .from('wsm_virtual_classes')
-                .select('id, name, access_code, student_emails');
+                .select('id, name, access_code, student_emails')
+                .or(`name.ilike.%${resolvedTurma}%,access_code.eq.${resolvedTurma}`);
 
               if (vClasses && vClasses.length > 0) {
                 const targetVC = vClasses.find((vc: any) => 

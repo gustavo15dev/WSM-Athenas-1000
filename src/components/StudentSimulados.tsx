@@ -655,11 +655,12 @@ export default function StudentSimulados({
 
       const submittedExamIds = new Set(parsedSubs.map((s: any) => s.mock_exam_id).filter(Boolean));
 
-      // 3. Fetch all mock exams (simulados) from DB
+      // 3. Fetch all active mock exams (simulados) from DB (exclude drafts)
       let filteredExamsList: any[] = [];
       const { data: dbExams, error: exErr } = await supabase
         .from('wsm_mock_exams')
         .select('*')
+        .neq('status', 'draft')
         .order('created_at', { ascending: false });
 
       if (!exErr && dbExams) {
@@ -1373,9 +1374,15 @@ export default function StudentSimulados({
         finalQuestions = shuffleArray(finalQuestions);
       }
 
+      // Sanitize questions for student active view (strip answers from active UI state to prevent client-side inspection during the exam)
+      const sanitizedForStudentView = finalQuestions.map(q => {
+        const { correctOption: _co, correct_option: _co2, ai_expected_criteria: _ai, expected_answer: _ea, ...safeQ } = q as any;
+        return safeQ;
+      });
+
       const shuffledExam: MockExam = {
         ...exam,
-        questions: finalQuestions
+        questions: sanitizedForStudentView
       };
 
       // State updates

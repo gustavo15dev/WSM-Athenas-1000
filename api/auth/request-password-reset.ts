@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import crypto from "crypto";
 import { createClient } from "@supabase/supabase-js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://jotwprwbqabeqswiiztq.supabase.co';
@@ -62,8 +63,9 @@ export default async function handler(req: any, res: any) {
     // Generate cryptographically secure 6-digit OTP
     const otp = String(Math.floor(100000 + Math.random() * 900000));
     const expiresAt = Date.now() + 15 * 60 * 1000; // 15 minutes
+    const otpHashed = crypto.createHash('sha256').update(otp).digest('hex');
 
-    // Store in Supabase audit logs so all serverless instances can verify it
+    // Store in Supabase audit logs using cryptographic hash (never plaintext OTP)
     try {
       await supabase.from("wsm_system_logs").insert([
         {
@@ -73,7 +75,7 @@ export default async function handler(req: any, res: any) {
           action: "PASSWORD_RESET_OTP_ISSUED",
           details: "Código de segurança OTP de 6 dígitos gerado e enviado via e-mail.",
           metadata: {
-            otp,
+            otp_hash: otpHashed,
             expires_at: expiresAt,
             attempts: 0,
             used: false,

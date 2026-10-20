@@ -195,9 +195,13 @@ export default function AcademicCalendar({
 
     const fetchMockExams = async () => {
       try {
-        let query = supabase.from('wsm_mock_exams').select('*');
+        let query = supabase
+          .from('wsm_mock_exams')
+          .select('id, title, subject, class_name, deadline, due_date, exam_date, teacher_name, teacher_email, description, status, is_draft');
         if (userRole === 'teacher' && cleanEmail) {
           query = query.eq('teacher_email', cleanEmail);
+        } else if (userRole === 'student') {
+          query = query.neq('status', 'draft');
         }
         const { data, error } = await query;
         if (!error && data && isMounted) {

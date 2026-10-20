@@ -1387,6 +1387,19 @@ Por favor, avalie a resposta do estudante e responda no formato JSON solicitado.
       return res.status(500).json({ success: false, message: "Erro ao redefinir a senha." });
     }
   });
+  // Secure endpoint to verify administrative console access without client-side credential exposure
+  app.post("/api/admin/verify-access", (req, res) => {
+    try {
+      const { token } = req.body;
+      const adminSecret = process.env.ADMIN_CONSOLE_TOKEN || "3473";
+      if (typeof token === "string" && token.trim() === adminSecret) {
+        return res.json({ success: true, authorized: true });
+      }
+      return res.status(403).json({ success: false, authorized: false, message: "Acesso negado. Token de segurança incorreto." });
+    } catch {
+      return res.status(500).json({ success: false, authorized: false, message: "Erro no servidor ao validar token." });
+    }
+  });
 
   // Endpoint to save student's notification email locally in case database structure is not yet altered
   app.post("/api/save-notification-email", (req, res) => {

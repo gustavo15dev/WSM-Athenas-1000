@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { createClient } from "@supabase/supabase-js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://jotwprwbqabeqswiiztq.supabase.co';
@@ -57,9 +58,13 @@ export default async function handler(req: any, res: any) {
       return res.status(400).json({ success: false, message: "Nenhum código ativo encontrado para este e-mail. Solicite um novo código." });
     }
 
+    const tokenHash = crypto.createHash('sha256').update(tokenClean).digest('hex');
+
     const latestValidLog = logs.find((l: any) => {
       const meta = l.metadata || {};
-      return !meta.used && meta.otp === tokenClean;
+      const matchesHash = meta.otp_hash && meta.otp_hash === tokenHash;
+      const matchesLegacy = meta.otp && meta.otp === tokenClean;
+      return !meta.used && (matchesHash || matchesLegacy);
     });
 
     if (!latestValidLog) {
@@ -87,15 +92,8 @@ export default async function handler(req: any, res: any) {
       // ignore
     }
 
-    // Update password in wsm_user_profiles
-    try {
-      await supabase
-        .from("wsm_user_profiles")
-        .update({ senha_plana: newPassword })
-        .ilike("email", targetEmail);
-    } catch (profileErr) {
-      console.warn("[Vercel Password Reset] Erro ao atualizar senha no perfil:", profileErr);
-    }
+    // Password update is handled securely via Supabase Auth
+    // Plaintext passwords must NEVER be saved to wsm_user_profiles
 
     // Audit log
     try {

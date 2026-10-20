@@ -1299,8 +1299,7 @@ export default function StudentDashboard({
       // 3. Direct UPDATE in wsm_user_profiles
       const directUpdatePayload: any = {
         nome_completo: cleanName,
-        numero_chamada: cleanChamada,
-        ...(setPassword.trim().length >= 6 ? { senha_plana: setPassword.trim() } : {})
+        numero_chamada: cleanChamada
       };
 
       if (profile?.id) {
@@ -1560,9 +1559,11 @@ export default function StudentDashboard({
       }
 
       // 2b. Fetch Mock Exams (Simulados Online) for this class, virtual class, or individual email
+      // Exclude questions/gabarito from dashboard preview to prevent data leakage
       const { data: dbMockExams } = await supabase
         .from('wsm_mock_exams')
-        .select('*')
+        .select('id, title, subject, class_name, deadline, description, teacher_name, teacher_email, total_points, duration_minutes, created_at, status, is_draft')
+        .neq('status', 'draft')
         .order('created_at', { ascending: false });
       
       let filteredMockExams: any[] = [];

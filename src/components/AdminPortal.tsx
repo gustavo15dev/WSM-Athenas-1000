@@ -310,14 +310,15 @@ export default function AdminPortal({ onBack, adminEmail }: AdminPortalProps) {
 
       if (profileErr) throw profileErr;
 
-      // Log the creation
+      // Log the creation (never include passwords in audit logs)
+      const { senhaPlana: _omittedPwd, ...safeNewUserForm } = newUserForm;
       await logSystemAction({
         userEmail: adminEmail,
         userName: 'Admin',
         role: 'admin',
         action: 'CREATE_USER',
         details: `Criou novo perfil (${newUserForm.role}): ${newUserForm.nomeCompleto} <${customEmail}>`,
-        metadata: { newUserForm }
+        metadata: { newUserForm: safeNewUserForm }
       });
 
       showToast('success', `Perfil de ${newUserForm.nomeCompleto} cadastrado com sucesso!`);
