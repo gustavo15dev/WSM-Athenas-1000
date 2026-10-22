@@ -3,7 +3,7 @@ import {
   Send, Sparkles, Bot, User, Trash2, HelpCircle, Loader2, 
   History, Plus, MessageSquare, Mic, ArrowUp, X, MicOff, 
   Paperclip, PanelLeftClose, PanelLeft, Search, Pin, Copy, Check, Headphones,
-  Globe, Brain, ChevronRight, ChevronDown
+  Globe, Brain, ChevronRight, ChevronDown, BookOpen, GraduationCap
 } from 'lucide-react';
 import { supabase } from '../supabase';
 import AthenasMarkdownRenderer from './AthenasMarkdownRenderer';
@@ -11,6 +11,16 @@ import { motion, AnimatePresence } from 'motion/react';
 import { checkFastSafetyViolation } from '../utils/safetyCheck';
 import { WebSource, extractSourcesFromContent } from '../utils/tavilyAgent';
 import SourcesDrawer from './SourcesDrawer';
+import { 
+  InteractiveQuizModal, 
+  QuizLauncherCard, 
+  extractQuizData, 
+  stripQuizDataTag, 
+  QuizData 
+} from './InteractiveQuizModal';
+import { matchesStudentTarget, matchesStudentExam } from '../utils/targetMatcher';
+import { areTurmasMatching } from '../utils/profileDb';
+import { parseExamSettings } from '../utils/examSettings';
 
 declare global {
   interface Window {
@@ -271,28 +281,76 @@ const sanitizeAndNormalizeContent = (text: string) => {
     .replace(/[\uFFFD]/g, '');
 };
 
+/**
+ * Highlights @ mentions in bold verde-água tags.
+ * Supports @[Nome da Prova], @NomeDaProva, or exact titles from knownExamTitles.
+ */
+export function renderHighlightedMentions(text: string, knownTitles: string[] = []): React.ReactNode {
+  if (!text) return null;
+
+  const validTitles = (knownTitles || [])
+    .map(t => (t || '').trim())
+    .filter(Boolean)
+    .sort((a, b) => b.length - a.length);
+
+  let patternStr: string;
+  if (validTitles.length > 0) {
+    const escapedTitles = validTitles
+      .map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+      .join('|');
+    patternStr = `(@\\[[^\\]]+\\]|@(?:${escapedTitles})|@[\\wÀ-ÿ0-9._-]+)`;
+  } else {
+    patternStr = `(@\\[[^\\]]+\\]|@[\\wÀ-ÿ0-9._-]+(?:\\s+[\\wÀ-ÿ0-9._-]+)*)`;
+  }
+
+  const parts = text.split(new RegExp(patternStr, 'g'));
+
+  return parts.map((part, idx) => {
+    if (!part) return null;
+    if (part.startsWith('@')) {
+      const cleanTitle = part.replace(/^@\[?/, '').replace(/\]?$/, '').trim();
+      return (
+        <span 
+          key={idx} 
+          className="inline-flex items-center gap-1 font-bold text-emerald-300 bg-emerald-950/80 border border-emerald-500/40 px-2 py-0.5 rounded-lg shadow-xs my-0.5 align-middle select-text"
+          title={`Prova/Simulado Selecionado: ${cleanTitle}`}
+        >
+          <span className="text-emerald-400 font-extrabold text-[13px]">@</span>
+          <span className="truncate max-w-[280px]">{cleanTitle}</span>
+        </span>
+      );
+    }
+    return <span key={idx}>{part}</span>;
+  });
+}
+
 const ChatMessageItem = React.memo(({ 
   msg,
   onOpenSources,
-  isBlinking = false
+  onStartQuiz,
+  isBlinking = false,
+  knownExamTitles = []
 }: { 
   msg: ChatMessage;
   onOpenSources?: (sources: WebSource[], targetUrl?: string) => void;
+  onStartQuiz?: (quiz: QuizData) => void;
   isBlinking?: boolean;
+  knownExamTitles?: string[];
 }) => {
   const [copied, setCopied] = useState(false);
+  const isAssistant = msg.role === 'assistant';
+  const quizData = React.useMemo(() => isAssistant ? extractQuizData(msg.content) : null, [isAssistant, msg.content]);
+  const cleanedContent = React.useMemo(() => isAssistant ? stripQuizDataTag(msg.content) : msg.content, [isAssistant, msg.content]);
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(sanitizeAndNormalizeContent(msg.content));
+      await navigator.clipboard.writeText(sanitizeAndNormalizeContent(cleanedContent || msg.content));
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
       console.warn("Failed to copy text", err);
     }
   };
-
-  const isAssistant = msg.role === 'assistant';
 
   return (
     <motion.div
@@ -314,7 +372,7 @@ const ChatMessageItem = React.memo(({
                 const displayText = cleaned === "Análise de arquivos anexados." ? "" : cleaned;
                 return displayText ? (
                   <p className="whitespace-pre-wrap text-[14px] md:text-[14.5px] leading-relaxed break-words font-medium">
-                    {displayText}
+                    {renderHighlightedMentions(displayText, knownExamTitles)}
                   </p>
                 ) : null;
               })()}
@@ -380,9 +438,9 @@ const ChatMessageItem = React.memo(({
 
             {/* Message Body (Transparent background, no card borders) */}
             <div className="text-neutral-200 text-[14px] md:text-[14.5px] leading-relaxed antialiased select-text pl-0.5 w-full">
-              {msg.content ? (
+              {cleanedContent ? (
                 <AthenasMarkdownRenderer 
-                  content={sanitizeAndNormalizeContent(msg.content)} 
+                  content={sanitizeAndNormalizeContent(cleanedContent)} 
                   sources={msg.sources}
                   onSelectSource={(source) => {
                     if (onOpenSources) {
@@ -391,6 +449,14 @@ const ChatMessageItem = React.memo(({
                   }}
                 />
               ) : null}
+
+              {/* Card interativo largo do Quiz quando gerado pela IA */}
+              {quizData && (
+                <QuizLauncherCard 
+                  quiz={quizData} 
+                  onStart={() => onStartQuiz && onStartQuiz(quizData)} 
+                />
+              )}
 
               {/* Real-time generating indicator with 3x3 animated grid + live timer */}
               {msg.isGenerating && (
@@ -452,6 +518,9 @@ interface WsmChatProps {
   studyExamTheme?: string;
   studyExamContent?: string;
   onClearStudyTheme?: () => void;
+  exams?: any[];
+  mockExams?: any[];
+  userTurma?: string;
 }
 
 export default function WsmChat({ 
@@ -459,7 +528,10 @@ export default function WsmChat({
   userRole, 
   studyExamTheme, 
   studyExamContent, 
-  onClearStudyTheme 
+  onClearStudyTheme,
+  exams = [],
+  mockExams = [],
+  userTurma = ''
 }: WsmChatProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
@@ -467,6 +539,252 @@ export default function WsmChat({
   const [isTyping, setIsTyping] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [isBlinking, setIsBlinking] = useState(false);
+  const [activeQuiz, setActiveQuiz] = useState<QuizData | null>(null);
+
+  const [isHoveringThinkingBtn, setIsHoveringThinkingBtn] = useState(false);
+  const [showThinkingNoticeBriefly, setShowThinkingNoticeBriefly] = useState(false);
+
+  const [internalExams, setInternalExams] = useState<any[]>(exams || []);
+  const [internalMockExams, setInternalMockExams] = useState<any[]>(mockExams || []);
+  const [studentVirtualClassIds, setStudentVirtualClassIds] = useState<string[]>([]);
+
+  // Load student virtual class identifiers for accurate target matching
+  useEffect(() => {
+    if (userRole === 'student' && userEmail) {
+      const cleanEmail = userEmail.toLowerCase().trim();
+      supabase
+        .from('wsm_virtual_classes')
+        .select('*')
+        .then(({ data: vClasses }) => {
+          if (vClasses) {
+            const ids: string[] = [];
+            vClasses.forEach((vc: any) => {
+              let emails: string[] = [];
+              if (Array.isArray(vc.student_emails)) emails = vc.student_emails.map((e: any) => String(e).toLowerCase().trim());
+              else if (typeof vc.student_emails === 'string') {
+                try {
+                  const parsed = JSON.parse(vc.student_emails);
+                  if (Array.isArray(parsed)) emails = parsed.map((e: any) => String(e).toLowerCase().trim());
+                } catch {
+                  emails = vc.student_emails.split(',').map((s: string) => s.trim().toLowerCase()).filter(Boolean);
+                }
+              }
+              const inEmails = emails.includes(cleanEmail);
+              const matchesCohort = userTurma ? areTurmasMatching(vc.name, userTurma) || vc.access_code === userTurma : false;
+              if (inEmails || matchesCohort) {
+                if (vc.id) ids.push(vc.id);
+                if (vc.name) ids.push(vc.name);
+                if (vc.access_code) ids.push(vc.access_code);
+              }
+            });
+            if (userTurma) ids.push(userTurma);
+            setStudentVirtualClassIds(Array.from(new Set(ids)));
+          }
+        })
+        .catch(err => console.warn('Virtual classes check error in WsmChat:', err));
+    }
+  }, [userEmail, userRole, userTurma]);
+
+  // @ Mention states
+  const [showMentionPopup, setShowMentionPopup] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState('');
+  const [activeMentionIndex, setActiveMentionIndex] = useState(0);
+  const [selectedExamMention, setSelectedExamMention] = useState<any | null>(null);
+  const mentionPopupRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (exams && exams.length > 0) {
+      setInternalExams(exams);
+    }
+  }, [exams]);
+
+  useEffect(() => {
+    if (mockExams && mockExams.length > 0) {
+      setInternalMockExams(mockExams);
+    }
+  }, [mockExams]);
+
+  // Fallback load exams from Supabase if not provided
+  useEffect(() => {
+    if (!exams || exams.length === 0) {
+      const fetchExams = async () => {
+        try {
+          const { data: dbExams } = await supabase
+            .from('wsm_exams')
+            .select('*')
+            .order('exam_date', { ascending: true });
+          if (dbExams) {
+            setInternalExams(dbExams);
+          }
+        } catch (err) {
+          console.warn('Fallback exams fetch error:', err);
+        }
+      };
+      fetchExams();
+    }
+  }, [exams]);
+
+  useEffect(() => {
+    if (!mockExams || mockExams.length === 0) {
+      const fetchMocks = async () => {
+        try {
+          const { data: dbMocks } = await supabase
+            .from('wsm_mock_exams')
+            .select('id, title, subject, class_name, deadline, description, teacher_name, teacher_email, status, is_draft')
+            .neq('status', 'draft')
+            .order('created_at', { ascending: false });
+          if (dbMocks) {
+            setInternalMockExams(dbMocks);
+          }
+        } catch (err) {
+          console.warn('Fallback mock exams fetch error:', err);
+        }
+      };
+      fetchMocks();
+    }
+  }, [mockExams]);
+
+  // Close mention popup when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        mentionPopupRef.current && 
+        !mentionPopupRef.current.contains(e.target as Node) &&
+        textareaRef.current &&
+        !textareaRef.current.contains(e.target as Node)
+      ) {
+        setShowMentionPopup(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Compute unified list of pending exams strictly filtered for current user
+  const combinedPendingExams = React.useMemo(() => {
+    const list: Array<{
+      id: string;
+      title: string;
+      subject: string;
+      date?: string;
+      content: string;
+      type: 'exam' | 'mock';
+      typeLabel: string;
+    }> = [];
+
+    const cleanEmail = (userEmail || '').toLowerCase().trim();
+
+    // 1. Provas presenciais (internalExams)
+    const validExams = (internalExams || []).filter(ex => {
+      if (!ex || !ex.title) return false;
+
+      // Exclude drafts
+      const { settings } = parseExamSettings(ex.observations || ex.description || '');
+      if (settings.is_draft || ex.is_draft === true || ex.status === 'draft') return false;
+
+      if (userRole === 'student') {
+        return matchesStudentExam(ex, cleanEmail, userTurma, studentVirtualClassIds);
+      } else if (userRole === 'teacher') {
+        return (ex.teacher_email || '').toLowerCase().trim() === cleanEmail;
+      }
+      return true;
+    });
+
+    validExams.forEach(ex => {
+      list.push({
+        id: `exam-${ex.id || ex.title}`,
+        title: String(ex.title).trim(),
+        subject: ex.subject || ex.materia || 'Geral',
+        date: ex.exam_date,
+        content: ex.content || ex.description || '',
+        type: 'exam',
+        typeLabel: 'Prova'
+      });
+    });
+
+    // 2. Simulados online (internalMockExams)
+    const validMocks = (internalMockExams || []).filter(m => {
+      if (!m || !m.title) return false;
+
+      // Exclude drafts
+      const { settings } = parseExamSettings(m.description || '');
+      if (settings.is_draft || m.is_draft === true || m.status === 'draft') return false;
+
+      if (userRole === 'student') {
+        return matchesStudentTarget(m.class_name || m.target, cleanEmail, userTurma, studentVirtualClassIds);
+      } else if (userRole === 'teacher') {
+        return (m.teacher_email || '').toLowerCase().trim() === cleanEmail;
+      }
+      return true;
+    });
+
+    validMocks.forEach(m => {
+      list.push({
+        id: `mock-${m.id || m.title}`,
+        title: String(m.title).trim(),
+        subject: m.subject || 'Simulado',
+        date: m.deadline,
+        content: m.description || m.content || '',
+        type: 'mock',
+        typeLabel: 'Simulado'
+      });
+    });
+
+    return list;
+  }, [internalExams, internalMockExams, userEmail, userRole, userTurma, studentVirtualClassIds]);
+
+  // All known titles for highlighting in ChatMessageItem
+  const allExamTitles = React.useMemo(() => {
+    return combinedPendingExams.map(item => item.title).filter(Boolean);
+  }, [combinedPendingExams]);
+
+  // Filtered list for @ mention popup
+  const filteredMentionExams = React.useMemo(() => {
+    const q = (mentionQuery || '').toLowerCase().trim();
+    if (!q) return combinedPendingExams;
+    return combinedPendingExams.filter(item => 
+      item.title.toLowerCase().includes(q) || 
+      item.subject.toLowerCase().includes(q)
+    );
+  }, [combinedPendingExams, mentionQuery]);
+
+  // Handle clicking on empty state cards: sets text and focuses textarea without sending
+  const handleCardClick = (predefinedText: string) => {
+    setInputText(predefinedText);
+    if (textareaRef.current) {
+      textareaRef.current.focus();
+      const len = predefinedText.length;
+      textareaRef.current.setSelectionRange(len, len);
+      textareaRef.current.style.height = 'auto';
+      const sH = textareaRef.current.scrollHeight;
+      textareaRef.current.style.height = `${Math.min(Math.max(sH, 32), 200)}px`;
+      textareaRef.current.style.overflowY = sH > 200 ? 'auto' : 'hidden';
+    }
+  };
+
+  // Handle selecting an exam from the @ mention popup
+  const handleSelectExamMention = (item: { title: string; content: string; subject: string; type: string }) => {
+    const cursorPos = textareaRef.current?.selectionStart || inputText.length;
+    const textBeforeCursor = inputText.slice(0, cursorPos);
+    const textAfterCursor = inputText.slice(cursorPos);
+    const atIndex = textBeforeCursor.lastIndexOf('@');
+
+    if (atIndex !== -1) {
+      const mentionTag = `@${item.title} `;
+      const newText = textBeforeCursor.slice(0, atIndex) + mentionTag + textAfterCursor;
+      setInputText(newText);
+      setSelectedExamMention(item);
+      setShowMentionPopup(false);
+
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.focus();
+          const nextPos = atIndex + mentionTag.length;
+          textareaRef.current.setSelectionRange(nextPos, nextPos);
+        }
+      }, 20);
+    }
+  };
 
   // Preload and manage the mascot double-blink cycle:
   // 1. Imagem 1 (Aberta): 3 segundos
@@ -971,6 +1289,25 @@ export default function WsmChat({
     const rawText = textToSend || inputText;
     if ((!rawText.trim() && attachedFiles.length === 0) || isLoading || isTyping) return;
 
+    // Detect if an exam was selected or mentioned
+    let currentMention = selectedExamMention;
+    if (!currentMention && rawText && rawText.includes('@')) {
+      currentMention = combinedPendingExams.find(ex => {
+        const title = ex.title.toLowerCase();
+        return rawText.toLowerCase().includes(`@${title}`) || rawText.toLowerCase().includes(title);
+      }) || null;
+    }
+
+    let effectiveExamTheme = studyExamTheme;
+    let effectiveExamContent = studyExamContent;
+    if (currentMention) {
+      effectiveExamTheme = currentMention.title;
+      effectiveExamContent = currentMention.content || currentMention.description || currentMention.subject;
+    }
+
+    setSelectedExamMention(null);
+    setShowMentionPopup(false);
+
     if (activeIntervalRef.current) {
       clearInterval(activeIntervalRef.current);
       activeIntervalRef.current = null;
@@ -988,6 +1325,10 @@ export default function WsmChat({
 
     setMessages(prev => [...prev, userMessage]);
     setInputText('');
+    if (textareaRef.current) {
+      textareaRef.current.style.height = '32px';
+      textareaRef.current.style.overflowY = 'hidden';
+    }
     setAttachedFiles([]);
     setIsLoading(true);
     setErrorMessage('');
@@ -999,7 +1340,7 @@ export default function WsmChat({
         let sessionId = currentSessionId;
         if (!sessionId) {
           try {
-            let title = studyExamTheme ? `Estudos: ${studyExamTheme}` : rawText.trim();
+            let title = effectiveExamTheme ? `Estudos: ${effectiveExamTheme}` : rawText.trim();
             if (title.length > 25) title = title.substring(0, 25) + "...";
             const { data: newSess } = await supabase
               .from('wsm_chat_sessions')
@@ -1057,8 +1398,8 @@ export default function WsmChat({
     try {
       let sessionId = currentSessionId;
       if (!sessionId) {
-        let title = studyExamTheme ? `Estudos: ${studyExamTheme}` : rawText.trim();
-        if (!studyExamTheme && !title && currentFiles.length > 0) {
+        let title = effectiveExamTheme ? `Estudos: ${effectiveExamTheme}` : rawText.trim();
+        if (!effectiveExamTheme && !title && currentFiles.length > 0) {
           title = `Anexos: ${currentFiles.map(f => f.name).join(', ')}`;
         }
         if (title.length > 25) {
@@ -1143,8 +1484,8 @@ export default function WsmChat({
             message: rawText || "Análise de arquivos anexados.",
             history: conversationalHistory,
             attachments: currentFiles,
-            studyExamTheme,
-            studyExamContent,
+            studyExamTheme: effectiveExamTheme,
+            studyExamContent: effectiveExamContent,
             userRole,
             reasoningActive: isThinkingActive,
             clientDateTime
@@ -1683,7 +2024,7 @@ export default function WsmChat({
         >
           {messages.length === 0 ? (
             /* EMPTY STATE: Welcoming mascot screen */
-            <div className="flex flex-col items-center justify-center h-full py-6 px-6 max-w-2xl mx-auto w-full text-center animate-fadeIn space-y-6 select-none overflow-hidden">
+            <div className="flex flex-col items-center justify-center h-full py-4 px-4 sm:px-6 max-w-2xl mx-auto w-full text-center animate-fadeIn space-y-4 select-none overflow-y-auto">
               <div className="space-y-4">
                 <div className="w-24 h-24 flex items-center justify-center mx-auto">
                   <img
@@ -1693,11 +2034,59 @@ export default function WsmChat({
                     className="w-24 h-24 object-contain select-none drop-shadow-[0_0_15px_rgba(30,185,150,0.25)] transition-all duration-75"
                   />
                 </div>
-                <div>
+                <div className="w-full">
                   <h3 className="text-xl font-black text-neutral-100 font-display">Como posso ajudar hoje?</h3>
-                  <p className="text-neutral-400 text-xs mt-1 leading-relaxed max-w-sm mx-auto">
-                    Sou o seu assistente inteligente acadêmico. Posso explicar matérias, corrigir exercícios, ou gerar simulados.
-                  </p>
+
+                  {/* 3 Action Button Cards */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full max-w-2xl mt-5 text-left items-stretch">
+                    <button
+                      type="button"
+                      onClick={() => handleCardClick("Crie um simulado pra mim sobre ")}
+                      className="p-3.5 sm:p-4 rounded-xl bg-neutral-900/80 hover:bg-neutral-800/90 border border-neutral-800 hover:border-emerald-500/40 text-left transition-all duration-200 group cursor-pointer flex flex-col justify-start items-start shadow-xs hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 w-full"
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 group-hover:bg-emerald-500/20 group-hover:scale-105 transition-all mb-3 shrink-0">
+                        <Sparkles className="w-4 h-4" />
+                      </div>
+                      <h4 className="text-xs sm:text-sm font-bold text-neutral-100 group-hover:text-emerald-300 transition-colors">
+                        Crie Simulados
+                      </h4>
+                      <p className="text-[11px] text-neutral-400 mt-1.5 leading-relaxed">
+                        Peça pra IA criar simulados interativos para testar seus conhecimentos
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleCardClick("Quero aprender sobre: ")}
+                      className="p-3.5 sm:p-4 rounded-xl bg-neutral-900/80 hover:bg-neutral-800/90 border border-neutral-800 hover:border-emerald-500/40 text-left transition-all duration-200 group cursor-pointer flex flex-col justify-start items-start shadow-xs hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 w-full"
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 group-hover:bg-emerald-500/20 group-hover:scale-105 transition-all mb-3 shrink-0">
+                        <BookOpen className="w-4 h-4" />
+                      </div>
+                      <h4 className="text-xs sm:text-sm font-bold text-neutral-100 group-hover:text-emerald-300 transition-colors">
+                        Aprenda Conteúdo
+                      </h4>
+                      <p className="text-[11px] text-neutral-400 mt-1.5 leading-relaxed">
+                        Aprenda um conteúdo de formas diferentes com o Athenas AI
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleCardClick("Quero estudar para prova. A Matéria é ")}
+                      className="p-3.5 sm:p-4 rounded-xl bg-neutral-900/80 hover:bg-neutral-800/90 border border-neutral-800 hover:border-emerald-500/40 text-left transition-all duration-200 group cursor-pointer flex flex-col justify-start items-start shadow-xs hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 w-full"
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 group-hover:bg-emerald-500/20 group-hover:scale-105 transition-all mb-3 shrink-0">
+                        <GraduationCap className="w-4 h-4" />
+                      </div>
+                      <h4 className="text-xs sm:text-sm font-bold text-neutral-100 group-hover:text-emerald-300 transition-colors">
+                        Revise para prova
+                      </h4>
+                      <p className="text-[11px] text-neutral-400 mt-1.5 leading-relaxed">
+                        Revise e estude para provas
+                      </p>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1709,7 +2098,9 @@ export default function WsmChat({
                   key={msg.id} 
                   msg={msg} 
                   onOpenSources={handleOpenSources}
+                  onStartQuiz={(quiz) => setActiveQuiz(quiz)}
                   isBlinking={isBlinking}
+                  knownExamTitles={allExamTitles}
                 />
               ))}
 
@@ -1767,11 +2158,111 @@ export default function WsmChat({
           {/* Centered chat wrapper */}
           <div className="w-full max-w-3xl space-y-2 relative z-50 transition-all duration-300">
             
-            <div className={`bg-[#212121] border border-neutral-800 focus-within:border-neutral-700 rounded-[28px] py-2.5 pl-4 pr-3 flex flex-col transition-all duration-300 shadow-xl overflow-hidden relative z-50`}>
+            {/* Floating @ Mention Popover */}
+            <AnimatePresence>
+              {showMentionPopup && (
+                <motion.div
+                  ref={mentionPopupRef}
+                  initial={{ opacity: 0, y: 10, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                  transition={{ duration: 0.15, ease: "easeOut" }}
+                  className="absolute bottom-full left-0 mb-3 w-full max-w-xl bg-[#141414]/98 border border-neutral-800/90 rounded-2xl shadow-2xl backdrop-blur-xl z-50 overflow-hidden text-left"
+                >
+                  {/* Header */}
+                  <div className="px-4 py-2.5 bg-neutral-900/60 border-b border-neutral-800/80 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="w-5 h-5 rounded-md bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center font-bold text-xs">
+                        @
+                      </span>
+                      <span className="text-xs font-semibold text-neutral-200">
+                        Provas e Simulados da sua Turma
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-neutral-500 font-mono hidden sm:inline">
+                      Navegue com ↑ ↓ e pressione Enter
+                    </span>
+                  </div>
+
+                  {/* List of pending exams */}
+                  <div className="max-h-64 overflow-y-auto p-1.5 space-y-1 scrollbar-thin scrollbar-thumb-neutral-800">
+                    {filteredMentionExams.length > 0 ? (
+                      filteredMentionExams.map((item, idx) => {
+                        const isSelected = idx === activeMentionIndex;
+                        const dateInfo = item.date ? formatExamDateDisplay(item.date) : null;
+                        return (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => handleSelectExamMention(item)}
+                            onMouseEnter={() => setActiveMentionIndex(idx)}
+                            className={`w-full px-3 py-2 rounded-xl flex items-center justify-between gap-3 text-left transition-all cursor-pointer group ${
+                              isSelected
+                                ? 'bg-neutral-850 border border-emerald-500/40 text-white'
+                                : 'bg-transparent border border-transparent hover:bg-neutral-850/60 text-neutral-300'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                              <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                                item.type === 'mock'
+                                  ? 'bg-purple-500/15 text-purple-400 border border-purple-500/30'
+                                  : 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                              }`}>
+                                {item.type === 'mock' ? (
+                                  <Sparkles className="w-3.5 h-3.5" />
+                                ) : (
+                                  <GraduationCap className="w-3.5 h-3.5" />
+                                )}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs sm:text-[13px] font-semibold text-neutral-100 group-hover:text-emerald-300 transition-colors truncate">
+                                    {item.title}
+                                  </span>
+                                </div>
+                                <p className="text-[11px] text-neutral-400 truncate mt-0.5">
+                                  <span className="text-emerald-400/90 font-medium">{item.subject}</span>
+                                  {dateInfo?.fullFormatted && (
+                                    <span className="text-neutral-500 ml-1.5 font-mono">
+                                      • {dateInfo.fullFormatted}
+                                    </span>
+                                  )}
+                                  {item.content && (
+                                    <span className="text-neutral-500 ml-1.5 truncate">
+                                      • {item.content.slice(0, 40)}...
+                                    </span>
+                                  )}
+                                </p>
+                              </div>
+                            </div>
+
+                            <span className={`text-[10px] px-2 py-0.5 rounded-md font-medium shrink-0 border ${
+                              item.type === 'mock'
+                                ? 'bg-purple-500/10 text-purple-300 border-purple-500/25'
+                                : 'bg-emerald-500/10 text-emerald-300 border-emerald-500/25'
+                            }`}>
+                              {item.typeLabel}
+                            </span>
+                          </button>
+                        );
+                      })
+                    ) : (
+                      <div className="py-6 px-4 text-center">
+                        <p className="text-xs text-neutral-400">
+                          {mentionQuery ? `Nenhuma prova ou simulado encontrado com "${mentionQuery}".` : 'Nenhuma prova pendente encontrada no momento.'}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <div className={`bg-[#212121] border border-neutral-800 focus-within:border-neutral-700 rounded-[28px] py-2 px-3 flex flex-col transition-all duration-300 shadow-xl overflow-hidden relative z-50`}>
               
               {/* Attached file tags */}
               {attachedFiles.length > 0 && (
-                <div className="flex flex-wrap gap-2 px-3 py-2 border-b border-neutral-800 max-h-24 overflow-y-auto">
+                <div className="flex flex-wrap gap-2 px-3 py-2 border-b border-neutral-800 max-h-24 overflow-y-auto mb-1.5">
                   {attachedFiles.map((file, i) => (
                     <div key={i} className="flex items-center gap-1.5 bg-neutral-900 border border-neutral-700 px-2.5 py-1 rounded-xl text-[10px] text-neutral-300 animate-fadeIn">
                       <Paperclip className="w-3 h-3 text-neutral-400 shrink-0" />
@@ -1789,8 +2280,8 @@ export default function WsmChat({
                 </div>
               )}
 
-              {/* Text Input Panel */}
-              <div className="flex items-center gap-1.5 w-full relative z-50">
+              {/* Text Input Panel: All elements perfectly aligned on the horizontal axis */}
+              <div className="flex items-center gap-2 w-full relative z-50 min-h-[36px]">
                 
                 {/* Plus Upload button */}
                 <button
@@ -1798,43 +2289,105 @@ export default function WsmChat({
                   onClick={() => fileInputRef.current?.click()}
                   title="Anexar arquivos (max 5)"
                   disabled={isLoading || isTyping || attachedFiles.length >= 5}
-                  className="w-8 h-8 ml-1 text-neutral-400 hover:text-white rounded-full transition-all flex items-center justify-center shrink-0 cursor-pointer disabled:opacity-30"
+                  className="w-8 h-8 text-neutral-400 hover:text-white rounded-full transition-all flex items-center justify-center shrink-0 cursor-pointer disabled:opacity-30 self-center"
                 >
-                  <Plus className="w-5.5 h-5.5" />
+                  <Plus className="w-5 h-5" />
                 </button>
 
                 {/* Input TextArea */}
                 <textarea
                   ref={textareaRef}
                   rows={1}
-                  placeholder="Pergunte alguma coisa"
+                  placeholder="Digite algo ou @ para anexar alguma prova..."
                   value={inputText}
-                  onChange={(e) => setInputText(e.target.value)}
+                  style={{ resize: 'none', overflowY: 'hidden', height: '32px', minHeight: '32px' }}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setInputText(val);
+
+                    // Auto-resize textarea smoothly without showing scrollbar arrows
+                    e.target.style.height = 'auto';
+                    const scrollH = e.target.scrollHeight;
+                    e.target.style.height = `${Math.min(Math.max(scrollH, 32), 200)}px`;
+                    e.target.style.overflowY = scrollH > 200 ? 'auto' : 'hidden';
+
+                    // Detect @ mention trigger
+                    const cursorPos = e.target.selectionStart || val.length;
+                    const textBeforeCursor = val.slice(0, cursorPos);
+                    const atMatch = textBeforeCursor.match(/@([^@\s]*)$/);
+
+                    if (atMatch) {
+                      setMentionQuery(atMatch[1]);
+                      setShowMentionPopup(true);
+                      setActiveMentionIndex(0);
+                    } else {
+                      setShowMentionPopup(false);
+                    }
+                  }}
                   onKeyDown={(e) => {
+                    if (showMentionPopup && filteredMentionExams.length > 0) {
+                      if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        setActiveMentionIndex(prev => (prev + 1) % filteredMentionExams.length);
+                        return;
+                      }
+                      if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        setActiveMentionIndex(prev => (prev - 1 + filteredMentionExams.length) % filteredMentionExams.length);
+                        return;
+                      }
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleSelectExamMention(filteredMentionExams[activeMentionIndex]);
+                        return;
+                      }
+                      if (e.key === 'Escape') {
+                        e.preventDefault();
+                        setShowMentionPopup(false);
+                        return;
+                      }
+                    }
+
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
                       handleSendMessage();
                     }
                   }}
                   disabled={isLoading || isTyping}
-                  className="flex-1 min-w-0 bg-transparent border-none focus:ring-0 focus:outline-none outline-none text-xs md:text-[14.5px] text-neutral-200 placeholder-neutral-500 px-1 py-1 resize-none max-h-[200px] leading-relaxed overflow-y-auto select-text scrollbar-thin scrollbar-thumb-neutral-700"
+                  className="athenas-chat-textarea flex-1 min-w-0 bg-transparent border-none focus:ring-0 focus:outline-none outline-none text-xs md:text-[14px] text-neutral-200 placeholder-neutral-500 px-2 py-1.5 resize-none min-h-[32px] max-h-[200px] leading-[20px] overflow-hidden select-text self-center [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
                 />
 
-                {/* "Pensar" reasoning toggle button */}
-                <button
-                  type="button"
-                  onClick={() => setIsThinkingActive(prev => !prev)}
-                  title={isThinkingActive ? "Raciocínio da IA Ativado (clique para desativar)" : "Ativar Raciocínio da IA (Pensar)"}
-                  disabled={isLoading || isTyping}
-                  className={`h-7.5 px-2.5 rounded-full text-xs font-semibold flex items-center gap-1 transition-all duration-200 cursor-pointer border select-none shrink-0 ${
-                    isThinkingActive
-                      ? 'bg-emerald-500/15 border-emerald-500/50 text-emerald-300 shadow-sm shadow-emerald-500/15 ring-1 ring-emerald-500/30'
-                      : 'bg-neutral-850 hover:bg-neutral-800 border-neutral-750/70 text-neutral-400 hover:text-neutral-200'
-                  }`}
-                >
-                  <Brain className={`w-3.5 h-3.5 transition-transform duration-200 ${isThinkingActive ? 'text-emerald-400 animate-pulse scale-105' : 'text-neutral-400'}`} />
-                  <span className="font-sans font-medium">Pensar</span>
-                </button>
+                {/* "Pensar" reasoning toggle button with tooltip notice */}
+                <div className="relative flex items-center shrink-0 self-center">
+                  {(isHoveringThinkingBtn || showThinkingNoticeBriefly) && (
+                    <div className="absolute bottom-full mb-2.5 right-0 sm:right-auto sm:left-1/2 sm:-translate-x-1/2 px-3 py-1.5 bg-neutral-900 border border-emerald-500/40 text-emerald-300 font-medium text-[11px] rounded-xl shadow-2xl whitespace-nowrap z-50 animate-fadeIn flex items-center gap-1.5 pointer-events-none drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)]">
+                      <Clock className="w-3 h-3 text-emerald-400 shrink-0" />
+                      <span>A Resposta pode demorar até 3x mais para ser gerada</span>
+                      <div className="absolute -bottom-1.5 right-4 sm:right-auto sm:left-1/2 sm:-translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-neutral-900" />
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    onMouseEnter={() => setIsHoveringThinkingBtn(true)}
+                    onMouseLeave={() => setIsHoveringThinkingBtn(false)}
+                    onClick={() => {
+                      setIsThinkingActive(prev => !prev);
+                      setShowThinkingNoticeBriefly(true);
+                      setTimeout(() => setShowThinkingNoticeBriefly(false), 3000);
+                    }}
+                    title="A Resposta pode demorar até 3x mais para ser gerada"
+                    disabled={isLoading || isTyping}
+                    className={`h-8 px-3 rounded-full text-xs font-semibold flex items-center justify-center gap-1.5 transition-all duration-200 cursor-pointer border select-none shrink-0 self-center ${
+                      isThinkingActive
+                        ? 'bg-emerald-500/15 border-emerald-500/50 text-emerald-300 shadow-sm shadow-emerald-500/15 ring-1 ring-emerald-500/30'
+                        : 'bg-neutral-850 hover:bg-neutral-800 border-neutral-750/70 text-neutral-400 hover:text-neutral-200'
+                    }`}
+                  >
+                    <Brain className={`w-3.5 h-3.5 transition-transform duration-200 shrink-0 ${isThinkingActive ? 'text-emerald-400 animate-pulse scale-105' : 'text-neutral-400'}`} />
+                    <span className="font-sans font-medium text-xs leading-none">Pensar</span>
+                  </button>
+                </div>
 
                 {/* Send button */}
                 <button
@@ -1842,9 +2395,9 @@ export default function WsmChat({
                   onClick={() => handleSendMessage()}
                   disabled={isLoading || isTyping || (!inputText.trim() && attachedFiles.length === 0)}
                   title="Enviar pergunta"
-                  className="relative z-50 w-8 h-8 bg-white disabled:bg-[#333333] text-black disabled:text-neutral-500 rounded-full transition-all flex items-center justify-center shrink-0 cursor-pointer disabled:cursor-not-allowed hover:bg-neutral-200 duration-300 shadow-sm"
+                  className="relative z-50 w-8 h-8 bg-white disabled:bg-[#333333] text-black disabled:text-neutral-500 rounded-full transition-all flex items-center justify-center shrink-0 cursor-pointer disabled:cursor-not-allowed hover:bg-neutral-200 duration-300 shadow-sm self-center"
                 >
-                  <ArrowUp className="w-4.5 h-4.5 stroke-[3]" />
+                  <ArrowUp className="w-4 h-4 stroke-[2.5]" />
                 </button>
               </div>
             </div>
@@ -1872,6 +2425,17 @@ export default function WsmChat({
         sources={drawerSources}
         activeSourceUrl={activeSourceUrl}
       />
+
+      {/* 5. INTERACTIVE QUIZ FULLSCREEN MODAL */}
+      {activeQuiz && (
+        <InteractiveQuizModal
+          quiz={activeQuiz}
+          onClose={() => setActiveQuiz(null)}
+          onSendToAi={(reportText) => {
+            handleSendMessage(reportText);
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -69,6 +69,7 @@ import StudentAnnouncements from './StudentAnnouncements';
 import TabLoadingSkeleton from './TabLoadingSkeleton';
 import BrowserNotificationPrompt from './BrowserNotificationPrompt';
 import VirtualNotebook from './VirtualNotebook';
+import StudentProgress from './StudentProgress';
 import { startRealtimeNotificationListener } from '../utils/browserNotifications';
 import { supabase } from '../supabase';
 import { safeUpsertUserProfile, areTurmasMatching, setWelcomeModalDismissedInDb } from '../utils/profileDb';
@@ -92,12 +93,12 @@ export default function StudentDashboard({
   onToggleTask 
 }: StudentDashboardProps) {
   
-  const [activeTab, setActiveTab] = useState<'inicio' | 'mural' | 'calendario' | 'conversas' | 'caderno' | 'wsm_athenas' | 'simulados' | 'desempenho'>('inicio');
+  const [activeTab, setActiveTab] = useState<'inicio' | 'mural' | 'calendario' | 'conversas' | 'caderno' | 'wsm_athenas' | 'simulados' | 'progresso'>('inicio');
   const [isExamActive, setIsExamActive] = useState(false);
   const [isTabTransitioning, setIsTabTransitioning] = useState(false);
   const [hasUnsavedNotebook, setHasUnsavedNotebook] = useState(false);
   const [showUnsavedModal, setShowUnsavedModal] = useState(false);
-  const [pendingTargetTab, setPendingTargetTab] = useState<'inicio' | 'mural' | 'calendario' | 'conversas' | 'caderno' | 'wsm_athenas' | 'simulados' | 'desempenho' | null>(null);
+  const [pendingTargetTab, setPendingTargetTab] = useState<'inicio' | 'mural' | 'calendario' | 'conversas' | 'caderno' | 'wsm_athenas' | 'simulados' | 'progresso' | null>(null);
 
   // Explicit active class context for multi-room students
   const [activeTurma, setActiveTurma] = useState<string>(() => {
@@ -2718,6 +2719,24 @@ export default function StudentDashboard({
               <span className={isSidebarCollapsed ? 'text-[9.5px] font-medium leading-normal tracking-wide block truncate w-full' : 'truncate'}>Simulados</span>
             </button>
 
+            {/* NEW Meu Progresso Tab */}
+            <button
+              id="student-tab-progresso"
+              onClick={() => handleTabClick('progresso')}
+              className={`${
+                isSidebarCollapsed 
+                  ? 'w-full flex flex-col items-center justify-center py-2 px-1 text-[10px] text-center gap-1' 
+                  : 'w-full flex items-center gap-3 px-3.5 py-2.5 text-xs'
+              } rounded-xl font-semibold transition-all border cursor-pointer ${
+                activeTab === 'progresso'
+                  ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/15 font-bold shadow-[0_0_12px_rgba(30, 185, 150,0.03)]'
+                  : 'bg-transparent text-neutral-400 border-transparent hover:bg-neutral-900/40 hover:text-neutral-200'
+              }`}
+            >
+              <TrendingUp className={`${isSidebarCollapsed ? 'w-5 h-5' : 'w-4 h-4'} text-emerald-400`} />
+              <span className={isSidebarCollapsed ? 'text-[9.5px] font-medium leading-normal tracking-wide block truncate w-full' : 'truncate'}>Meu Progresso</span>
+            </button>
+
             {/* Ouvir música ambiente Tab */}
             <button
               id="student-tab-musica"
@@ -2930,6 +2949,19 @@ export default function StudentDashboard({
               <span>Simulados</span>
             </button>
 
+            {/* Mobile Progresso Button */}
+            <button
+              onClick={() => handleTabClick('progresso')}
+              className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-2 py-2 rounded-xl text-[11px] font-semibold transition-all border shrink-0 ${
+                activeTab === 'progresso' 
+                  ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20' 
+                  : 'bg-neutral-900/60 text-neutral-450 border-transparent hover:text-neutral-200'
+              }`}
+            >
+              <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Progresso</span>
+            </button>
+
 
             <button
               onClick={() => {
@@ -3029,6 +3061,9 @@ export default function StudentDashboard({
               setStudyExamTheme(undefined);
               setStudyExamContent(undefined);
             }}
+            exams={exams}
+            mockExams={mockExams}
+            userTurma={activeTurma || profile?.turma || ''}
           />
         ) : activeTab === 'calendario' ? (
           <AcademicCalendar
@@ -3060,6 +3095,14 @@ export default function StudentDashboard({
               setStudyExamContent(content);
               setActiveTab('wsm_athenas');
             }}
+          />
+        ) : activeTab === 'progresso' ? (
+          <StudentProgress
+            userEmail={email}
+            userName={profile?.nome_completo || 'Aluno'}
+            userTurma={activeTurma || profile?.turma || ''}
+            submissions={studentSubmissions}
+            mockExams={mockExams}
           />
         ) : (
           /* Main Dashboard Content Layout (Início) */
@@ -3615,9 +3658,6 @@ export default function StudentDashboard({
                 </div>
               )}
             </div>
-
-            {/* Minhas Métricas Section (Analytics) */}
-            {renderStudentAnalytics()}
 
           </div>
         )}

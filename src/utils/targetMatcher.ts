@@ -61,44 +61,46 @@ export function matchesStudentTarget(
 ): boolean {
   if (!rawTarget || !rawTarget.trim()) return false;
   const rawClean = rawTarget.trim().toLowerCase();
+  const cleanEmail = (studentEmail || '').toLowerCase().trim();
+  const cleanTurma = (studentCohort || '').trim();
 
-  // If student has no room/turma and no virtual classes, they must not receive class-wide exams
-  const hasAnyRoomOrCohort = Boolean(studentCohort && studentCohort.trim()) || virtualClassIdsOrNames.length > 0;
+  const { classes, students } = parseExamTargets(rawTarget);
 
+  // 1. If specific students are explicitly designated:
+  // MUST ONLY show to those specific students. Other students in the class MUST NOT see it.
+  if (students.length > 0) {
+    return students.includes(cleanEmail);
+  }
+
+  // Fallback for single string rawTarget if it's an email address
+  if (rawClean.includes('@')) {
+    return rawClean === cleanEmail;
+  }
+
+  // 2. If student has no room/turma and no virtual classes, they must not receive class-wide exams
+  const hasAnyRoomOrCohort = Boolean(cleanTurma) || virtualClassIdsOrNames.length > 0;
   if (['geral', 'todas', 'toda a escola', 'todos'].includes(rawClean)) {
     return hasAnyRoomOrCohort;
   }
 
-  const { classes, students } = parseExamTargets(rawTarget);
-  const emailLower = (studentEmail || '').toLowerCase().trim();
-
-  // 1. Check if student's email is explicitly targeted
-  if (students.some(s => s.toLowerCase() === emailLower)) {
+  // 3. Check official student cohort match
+  if (cleanTurma && classes.some(c => c && (areTurmasMatching(c, cleanTurma) || c.toLowerCase().trim() === cleanTurma.toLowerCase()))) {
     return true;
   }
 
-  // Fallback for single string email target
-  if (rawClean === emailLower) {
-    return true;
+  // 4. Check student's virtual classes match
+  if (virtualClassIdsOrNames.length > 0) {
+    const matchesVC = virtualClassIdsOrNames.some(vcIdentifier => {
+      if (!vcIdentifier) return false;
+      const vcLower = vcIdentifier.toLowerCase().trim();
+      return classes.some(c => c && (areTurmasMatching(c, vcIdentifier) || c.toLowerCase().trim() === vcLower));
+    });
+    if (matchesVC) return true;
   }
 
-  // 2. Check official student cohort
-  if (studentCohort && classes.some(c => areTurmasMatching(c, studentCohort) || c.toLowerCase() === studentCohort.toLowerCase())) {
-    return true;
-  }
-
-  // 3. Check student's virtual classes
-  const matchesVC = virtualClassIdsOrNames.some(vcIdentifier => {
-    if (!vcIdentifier) return false;
-    const vcLower = vcIdentifier.toLowerCase();
-    return classes.some(c => areTurmasMatching(c, vcIdentifier) || c.toLowerCase() === vcLower);
-  });
-
-  if (matchesVC) return true;
-
-  // Single string match fallback
-  if (classes.length === 0 && students.length === 0) {
-    if (studentCohort && areTurmasMatching(rawTarget, studentCohort)) return true;
+  // 5. Fallback for rawTarget single string match if classes array was empty
+  if (classes.length === 0) {
+    if (cleanTurma && areTurmasMatching(rawTarget, cleanTurma)) return true;
     if (virtualClassIdsOrNames.some(v => areTurmasMatching(rawTarget, v))) return true;
   }
 
@@ -115,44 +117,64 @@ export function matchesStudentExam(
   const cleanEmail = (studentEmail || '').toLowerCase().trim();
   const cleanTurma = (studentCohort || '').trim();
 
-  let rawClasses: string[] = [];
+  let allRawTargets: string[] = [];
   if (Array.isArray(ex.classes)) {
-    rawClasses = ex.classes.map((c: any) => String(c).trim()).filter(Boolean);
+    allRawTargets.push(...ex.classes.map((c: any) => String(c).trim()).filter(Boolean));
   } else if (typeof ex.classes === 'string') {
     try {
       const parsed = JSON.parse(ex.classes);
-      if (Array.isArray(parsed)) rawClasses = parsed.map(c => String(c).trim()).filter(Boolean);
-      else rawClasses = [ex.classes.trim()];
+      if (Array.isArray(parsed)) allRawTargets.push(...parsed.map(c => String(c).trim()).filter(Boolean));
+      else allRawTargets.push(ex.classes.trim());
     } catch {
-      rawClasses = ex.classes.split(',').map(s => s.trim()).filter(Boolean);
+      allRawTargets.push(...ex.classes.split(',').map(s => s.trim()).filter(Boolean));
     }
   }
 
-  if (ex.class_name) rawClasses.push(String(ex.class_name).trim());
-  if (ex.turma) rawClasses.push(String(ex.turma).trim());
+  if (ex.class_name) allRawTargets.push(String(ex.class_name).trim());
+  if (ex.turma) allRawTargets.push(String(ex.turma).trim());
+  if (ex.target) allRawTargets.push(String(ex.target).trim());
 
-  if (rawClasses.length === 0) {
+  if (allRawTargets.length === 0) {
     return false;
   }
 
-  // Direct student email match
-  if (rawClasses.some(c => c.toLowerCase() === cleanEmail)) {
+  // Separate email targets vs class targets
+  const classes: string[] = [];
+  const students: string[] = [];
+
+  allRawTargets.forEach(t => {
+    const { classes: parsedC, students: parsedS } = parseExamTargets(t);
+    classes.push(...parsedC);
+    students.push(...parsedS);
+  });
+
+  const uniqueClasses = Array.from(new Set(classes.map(c => c.trim()).filter(Boolean)));
+  const uniqueStudents = Array.from(new Set(students.map(s => s.toLowerCase().trim()).filter(Boolean)));
+
+  // 1. If SPECIFIC STUDENTS are designated:
+  // MUST ONLY show to those specific students. Other students MUST NOT see it!
+  if (uniqueStudents.length > 0) {
+    return uniqueStudents.includes(cleanEmail);
+  }
+
+  // 2. Official student turma match
+  if (cleanTurma && uniqueClasses.some(c => areTurmasMatching(c, cleanTurma) || c.toLowerCase() === cleanTurma.toLowerCase())) {
     return true;
   }
 
-  // Official student turma match
-  if (cleanTurma && rawClasses.some(c => areTurmasMatching(c, cleanTurma))) {
-    return true;
+  // 3. Virtual class match
+  if (virtualClassIdsOrNames.length > 0) {
+    const matchesVC = virtualClassIdsOrNames.some(vcId => {
+      if (!vcId) return false;
+      const vcLower = vcId.toLowerCase().trim();
+      return uniqueClasses.some(c => areTurmasMatching(c, vcId) || c.toLowerCase() === vcLower);
+    });
+    if (matchesVC) return true;
   }
 
-  // Virtual class match
-  if (virtualClassIdsOrNames.length > 0 && rawClasses.some(c => virtualClassIdsOrNames.some(vcId => areTurmasMatching(c, vcId) || c.toLowerCase() === vcId.toLowerCase()))) {
-    return true;
-  }
-
-  // General / school-wide match ONLY if student belongs to at least one class/room
+  // 4. General / school-wide match ONLY if student belongs to at least one class/room
   const hasAnyRoomOrCohort = Boolean(cleanTurma) || virtualClassIdsOrNames.length > 0;
-  const isExplicitGeneral = rawClasses.some(c => ['geral', 'todas', 'toda a escola', 'todos'].includes(c.toLowerCase()));
+  const isExplicitGeneral = uniqueClasses.some(c => ['geral', 'todas', 'toda a escola', 'todos'].includes(c.toLowerCase()));
   if (isExplicitGeneral && hasAnyRoomOrCohort) {
     return true;
   }
