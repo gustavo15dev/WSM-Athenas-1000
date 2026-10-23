@@ -3,7 +3,7 @@ import {
   Send, Sparkles, Bot, User, Trash2, HelpCircle, Loader2, 
   History, Plus, MessageSquare, Mic, ArrowUp, X, MicOff, 
   Paperclip, PanelLeftClose, PanelLeft, Search, Pin, Copy, Check, Headphones,
-  Globe, Brain, ChevronRight, ChevronDown, BookOpen, GraduationCap
+  Globe, Brain, ChevronRight, ChevronDown, BookOpen, GraduationCap, Clock
 } from 'lucide-react';
 import { supabase } from '../supabase';
 import AthenasMarkdownRenderer from './AthenasMarkdownRenderer';

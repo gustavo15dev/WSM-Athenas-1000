@@ -1563,8 +1563,7 @@ export default function StudentDashboard({
       // Exclude questions/gabarito from dashboard preview to prevent data leakage
       const { data: dbMockExams } = await supabase
         .from('wsm_mock_exams')
-        .select('id, title, subject, class_name, deadline, description, teacher_name, teacher_email, total_points, duration_minutes, created_at, status, is_draft')
-        .neq('status', 'draft')
+        .select('id, title, subject, class_name, deadline, description, teacher_name, teacher_email, created_at')
         .order('created_at', { ascending: false });
       
       let filteredMockExams: any[] = [];

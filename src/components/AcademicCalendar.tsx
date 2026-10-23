@@ -197,11 +197,9 @@ export default function AcademicCalendar({
       try {
         let query = supabase
           .from('wsm_mock_exams')
-          .select('id, title, subject, class_name, deadline, due_date, exam_date, teacher_name, teacher_email, description, status, is_draft');
+          .select('id, title, subject, class_name, deadline, teacher_name, teacher_email, description, created_at');
         if (userRole === 'teacher' && cleanEmail) {
           query = query.eq('teacher_email', cleanEmail);
-        } else if (userRole === 'student') {
-          query = query.neq('status', 'draft');
         }
         const { data, error } = await query;
         if (!error && data && isMounted) {

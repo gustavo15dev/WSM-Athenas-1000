@@ -32,32 +32,7 @@ export async function getStudentTeachers(studentEmail: string, userTurma?: strin
   const cleanEmail = (studentEmail || '').toLowerCase().trim();
   if (!cleanEmail) return [];
 
-  // 1. Tentar Edge Function Supabase caso tenha sido feito o deploy
-  try {
-    const { data, error } = await supabase.functions.invoke('get-student-teachers', {
-      body: { email: cleanEmail }
-    });
-    if (!error && Array.isArray(data)) {
-      return data;
-    }
-  } catch {
-    // Edge function fallback
-  }
-
-  // 2. Tentar endpoint da API interna do servidor
-  try {
-    const res = await fetch(`/api/get-student-teachers?email=${encodeURIComponent(cleanEmail)}`);
-    if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        return data;
-      }
-    }
-  } catch {
-    // API endpoint fallback
-  }
-
-  // 3. Fallback no cliente via Supabase:
+  // Consulta direta no cliente via Supabase:
   // Primeiro, busca as salas virtuais em que o aluno está matriculado
   try {
     const { data: vClasses } = await supabase
