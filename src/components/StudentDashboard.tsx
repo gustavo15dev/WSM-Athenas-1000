@@ -3042,8 +3042,8 @@ export default function StudentDashboard({
                 ? 'WSM Athenas AI Chatbot'
                 : activeTab === 'simulados'
                 ? 'Simulados & Avaliações'
-                : activeTab === 'desempenho'
-                ? 'Métricas de Desempenho'
+                : (activeTab as string) === 'progresso'
+                ? 'Meu Progresso & Métricas'
                 : 'Painel do Estudante'
             }...`}
             subtitle="Sincronizando registros do sistema e dados em tempo real..."

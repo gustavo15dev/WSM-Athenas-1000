@@ -496,3 +496,25 @@ mjx-assistive-mml mjx-container {
     display: none !important;
   }
 }
+
+/* ========================================================
+   VLIBRAS: ACESSIBILIDADE EM LIBRAS (Z-INDEX & DISPLAY FIXES)
+   ======================================================== */
+[vw] {
+  position: relative;
+  z-index: 99999999 !important;
+}
+
+[vw-access-button] {
+  z-index: 99999999 !important;
+  cursor: pointer !important;
+  transition: transform 0.2s ease, filter 0.2s ease;
+}
+
+[vw-access-button]:hover {
+  filter: drop-shadow(0 0 10px rgba(30, 185, 150, 0.5));
+}
+
+[vw-plugin-wrapper] {
+  z-index: 99999999 !important;
+}

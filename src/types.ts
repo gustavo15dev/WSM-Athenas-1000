@@ -87,6 +87,9 @@ export interface MockSubmission {
   total_questions: number;
   correct_count: number;
   submitted_at: string;
+  created_at?: string;
+  time_spent?: number;
+  mock_exam_title?: string;
   manual_grades?: Record<string, {
     status: 'correct' | 'half' | 'wrong';
     pointsAwarded: number;

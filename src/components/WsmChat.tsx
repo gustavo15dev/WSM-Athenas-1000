@@ -20,7 +20,7 @@ import {
 } from './InteractiveQuizModal';
 import { matchesStudentTarget, matchesStudentExam } from '../utils/targetMatcher';
 import { areTurmasMatching } from '../utils/profileDb';
-import { parseExamSettings } from '../utils/examSettings';
+import { parseExamSettings, formatExamDateDisplay } from '../utils/examSettings';
 
 declare global {
   interface Window {
@@ -551,11 +551,12 @@ export default function WsmChat({
   // Load student virtual class identifiers for accurate target matching
   useEffect(() => {
     if (userRole === 'student' && userEmail) {
-      const cleanEmail = userEmail.toLowerCase().trim();
-      supabase
-        .from('wsm_virtual_classes')
-        .select('*')
-        .then(({ data: vClasses }) => {
+      const fetchClasses = async () => {
+        try {
+          const cleanEmail = userEmail.toLowerCase().trim();
+          const { data: vClasses } = await supabase
+            .from('wsm_virtual_classes')
+            .select('*');
           if (vClasses) {
             const ids: string[] = [];
             vClasses.forEach((vc: any) => {
@@ -580,8 +581,11 @@ export default function WsmChat({
             if (userTurma) ids.push(userTurma);
             setStudentVirtualClassIds(Array.from(new Set(ids)));
           }
-        })
-        .catch(err => console.warn('Virtual classes check error in WsmChat:', err));
+        } catch (err) {
+          console.warn('Virtual classes check error in WsmChat:', err);
+        }
+      };
+      fetchClasses();
     }
   }, [userEmail, userRole, userTurma]);
 

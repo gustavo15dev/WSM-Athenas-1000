@@ -38,6 +38,37 @@
   </head>
   <body>
     <div id="root"></div>
+
+    <!-- VLibras: Acessibilidade em Libras para todo o site -->
+    <div vw class="enabled">
+      <div vw-access-button class="active"></div>
+      <div vw-plugin-wrapper>
+        <div class="vw-plugin-top-wrapper"></div>
+      </div>
+    </div>
+    <script src="https://vlibras.gov.br/app/vlibras-plugin.js"></script>
+    <script>
+      (function() {
+        var attempts = 0;
+        function initVLibras() {
+          if (window.VLibras && typeof window.VLibras.Widget === 'function') {
+            try {
+              new window.VLibras.Widget('https://vlibras.gov.br/app');
+            } catch (err) {
+              console.warn('VLibras init error:', err);
+            }
+          } else if (attempts < 50) {
+            attempts++;
+            setTimeout(initVLibras, 200);
+          }
+        }
+        if (document.readyState === 'complete' || document.readyState === 'interactive') {
+          initVLibras();
+        } else {
+          window.addEventListener('load', initVLibras);
+        }
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
