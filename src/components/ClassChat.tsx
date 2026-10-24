@@ -37,6 +37,8 @@ import {
 import { supabase } from '../supabase';
 import { sendBrowserNotification } from '../utils/browserNotifications';
 import { getStudentTeachers } from '../utils/studentTeachers';
+import { censorProfanity } from '../utils/profanityFilter';
+import { checkChatConsentDismissedInDb, setChatConsentDismissedInDb } from '../utils/profileDb';
 
 export interface ChatContact {
   email: string;
@@ -94,6 +96,7 @@ interface ClassChatProps {
   currentUserRole: 'student' | 'teacher';
   userTurma?: string; // For student, e.g. "9A"
   userAnosLecionados?: string[]; // For teacher, e.g. ["Biologia 9A", "Biologia 9B"]
+  onBackToHome?: () => void;
 }
 
 function parseAnosLecionados(val: any): string[] {
@@ -171,9 +174,46 @@ export default function ClassChat({
   currentUserName,
   currentUserRole,
   userTurma = '',
-  userAnosLecionados = []
+  userAnosLecionados = [],
+  onBackToHome
 }: ClassChatProps) {
   const myEmailLower = currentUserEmail.toLowerCase().trim();
+
+  // Student Consent Modal states (Termo de Convivência e Monitoramento)
+  const [showConsentModal, setShowConsentModal] = useState<boolean>(false);
+  const [checkingConsent, setCheckingConsent] = useState<boolean>(currentUserRole === 'student');
+  const [dontShowAgain, setDontShowAgain] = useState<boolean>(false);
+
+  // Profanity warning alert state
+  const [showProfanityAlert, setShowProfanityAlert] = useState<boolean>(false);
+  const profanityTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Check consent in Supabase & LocalStorage for students
+  useEffect(() => {
+    if (currentUserRole !== 'student') {
+      setCheckingConsent(false);
+      return;
+    }
+
+    let isMounted = true;
+    async function verifyConsent() {
+      try {
+        const isDismissed = await checkChatConsentDismissedInDb(myEmailLower);
+        if (isMounted) {
+          setShowConsentModal(!isDismissed);
+          setCheckingConsent(false);
+        }
+      } catch {
+        if (isMounted) {
+          setShowConsentModal(true);
+          setCheckingConsent(false);
+        }
+      }
+    }
+
+    verifyConsent();
+    return () => { isMounted = false; };
+  }, [currentUserRole, myEmailLower]);
 
   // Dynamically resolved classes for display and matching
   const [resolvedTaughtClasses, setResolvedTaughtClasses] = useState<string[]>(() => parseAnosLecionados(userAnosLecionados));
@@ -320,9 +360,16 @@ export default function ClassChat({
     if (!editingContent.trim()) return;
 
     const trimmed = editingContent.trim();
+    const { censoredText, hasProfanity } = censorProfanity(trimmed);
+    if (hasProfanity) {
+      setShowProfanityAlert(true);
+      if (profanityTimerRef.current) clearTimeout(profanityTimerRef.current);
+      profanityTimerRef.current = setTimeout(() => setShowProfanityAlert(false), 4500);
+    }
+
     setMessages(prev => prev.map(m => {
       if (m.id === msgId) {
-        return { ...m, content: trimmed, is_edited: true };
+        return { ...m, content: censoredText, is_edited: true };
       }
       return m;
     }));
@@ -331,7 +378,7 @@ export default function ClassChat({
     setEditingContent('');
 
     try {
-      const payload = { content: trimmed, is_edited: true };
+      const payload = { content: censoredText, is_edited: true };
       const res1 = await supabase.from('direct_messages').update(payload).eq('id', msgId);
       if (res1.error) {
         await supabase.from('wsm_direct_messages').update(payload).eq('id', msgId);
@@ -1182,6 +1229,14 @@ export default function ClassChat({
     const textContent = messageInput.trim();
     const contactEmailLower = activeContact.email.toLowerCase().trim();
 
+    // Check & Censor Profanity
+    const { censoredText, hasProfanity } = censorProfanity(textContent);
+    if (hasProfanity) {
+      setShowProfanityAlert(true);
+      if (profanityTimerRef.current) clearTimeout(profanityTimerRef.current);
+      profanityTimerRef.current = setTimeout(() => setShowProfanityAlert(false), 4500);
+    }
+
     const newMsg: ChatMessage = {
       id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       sender_email: myEmailLower,
@@ -1189,7 +1244,7 @@ export default function ClassChat({
       sender_role: currentUserRole,
       receiver_email: contactEmailLower,
       receiver_name: activeContact.name,
-      content: textContent,
+      content: censoredText,
       attachment_url: selectedFile?.previewUrl || undefined,
       attachment_name: selectedFile?.file.name || undefined,
       attachment_type: selectedFile?.type || undefined,
@@ -1552,9 +1607,158 @@ export default function ClassChat({
     );
   }
 
+  if (currentUserRole === 'student' && checkingConsent) {
+    return (
+      <div className="h-[calc(100vh-140px)] min-h-[550px] bg-neutral-950 rounded-3xl border border-neutral-900 flex items-center justify-center p-8">
+        <div className="text-center space-y-3">
+          <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-xs text-neutral-400 font-mono">Verificando autorização de acesso ao chat...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="h-[calc(100vh-140px)] min-h-[550px] bg-neutral-950 rounded-3xl border border-neutral-900 overflow-hidden flex flex-col md:flex-row shadow-2xl relative">
       
+      {/* Floating Profanity Warning Tag Banner */}
+      <AnimatePresence>
+        {showProfanityAlert && (
+          <motion.div
+            initial={{ opacity: 0, y: -25, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -25, scale: 0.95 }}
+            className="absolute top-4 left-1/2 -translate-x-1/2 z-[250] max-w-md w-[92%] sm:w-auto px-4 py-3 rounded-2xl bg-neutral-950/95 border border-rose-500/60 shadow-2xl shadow-rose-950/80 backdrop-blur-2xl flex items-center justify-between gap-3 text-rose-200"
+          >
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 bg-rose-500/20 text-rose-400 rounded-xl border border-rose-500/30 shrink-0 animate-pulse">
+                <ShieldAlert className="w-5 h-5" />
+              </div>
+              <div>
+                <span className="text-[10px] font-mono font-black uppercase tracking-wider text-rose-400 block">
+                  Aviso de Conduta no Chat
+                </span>
+                <p className="text-xs font-bold text-white mt-0.5">
+                  Evite usar palavras feias! Aqui não é lugar disso!
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowProfanityAlert(false)}
+              className="p-1.5 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800 transition-colors cursor-pointer shrink-0"
+              title="Fechar aviso"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Student Consent Modal Overlay (Termo de Convivência e Monitoramento) */}
+      <AnimatePresence>
+        {showConsentModal && !checkingConsent && currentUserRole === 'student' && (
+          <div className="fixed inset-0 z-[300] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className="max-w-lg w-full bg-neutral-900 border border-emerald-500/30 rounded-3xl p-6 sm:p-7 shadow-2xl relative overflow-hidden space-y-5 text-neutral-200"
+            >
+              <div className="absolute top-0 right-0 w-60 h-60 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+
+              {/* Modal Header */}
+              <div className="flex items-start gap-4">
+                <div className="p-3 bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 rounded-2xl shrink-0">
+                  <ShieldCheck className="w-6 h-6" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-emerald-400 block">
+                    AMBIENTE EDUCACIONAL MONITORADO
+                  </span>
+                  <h2 className="text-lg sm:text-xl font-black text-white font-display mt-0.5">
+                    Termo de Uso e Convivência no Chat Escolar
+                  </h2>
+                </div>
+              </div>
+
+              {/* Term Body (Opção 1) */}
+              <div className="space-y-3.5 text-xs text-neutral-300 leading-relaxed bg-neutral-950/80 p-4 sm:p-5 rounded-2xl border border-neutral-800">
+                <p>
+                  Bem-vindo(a) ao ambiente de conversas da sua turma! Este é um espaço exclusivamente pedagógico destinado à troca de dúvidas, trabalhos e estudos em grupo.
+                </p>
+
+                <p className="font-semibold text-neutral-200">
+                  Para garantir a segurança de todos e manter um ambiente respeitoso e acolhedor:
+                </p>
+
+                <div className="space-y-2 pl-1">
+                  <div className="flex items-start gap-2">
+                    <span className="text-emerald-400 font-bold">•</span>
+                    <div>
+                      <strong className="text-white">Supervisão Contínua:</strong> Todas as mensagens, anexos e conversas enviadas neste chat são registradas e podem ser visualizadas e acompanhadas em tempo real pelos professores, equipe pedagógica e responsáveis legais.
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-2">
+                    <span className="text-emerald-400 font-bold">•</span>
+                    <div>
+                      <strong className="text-white">Conduta Responsável:</strong> É proibido o uso de palavras ofensivas, discriminação, práticas de bullying ou compartilhamento de materiais inapropriados.
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-[11px] text-neutral-400 pt-1 border-t border-neutral-850">
+                  Ao continuar, você declara estar ciente do monitoramento pedagógico e concorda com as diretrizes de respeito da nossa comunidade escolar.
+                </p>
+              </div>
+
+              {/* Checkbox "Não mostrar isso novamente" */}
+              <label className="flex items-center gap-3 cursor-pointer group select-none">
+                <input
+                  type="checkbox"
+                  checked={dontShowAgain}
+                  onChange={(e) => setDontShowAgain(e.target.checked)}
+                  className="w-4 h-4 rounded text-emerald-500 bg-neutral-800 border-neutral-700 focus:ring-emerald-500/40 focus:ring-offset-0 cursor-pointer"
+                />
+                <span className="text-xs text-neutral-300 group-hover:text-white font-medium">
+                  Não mostrar este aviso novamente
+                </span>
+              </label>
+
+              {/* Action Buttons: Voltar & Aceitar */}
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (onBackToHome) {
+                      onBackToHome();
+                    }
+                  }}
+                  className="px-4 py-2.5 rounded-xl text-xs font-bold bg-neutral-800 hover:bg-neutral-750 text-neutral-300 hover:text-white border border-neutral-700 transition-all cursor-pointer"
+                >
+                  Voltar
+                </button>
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (dontShowAgain) {
+                      await setChatConsentDismissedInDb(myEmailLower);
+                    }
+                    setShowConsentModal(false);
+                  }}
+                  className="px-5 py-2.5 rounded-xl text-xs font-black bg-emerald-500 hover:bg-emerald-400 text-neutral-950 transition-all shadow-lg shadow-emerald-500/20 active:scale-95 cursor-pointer flex items-center gap-2"
+                >
+                  <Check className="w-4 h-4 stroke-[3]" />
+                  <span>Aceitar e Entrar</span>
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* 1. Sidebar Contacts List */}
       <div 
         className={`${
@@ -1749,7 +1953,7 @@ export default function ClassChat({
                       <p className={`text-[11px] truncate mt-1 ${
                         hasUnread ? 'text-emerald-300 font-bold' : 'text-neutral-400'
                       }`}>
-                        {contact.lastMessage}
+                        {censorProfanity(contact.lastMessage).censoredText}
                       </p>
                     )}
                   </div>
@@ -2042,7 +2246,7 @@ export default function ClassChat({
                         ) : (
                           msg.content && (
                             <p className="text-xs leading-relaxed whitespace-pre-wrap break-words pr-5">
-                              {msg.content}
+                              {censorProfanity(msg.content).censoredText}
                             </p>
                           )
                         )}

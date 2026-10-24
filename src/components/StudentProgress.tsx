@@ -25,7 +25,9 @@ import {
   Zap,
   HelpCircle,
   Flame,
-  MousePointerClick
+  MousePointerClick,
+  Sun,
+  Check
 } from 'lucide-react';
 import { 
   ResponsiveContainer, 
@@ -45,6 +47,8 @@ interface StudentProgressProps {
   userTurma?: string;
   submissions?: MockSubmission[];
   mockExams?: MockExam[];
+  openTimeSeconds?: number;
+  activeTimeSeconds?: number;
 }
 
 // Semicircular Arc Gauge Component (Verde Água)
@@ -131,33 +135,40 @@ export default function StudentProgress({
   userName,
   userTurma = '',
   submissions = [],
-  mockExams = []
+  mockExams = [],
+  openTimeSeconds,
+  activeTimeSeconds
 }: StudentProgressProps) {
   const cleanEmail = (userEmail || '').toLowerCase().trim();
 
-  // 1. Local Active Time Tracker
-  const [localActiveSeconds, setLocalActiveSeconds] = useState<number>(() => {
-    try {
-      const saved = localStorage.getItem(`wsm_student_active_secs_${cleanEmail}`);
-      return saved ? parseInt(saved, 10) : 600; // 10 min default session
-    } catch {
-      return 600;
+  // 1. Real Tracked Platform Time (Tempo Aberto e Tempo Ativo)
+  const currentOpenSeconds = Math.max(
+    openTimeSeconds ?? 0,
+    parseInt(localStorage.getItem(`wsm_time_open_${cleanEmail}`) || '0', 10)
+  );
+
+  const currentActiveSeconds = Math.max(
+    activeTimeSeconds ?? 0,
+    parseInt(localStorage.getItem(`wsm_time_active_${cleanEmail}`) || '0', 10)
+  );
+
+  const formatDurationReal = (totalSec: number) => {
+    if (totalSec <= 0) return '0 min';
+    const hrs = Math.floor(totalSec / 3600);
+    const mins = Math.floor((totalSec % 3600) / 60);
+    const secs = totalSec % 60;
+    if (hrs > 0) {
+      return `${hrs}h ${mins}min`;
     }
-  });
+    if (mins > 0) {
+      return `${mins}min ${secs}s`;
+    }
+    return `${secs}s`;
+  };
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setLocalActiveSeconds(prev => {
-        const next = prev + 5;
-        try {
-          localStorage.setItem(`wsm_student_active_secs_${cleanEmail}`, String(next));
-        } catch {}
-        return next;
-      });
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, [cleanEmail]);
+  const engagementRatio = currentOpenSeconds > 0
+    ? Math.min(100, Math.round((currentActiveSeconds / currentOpenSeconds) * 100))
+    : 0;
 
   // 2. Notebooks & Athenas AI Chat Stats
   const [notebookStats, setNotebookStats] = useState({
@@ -200,6 +211,17 @@ export default function StudentProgress({
           if (nb.last_stamp || nb.status === 'reviewed') stamped += 1;
           if (nb.status === 'pending_review') pending += 1;
         });
+
+        // Also query official teacher reviews / stamps table if present
+        try {
+          const { data: dbReviews } = await supabase
+            .from('notebook_reviews')
+            .select('id, stamp_type')
+            .eq('student_email', cleanEmail);
+          if (dbReviews && dbReviews.length > 0) {
+            stamped = Math.max(stamped, dbReviews.length);
+          }
+        } catch {}
 
         setNotebookStats({
           count: nList.length,
@@ -334,16 +356,174 @@ export default function StudentProgress({
     })).sort((a, b) => b.count - a.count);
   }, [completedSubmissions, mockExams]);
 
-  // Time format helper
-  const totalActiveSecondsCombined = localActiveSeconds + questionMetrics.totalTimeSec;
-  const formatSecondsToHoursMins = (totalSec: number) => {
-    if (totalSec <= 0) return '0m';
-    const hrs = Math.floor(totalSec / 3600);
-    const mins = Math.floor((totalSec % 3600) / 60);
-    if (hrs > 0) return `${hrs}h ${mins}m`;
-    return `${mins}m`;
-  };
-  const totalActiveHoursText = formatSecondsToHoursMins(totalActiveSecondsCombined);
+  // Time format helper (Strictly real seconds)
+  const totalActiveSecondsCombined = currentActiveSeconds > 0 ? currentActiveSeconds : questionMetrics.totalTimeSec;
+  const totalActiveHoursText = formatDurationReal(totalActiveSecondsCombined);
+
+  // REAL Exam Extremes & Average Duration (Melhor Nota, Menor Nota, Tempo Médio por Prova)
+  const examStatsDetailed = useMemo(() => {
+    if (completedSubmissions.length === 0) {
+      return {
+        highestScore: null as number | null,
+        highestTitle: '',
+        lowestScore: null as number | null,
+        lowestTitle: '',
+        avgDurationMinutes: 0
+      };
+    }
+
+    let highest = -1;
+    let highestTitle = '';
+    let lowest = 999;
+    let lowestTitle = '';
+    let totalSec = 0;
+    let countedTime = 0;
+
+    completedSubmissions.forEach((sub, idx) => {
+      const matchExam = mockExams.find(m => m.id === sub.mock_exam_id);
+      const title = sub.mock_exam_title || matchExam?.title || `Simulado ${idx + 1}`;
+      const score = Number(sub.score) || 0;
+
+      if (score > highest) {
+        highest = score;
+        highestTitle = title;
+      }
+      if (score < lowest) {
+        lowest = score;
+        lowestTitle = title;
+      }
+
+      const durSec = Number(sub.telemetry?.totalTimeSeconds) || Number(sub.time_spent) || 0;
+      if (durSec > 0) {
+        totalSec += durSec;
+        countedTime++;
+      }
+    });
+
+    const avgMin = countedTime > 0 ? Math.max(1, Math.round((totalSec / countedTime) / 60)) : 0;
+
+    return {
+      highestScore: highest >= 0 ? Math.round(highest * 10) / 10 : null,
+      highestTitle,
+      lowestScore: lowest <= 10 && lowest >= 0 ? Math.round(lowest * 10) / 10 : null,
+      lowestTitle,
+      avgDurationMinutes: avgMin
+    };
+  }, [completedSubmissions, mockExams]);
+
+  // REAL Preferred Study Shift (Turno de Maior Atividade)
+  const preferredStudyShift = useMemo(() => {
+    let morningCount = 0;   // 06:00 - 11:59
+    let afternoonCount = 0; // 12:00 - 17:59
+    let nightCount = 0;     // 18:00 - 23:59
+    let dawnCount = 0;      // 00:00 - 05:59
+
+    completedSubmissions.forEach(sub => {
+      if (sub.submitted_at) {
+        const h = new Date(sub.submitted_at).getHours();
+        if (h >= 6 && h < 12) morningCount++;
+        else if (h >= 12 && h < 18) afternoonCount++;
+        else if (h >= 18 && h < 24) nightCount++;
+        else dawnCount++;
+      }
+    });
+
+    const totalEvents = morningCount + afternoonCount + nightCount + dawnCount;
+    if (totalEvents === 0) {
+      return {
+        shift: 'Ainda não identificado',
+        period: 'Sem dados suficientes',
+        count: 0,
+        total: 0,
+        percentage: 0,
+        description: 'Conclua seu primeiro simulado ou atividade para mapear seu turno.'
+      };
+    }
+
+    const max = Math.max(morningCount, afternoonCount, nightCount, dawnCount);
+    if (max === morningCount) {
+      return {
+        shift: 'Manhã',
+        period: '06h às 12h',
+        count: morningCount,
+        total: totalEvents,
+        percentage: Math.round((morningCount / totalEvents) * 100),
+        description: `${Math.round((morningCount / totalEvents) * 100)}% das suas atividades concluídas foram realizadas no turno matutino.`
+      };
+    }
+    if (max === afternoonCount) {
+      return {
+        shift: 'Tarde',
+        period: '12h às 18h',
+        count: afternoonCount,
+        total: totalEvents,
+        percentage: Math.round((afternoonCount / totalEvents) * 100),
+        description: `${Math.round((afternoonCount / totalEvents) * 100)}% das suas atividades concluídas foram realizadas no turno vespertino.`
+      };
+    }
+    if (max === nightCount) {
+      return {
+        shift: 'Noite',
+        period: '18h às 23h59',
+        count: nightCount,
+        total: totalEvents,
+        percentage: Math.round((nightCount / totalEvents) * 100),
+        description: `${Math.round((nightCount / totalEvents) * 100)}% das suas atividades concluídas foram realizadas no turno noturno.`
+      };
+    }
+    return {
+      shift: 'Madrugada',
+      period: '00h às 06h',
+      count: dawnCount,
+      total: totalEvents,
+      percentage: Math.round((dawnCount / totalEvents) * 100),
+      description: `${Math.round((dawnCount / totalEvents) * 100)}% das suas atividades concluídas foram realizadas na madrugada.`
+    };
+  }, [completedSubmissions]);
+
+  // REAL Active Study Days (Dias Ativos de Estudo na Semana e Histórico)
+  const activeStudyDaysMetrics = useMemo(() => {
+    const distinctDates = new Set<string>();
+    const now = new Date();
+    const currentWeekDaysSet = new Set<number>(); // 0: Dom, 1: Seg, ..., 6: Sáb
+
+    // Start of current week (Sunday 00:00:00)
+    const sundayOfThisWeek = new Date(now);
+    sundayOfThisWeek.setDate(now.getDate() - now.getDay());
+    sundayOfThisWeek.setHours(0, 0, 0, 0);
+
+    completedSubmissions.forEach(sub => {
+      if (sub.submitted_at) {
+        const d = new Date(sub.submitted_at);
+        distinctDates.add(d.toLocaleDateString('pt-BR'));
+        if (d >= sundayOfThisWeek && d <= now) {
+          currentWeekDaysSet.add(d.getDay());
+        }
+      }
+    });
+
+    // If active in current session today (> 20 seconds)
+    if (currentActiveSeconds >= 20) {
+      currentWeekDaysSet.add(now.getDay());
+      distinctDates.add(now.toLocaleDateString('pt-BR'));
+    }
+
+    const weekDaysList = [
+      { day: 0, label: 'Dom', fullName: 'Domingo', active: currentWeekDaysSet.has(0) },
+      { day: 1, label: 'Seg', fullName: 'Segunda', active: currentWeekDaysSet.has(1) },
+      { day: 2, label: 'Ter', fullName: 'Terça', active: currentWeekDaysSet.has(2) },
+      { day: 3, label: 'Qua', fullName: 'Quarta', active: currentWeekDaysSet.has(3) },
+      { day: 4, label: 'Qui', fullName: 'Quinta', active: currentWeekDaysSet.has(4) },
+      { day: 5, label: 'Sex', fullName: 'Sexta', active: currentWeekDaysSet.has(5) },
+      { day: 6, label: 'Sáb', fullName: 'Sábado', active: currentWeekDaysSet.has(6) }
+    ];
+
+    return {
+      currentWeekCount: currentWeekDaysSet.size,
+      totalDistinctDays: distinctDates.size,
+      weekDaysList
+    };
+  }, [completedSubmissions, currentActiveSeconds]);
 
   // 8. GRAPH 1: Real Chronological Exam Score Evolution (Line Chart Data)
   // ONLY includes exact completed submissions (e.g. 3 submissions = 3 points)
@@ -369,7 +549,7 @@ export default function StudentProgress({
   // 9. GRAPH 2: Real Weekly Study Activity
   // ONLY includes real calendar weeks where activity occurred
   const studyTimeWeeklyData = useMemo(() => {
-    if (completedSubmissions.length === 0 && localActiveSeconds < 60) return [];
+    if (completedSubmissions.length === 0 && currentActiveSeconds < 60) return [];
 
     const weekMap: Record<string, number> = {};
 
@@ -379,23 +559,25 @@ export default function StudentProgress({
         const startOfWeek = new Date(date);
         startOfWeek.setDate(date.getDate() - date.getDay());
         const label = `Sem. ${startOfWeek.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`;
-        const sec = Number(sub.telemetry?.totalTimeSeconds || sub.time_spent || 300);
+        const sec = Number(sub.telemetry?.totalTimeSeconds || sub.time_spent || 0);
         weekMap[label] = (weekMap[label] || 0) + sec;
       }
     });
 
-    // Current session week
-    const now = new Date();
-    const currentWeekStart = new Date(now);
-    currentWeekStart.setDate(now.getDate() - now.getDay());
-    const currentWeekLabel = `Sem. ${currentWeekStart.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`;
-    weekMap[currentWeekLabel] = (weekMap[currentWeekLabel] || 0) + localActiveSeconds;
+    // Current session week (active real seconds)
+    if (currentActiveSeconds > 0) {
+      const now = new Date();
+      const currentWeekStart = new Date(now);
+      currentWeekStart.setDate(now.getDate() - now.getDay());
+      const currentWeekLabel = `Sem. ${currentWeekStart.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`;
+      weekMap[currentWeekLabel] = (weekMap[currentWeekLabel] || 0) + currentActiveSeconds;
+    }
 
     return Object.entries(weekMap).map(([name, sec]) => ({
       name,
       horas: Math.round((sec / 3600) * 10) / 10
     }));
-  }, [completedSubmissions, localActiveSeconds]);
+  }, [completedSubmissions, currentActiveSeconds]);
 
   // 10. GRAPH 3: Real Hourly Activity Distribution
   // ONLY includes exact hours where submissions occurred
@@ -408,7 +590,7 @@ export default function StudentProgress({
       if (sub.submitted_at) {
         const h = new Date(sub.submitted_at).getHours();
         const hourLabel = `${String(h).padStart(2, '0')}h`;
-        const timeSec = Number(sub.telemetry?.totalTimeSeconds || 300);
+        const timeSec = Number(sub.telemetry?.totalTimeSeconds || sub.time_spent || 0);
         const min = Math.max(1, Math.round(timeSec / 60));
         hourCounts[hourLabel] = (hourCounts[hourLabel] || 0) + min;
       }
@@ -433,9 +615,6 @@ export default function StudentProgress({
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl sm:text-3xl font-black text-white font-display tracking-tight">Meu Progresso</h1>
-            <span className="px-2.5 py-0.5 text-[10px] font-mono font-bold uppercase rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400">
-              Dados 100% Reais
-            </span>
           </div>
           <p className="text-xs sm:text-sm text-neutral-400 mt-1">
             Métricas exatas de desempenho, telemetria de simulados e engajamento coletados da sua conta.
@@ -488,14 +667,14 @@ export default function StudentProgress({
         <div className="p-5 rounded-2xl bg-neutral-900/80 border border-neutral-800 flex flex-col justify-between space-y-3 hover:border-neutral-700 transition-all shadow-md">
           <div className="flex items-center gap-2 text-neutral-400">
             <Activity className="w-4 h-4 text-teal-400" />
-            <span className="text-xs font-medium">Tempo em Estudos</span>
+            <span className="text-xs font-medium">Tempo Ativo (Mexendo)</span>
           </div>
           <div>
             <span className="text-2xl sm:text-3xl font-black text-white font-display tracking-tight block">
-              {totalActiveHoursText}
+              {formatDurationReal(currentActiveSeconds)}
             </span>
             <span className="text-[11px] text-teal-400 font-mono font-semibold mt-0.5 block">
-              {questionMetrics.avgSecPerQuestion > 0 ? `~${questionMetrics.avgSecPerQuestion}s por questão` : 'Interação ativa na conta'}
+              {engagementRatio}% do tempo total aberto
             </span>
           </div>
         </div>
@@ -514,6 +693,109 @@ export default function StudentProgress({
               Provas enviadas oficialmente
             </span>
           </div>
+        </div>
+      </div>
+
+      {/* SECTION: TEMPO DE USO DA PLATAFORMA (DADOS REAIS: TEMPO ABERTO VS TEMPO ATIVO) */}
+      <div className="p-6 sm:p-8 rounded-3xl bg-neutral-900/80 border border-neutral-800 space-y-6 shadow-xl relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-80 h-80 bg-teal-500/5 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-800 pb-4 relative z-10">
+          <div>
+            <h3 className="text-lg font-black text-white font-display flex items-center gap-2.5">
+              <Clock className="w-5 h-5 text-teal-400" />
+              <span>Tempo de Permanência & Atividade Real</span>
+            </h3>
+            <p className="text-xs text-neutral-400 mt-1">
+              Contabilização em tempo real do tempo em que a plataforma esteve aberta versus quando você esteve ativamente mexendo e estudando.
+            </p>
+          </div>
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            <span className="text-xs font-mono font-bold text-teal-300 bg-teal-950/60 border border-teal-500/30 px-3 py-1 rounded-full flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse" />
+              Taxa de Atividade: {engagementRatio}%
+            </span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 relative z-10">
+          {/* Card A: Tempo Total Aberto */}
+          <div className="p-5 rounded-2xl bg-neutral-950/70 border border-neutral-800 flex flex-col justify-between space-y-4 hover:border-neutral-700 transition-all">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-neutral-400">
+                <Monitor className="w-4 h-4 text-neutral-400" />
+                <span className="text-xs font-semibold text-neutral-300">Tempo Total Aberto</span>
+              </div>
+              <span className="text-[10px] font-mono text-neutral-400 bg-neutral-900 px-2 py-0.5 rounded border border-neutral-800">
+                Aba Aberta na Sessão
+              </span>
+            </div>
+
+            <div>
+              <span className="text-3xl sm:text-4xl font-black text-white font-display tracking-tight block">
+                {formatDurationReal(currentOpenSeconds)}
+              </span>
+              <p className="text-xs text-neutral-400 mt-2 leading-relaxed">
+                Tempo total acumulado com o portal aberto e carregado no seu navegador nesta conta.
+              </p>
+            </div>
+
+            <div className="pt-3 border-t border-neutral-850 text-[11px] font-mono text-neutral-500 flex items-center justify-between">
+              <span>Total de segundos computados:</span>
+              <span className="text-neutral-300 font-bold">{currentOpenSeconds.toLocaleString('pt-BR')}s</span>
+            </div>
+          </div>
+
+          {/* Card B: Tempo Total Ativo (Mexendo) */}
+          <div className="p-5 rounded-2xl bg-gradient-to-br from-teal-950/30 via-neutral-950/80 to-neutral-950/90 border border-teal-500/40 flex flex-col justify-between space-y-4 hover:border-teal-500/60 transition-all shadow-lg shadow-teal-950/20">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-teal-400">
+                <MousePointerClick className="w-4 h-4 text-teal-400" />
+                <span className="text-xs font-semibold text-teal-200">Tempo Total Usando (Ativo)</span>
+              </div>
+              <span className="text-[10px] font-mono text-teal-300 bg-teal-500/20 px-2.5 py-0.5 rounded-full border border-teal-500/40 font-bold animate-pulse">
+                Interação Física
+              </span>
+            </div>
+
+            <div>
+              <span className="text-3xl sm:text-4xl font-black text-teal-300 font-display tracking-tight block">
+                {formatDurationReal(currentActiveSeconds)}
+              </span>
+              <p className="text-xs text-neutral-300 mt-2 leading-relaxed">
+                Tempo real com movimentação de mouse, digitação no teclado, toques na tela e resolução de simulados.
+              </p>
+            </div>
+
+            <div className="pt-3 border-t border-teal-900/40 text-[11px] font-mono text-neutral-400 flex items-center justify-between">
+              <span>Total de segundos ativos:</span>
+              <span className="text-teal-300 font-bold">{currentActiveSeconds.toLocaleString('pt-BR')}s</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Barra comparativa de aproveitamento real */}
+        <div className="p-4 rounded-2xl bg-neutral-950/90 border border-neutral-800 space-y-2.5 relative z-10">
+          <div className="flex items-center justify-between text-xs font-mono">
+            <span className="text-neutral-400 flex items-center gap-1.5">
+              <Activity className="w-3.5 h-3.5 text-teal-400" />
+              Proporção de Engajamento Ativo:
+            </span>
+            <span className="text-teal-300 font-bold">
+              {engagementRatio}% ({formatDurationReal(currentActiveSeconds)} de {formatDurationReal(currentOpenSeconds)})
+            </span>
+          </div>
+
+          <div className="w-full bg-neutral-850 h-3 rounded-full overflow-hidden p-0.5 border border-neutral-800">
+            <div
+              className="bg-gradient-to-r from-teal-500 via-teal-400 to-emerald-400 h-full rounded-full transition-all duration-700 shadow-sm shadow-teal-500/50"
+              style={{ width: `${Math.max(currentActiveSeconds > 0 ? 3 : 0, engagementRatio)}%` }}
+            />
+          </div>
+
+          <p className="text-[11px] text-neutral-500 leading-relaxed font-sans">
+            💡 <strong className="text-neutral-400">Diferença Real:</strong> Se você deixar a aba aberta em segundo plano sem mexer, apenas o <span className="text-neutral-300 font-medium">Tempo Aberto</span> é somado. O <span className="text-teal-300 font-medium">Tempo Ativo</span> registra exclusivamente os períodos de interação física direta.
+          </p>
         </div>
       </div>
 
@@ -555,6 +837,82 @@ export default function StudentProgress({
               </p>
             </>
           )}
+        </div>
+
+        {/* SUB-CARDS DOS SIMULADOS: Melhor Nota, Menor Nota e Tempo Médio por Prova */}
+        <div className="pt-5 border-t border-neutral-800/80 grid grid-cols-1 sm:grid-cols-3 gap-3 text-left">
+          {/* 1. Melhor Nota */}
+          <div className="p-4 rounded-2xl bg-neutral-950/70 border border-neutral-800/80 flex flex-col justify-between space-y-2 hover:border-neutral-700 transition-all">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-mono font-bold text-teal-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Award className="w-3.5 h-3.5 text-teal-400" />
+                Melhor Nota
+              </span>
+              <span className="text-[10px] font-mono text-teal-300 bg-teal-500/10 px-2 py-0.5 rounded border border-teal-500/25">
+                Pico
+              </span>
+            </div>
+            <div>
+              <span className="text-2xl font-black text-white font-display">
+                {examStatsDetailed.highestScore !== null
+                  ? `${examStatsDetailed.highestScore.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}`
+                  : '—'}
+                {examStatsDetailed.highestScore !== null && <span className="text-xs text-neutral-500 font-normal"> /10</span>}
+              </span>
+              <p className="text-[11px] text-neutral-400 mt-1 line-clamp-1" title={examStatsDetailed.highestTitle}>
+                {examStatsDetailed.highestTitle ? examStatsDetailed.highestTitle : 'Aguardando entregas'}
+              </p>
+            </div>
+          </div>
+
+          {/* 2. Menor Nota */}
+          <div className="p-4 rounded-2xl bg-neutral-950/70 border border-neutral-800/80 flex flex-col justify-between space-y-2 hover:border-neutral-700 transition-all">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-mono font-bold text-neutral-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Target className="w-3.5 h-3.5 text-neutral-400" />
+                Menor Nota
+              </span>
+              <span className="text-[10px] font-mono text-neutral-500 bg-neutral-900 px-2 py-0.5 rounded border border-neutral-800">
+                Base
+              </span>
+            </div>
+            <div>
+              <span className="text-2xl font-black text-white font-display">
+                {examStatsDetailed.lowestScore !== null
+                  ? `${examStatsDetailed.lowestScore.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}`
+                  : '—'}
+                {examStatsDetailed.lowestScore !== null && <span className="text-xs text-neutral-500 font-normal"> /10</span>}
+              </span>
+              <p className="text-[11px] text-neutral-400 mt-1 line-clamp-1" title={examStatsDetailed.lowestTitle}>
+                {examStatsDetailed.lowestTitle ? examStatsDetailed.lowestTitle : 'Aguardando entregas'}
+              </p>
+            </div>
+          </div>
+
+          {/* 3. Tempo Médio por Prova */}
+          <div className="p-4 rounded-2xl bg-neutral-950/70 border border-neutral-800/80 flex flex-col justify-between space-y-2 hover:border-neutral-700 transition-all">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-mono font-bold text-teal-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5 text-teal-400" />
+                Tempo Médio por Prova
+              </span>
+              <span className="text-[10px] font-mono text-teal-300 bg-teal-500/10 px-2 py-0.5 rounded border border-teal-500/25">
+                Duração Real
+              </span>
+            </div>
+            <div>
+              <span className="text-2xl font-black text-white font-display">
+                {examStatsDetailed.avgDurationMinutes > 0
+                  ? `${examStatsDetailed.avgDurationMinutes} min`
+                  : '—'}
+              </span>
+              <p className="text-[11px] text-neutral-400 mt-1">
+                {examStatsDetailed.avgDurationMinutes > 0
+                  ? 'Média em resolução de simulado'
+                  : 'Aguardando registros de prova'}
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -734,10 +1092,21 @@ export default function StudentProgress({
             <span className="text-[11px] text-teal-400 font-mono block">{notebookStats.pagesCount} página(s) anotada(s)</span>
           </div>
 
-          <div className="p-4 rounded-2xl bg-neutral-950/70 border border-neutral-800 space-y-1">
-            <span className="text-[10px] font-mono font-bold text-neutral-400 uppercase tracking-wider block">Vistos de Professores</span>
+          {/* Carimbos e Vistos Pedagógicos */}
+          <div className="p-4 rounded-2xl bg-gradient-to-br from-teal-950/40 via-neutral-950/70 to-neutral-950/90 border border-teal-500/30 space-y-1.5 shadow-md shadow-teal-950/10">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-mono font-bold text-teal-300 uppercase tracking-wider flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5 text-teal-400" />
+                Vistos Pedagógicos
+              </span>
+              <span className="text-[9px] font-mono font-bold text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-1.5 py-0.5 rounded">
+                Docente
+              </span>
+            </div>
             <span className="text-2xl font-black text-white font-display block">{notebookStats.stampedCount}</span>
-            <span className="text-[11px] text-emerald-400 font-mono block">Carimbos recebidos</span>
+            <span className="text-[11px] text-teal-300 font-mono block">
+              {notebookStats.stampedCount > 0 ? `${notebookStats.stampedCount} carimbo(s) oficial(is)` : 'Aguardando validação'}
+            </span>
           </div>
 
           <div className="p-4 rounded-2xl bg-neutral-950/70 border border-neutral-800 space-y-1">
@@ -750,6 +1119,111 @@ export default function StudentProgress({
             <span className="text-[10px] font-mono font-bold text-neutral-400 uppercase tracking-wider block">Dúvidas na Athenas IA</span>
             <span className="text-2xl font-black text-white font-display block">{chatQueriesCount}</span>
             <span className="text-[11px] text-teal-400 font-mono block">Perguntas ao assistente</span>
+          </div>
+        </div>
+      </div>
+
+      {/* SECTION: ROTINA & ASSIDUIDADE DE ESTUDO (DADOS REAIS: TURNO PREFERIDO & DIAS ATIVOS) */}
+      <div className="p-6 sm:p-8 rounded-3xl bg-neutral-900/80 border border-neutral-800 space-y-6 shadow-xl relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-80 h-80 bg-teal-500/5 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-800 pb-4 relative z-10">
+          <div>
+            <h3 className="text-lg font-black text-white font-display flex items-center gap-2.5">
+              <Calendar className="w-5 h-5 text-teal-400" />
+              <span>Rotina, Assiduidade & Hábitos de Estudo</span>
+            </h3>
+            <p className="text-xs text-neutral-400 mt-0.5">
+              Mapeamento dos dias da semana com presença confirmada e turno preferido de estudo da sua conta
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 relative z-10">
+          {/* Card 1: Turno Preferido de Estudo */}
+          <div className="p-5 rounded-2xl bg-neutral-950/70 border border-neutral-800 flex flex-col justify-between space-y-4 hover:border-neutral-700 transition-all">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-teal-400">
+                {preferredStudyShift.shift === 'Noite' || preferredStudyShift.shift === 'Madrugada' ? (
+                  <Moon className="w-4 h-4 text-teal-400" />
+                ) : (
+                  <Sun className="w-4 h-4 text-teal-400" />
+                )}
+                <span className="text-xs font-semibold text-neutral-200">Turno Preferido de Estudo</span>
+              </div>
+              <span className="text-[10px] font-mono text-teal-300 bg-teal-500/15 px-2.5 py-0.5 rounded-full border border-teal-500/30 font-bold">
+                {preferredStudyShift.period}
+              </span>
+            </div>
+
+            <div>
+              <span className="text-3xl sm:text-4xl font-black text-white font-display tracking-tight block">
+                {preferredStudyShift.shift}
+              </span>
+              <p className="text-xs text-neutral-400 mt-2 leading-relaxed">
+                {preferredStudyShift.description}
+              </p>
+            </div>
+
+            <div className="pt-3 border-t border-neutral-850 text-[11px] font-mono text-neutral-400 flex items-center justify-between">
+              <span>Atividades computadas:</span>
+              <span className="text-teal-300 font-bold">
+                {preferredStudyShift.count > 0 ? `${preferredStudyShift.count} de ${preferredStudyShift.total}` : '0 registradas'}
+              </span>
+            </div>
+          </div>
+
+          {/* Card 2: Dias Ativos de Estudo */}
+          <div className="p-5 rounded-2xl bg-neutral-950/70 border border-neutral-800 flex flex-col justify-between space-y-4 hover:border-neutral-700 transition-all">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-emerald-400">
+                <Activity className="w-4 h-4 text-emerald-400" />
+                <span className="text-xs font-semibold text-neutral-200">Dias Ativos de Estudo</span>
+              </div>
+              <span className="text-[10px] font-mono text-emerald-300 bg-emerald-500/15 px-2.5 py-0.5 rounded-full border border-emerald-500/30 font-bold">
+                Semana Atual
+              </span>
+            </div>
+
+            <div>
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl sm:text-4xl font-black text-emerald-400 font-display tracking-tight">
+                  {activeStudyDaysMetrics.currentWeekCount}
+                </span>
+                <span className="text-sm font-display text-neutral-400 font-semibold">de 7 dias</span>
+              </div>
+              <p className="text-xs text-neutral-400 mt-1 leading-relaxed">
+                Dias com logins ativos, resoluções de questões ou simulados concluídos nesta semana.
+              </p>
+            </div>
+
+            {/* Dias da semana Pills */}
+            <div className="space-y-2 pt-2 border-t border-neutral-850">
+              <div className="grid grid-cols-7 gap-1.5 text-center">
+                {activeStudyDaysMetrics.weekDaysList.map(item => (
+                  <div
+                    key={item.day}
+                    className={`py-1.5 px-1 rounded-xl text-[10px] font-mono transition-all flex flex-col items-center justify-center gap-0.5 ${
+                      item.active
+                        ? 'bg-teal-500/20 border border-teal-500/50 text-teal-200 font-bold shadow-sm shadow-teal-500/20'
+                        : 'bg-neutral-900 border border-neutral-800/80 text-neutral-500'
+                    }`}
+                  >
+                    <span>{item.label}</span>
+                    {item.active ? (
+                      <Check className="w-2.5 h-2.5 text-teal-400 stroke-[3]" />
+                    ) : (
+                      <span className="w-1 h-1 rounded-full bg-neutral-700" />
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <div className="text-[11px] font-mono text-neutral-500 flex items-center justify-between pt-1">
+                <span>Histórico acumulado:</span>
+                <span className="text-neutral-300 font-bold">{activeStudyDaysMetrics.totalDistinctDays} dia(s) com estudos</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>

@@ -341,3 +341,82 @@ export async function getStudentVirtualClasses(studentEmail: string, studentTurm
     return [];
   }
 }
+
+/**
+ * Persiste a confirmação do termo de consentimento do chat no Supabase (auth metadata e perfil) e cache local
+ */
+export async function setChatConsentDismissedInDb(email: string): Promise<boolean> {
+  const cleanEmail = (email || '').toLowerCase().trim();
+  if (!cleanEmail) return false;
+
+  try {
+    localStorage.setItem(`wsm_chat_consent_dismissed_${cleanEmail}`, 'true');
+  } catch {}
+
+  // 1. Atualiza metadados do usuário autenticado no Supabase Auth
+  try {
+    await supabase.auth.updateUser({
+      data: {
+        chat_consent_dismissed: true,
+        chat_consent_accepted_at: new Date().toISOString()
+      }
+    });
+  } catch (err) {
+    console.warn('Notice: Error updating auth metadata for chat consent:', err);
+  }
+
+  // 2. Atualiza na tabela wsm_user_profiles
+  try {
+    await supabase
+      .from('wsm_user_profiles')
+      .update({ chat_consent_dismissed: true })
+      .ilike('email', cleanEmail);
+  } catch (err) {
+    // Coluna pode não existir
+  }
+
+  return true;
+}
+
+/**
+ * Verifica no Supabase (auth metadata e perfil) e cache se o aluno já marcou "Não mostrar novamente"
+ */
+export async function checkChatConsentDismissedInDb(email: string): Promise<boolean> {
+  const cleanEmail = (email || '').toLowerCase().trim();
+  if (!cleanEmail) return false;
+
+  // 1. Cache ultrarrápido no localStorage
+  try {
+    const cached = localStorage.getItem(`wsm_chat_consent_dismissed_${cleanEmail}`);
+    if (cached === 'true') return true;
+  } catch {}
+
+  // 2. Consulta metadados de autenticação do usuário
+  try {
+    const { data: authUserData } = await supabase.auth.getUser();
+    if (authUserData?.user?.user_metadata?.chat_consent_dismissed === true) {
+      try {
+        localStorage.setItem(`wsm_chat_consent_dismissed_${cleanEmail}`, 'true');
+      } catch {}
+      return true;
+    }
+  } catch (err) {}
+
+  // 3. Consulta na tabela wsm_user_profiles
+  try {
+    const { data, error } = await supabase
+      .from('wsm_user_profiles')
+      .select('chat_consent_dismissed')
+      .ilike('email', cleanEmail)
+      .maybeSingle();
+
+    if (!error && data && (data as any).chat_consent_dismissed === true) {
+      try {
+        localStorage.setItem(`wsm_chat_consent_dismissed_${cleanEmail}`, 'true');
+      } catch {}
+      return true;
+    }
+  } catch (err) {}
+
+  return false;
+}

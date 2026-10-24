@@ -747,17 +747,28 @@ export default function StudentDashboard({
             .select("*")
             .eq("student_email", email.toLowerCase())
             .maybeSingle();
-          if (data) {
-            const openS = data.hourly_distribution?.tempo_plataforma_aberta_s || 0;
-            const activeS = data.hourly_distribution?.tempo_ativo_mexendo_s || 0;
-            setOpenTime(openS);
-            setActiveTime(activeS);
-            openTimeRef.current = openS;
-            activeTimeRef.current = activeS;
-          }
+
+          const dbOpen = data?.hourly_distribution?.tempo_plataforma_aberta_s || 0;
+          const dbActive = data?.hourly_distribution?.tempo_ativo_mexendo_s || 0;
+          const localOpen = parseInt(localStorage.getItem(`wsm_time_open_${email.toLowerCase()}`) || '0', 10);
+          const localActive = parseInt(localStorage.getItem(`wsm_time_active_${email.toLowerCase()}`) || '0', 10);
+          const openS = Math.max(dbOpen, localOpen);
+          const activeS = Math.max(dbActive, localActive);
+
+          setOpenTime(openS);
+          setActiveTime(activeS);
+          openTimeRef.current = openS;
+          activeTimeRef.current = activeS;
           hasLoadedInitialTracking.current = true;
         } catch (err) {
           console.error("Error fetching initial tracking:", err);
+          const localOpen = parseInt(localStorage.getItem(`wsm_time_open_${email.toLowerCase()}`) || '0', 10);
+          const localActive = parseInt(localStorage.getItem(`wsm_time_active_${email.toLowerCase()}`) || '0', 10);
+          setOpenTime(localOpen);
+          setActiveTime(localActive);
+          openTimeRef.current = localOpen;
+          activeTimeRef.current = localActive;
+          hasLoadedInitialTracking.current = true;
         }
       };
       fetchInitialTracking();
@@ -786,6 +797,16 @@ export default function StudentDashboard({
       if (wasActiveInThisSecond) {
         activeTimeRef.current += 1;
         wasActiveInThisSecond = false;
+      }
+      setOpenTime(openTimeRef.current);
+      setActiveTime(activeTimeRef.current);
+
+      localTickCount += 1;
+      if (localTickCount % 5 === 0) {
+        try {
+          localStorage.setItem(`wsm_time_open_${email.toLowerCase()}`, String(openTimeRef.current));
+          localStorage.setItem(`wsm_time_active_${email.toLowerCase()}`, String(activeTimeRef.current));
+        } catch {}
       }
     }, 1000);
 
@@ -3040,6 +3061,7 @@ export default function StudentDashboard({
             currentUserName={profile?.nome_completo || 'Aluno'}
             currentUserRole="student"
             userTurma={activeTurma || profile?.turma || ''}
+            onBackToHome={() => handleTabClick('inicio')}
           />
         ) : activeTab === 'caderno' ? (
           <VirtualNotebook
@@ -3102,6 +3124,8 @@ export default function StudentDashboard({
             userTurma={activeTurma || profile?.turma || ''}
             submissions={studentSubmissions}
             mockExams={mockExams}
+            openTimeSeconds={openTime}
+            activeTimeSeconds={activeTime}
           />
         ) : (
           /* Main Dashboard Content Layout (Início) */
