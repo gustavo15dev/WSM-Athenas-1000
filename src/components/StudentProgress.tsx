@@ -188,8 +188,9 @@ export default function StudentProgress({
       try {
         const { data: dbNotebooks } = await supabase
           .from('wsm_saved_notebooks')
-          .select('*')
-          .eq('student_email', cleanEmail);
+          .select('id, student_email, title, pages, status, last_stamp')
+          .eq('student_email', cleanEmail)
+          .limit(30);
 
         let nList = dbNotebooks || [];
         if (nList.length === 0) {
@@ -217,7 +218,8 @@ export default function StudentProgress({
           const { data: dbReviews } = await supabase
             .from('notebook_reviews')
             .select('id, stamp_type')
-            .eq('student_email', cleanEmail);
+            .eq('student_email', cleanEmail)
+            .limit(50);
           if (dbReviews && dbReviews.length > 0) {
             stamped = Math.max(stamped, dbReviews.length);
           }

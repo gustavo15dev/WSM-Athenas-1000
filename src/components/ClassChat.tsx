@@ -104,41 +104,7 @@ interface ClassChatProps {
   onBackToHome?: () => void;
 }
 
-function formatLastSeen(lastSeenIso?: string, isOnline?: boolean): { text: string; online: boolean } {
-  if (isOnline) {
-    return { text: 'Online', online: true };
-  }
-  if (!lastSeenIso) {
-    return { text: 'Visto por último recentemente', online: false };
-  }
-  const date = new Date(lastSeenIso);
-  if (isNaN(date.getTime())) {
-    return { text: 'Visto por último recentemente', online: false };
-  }
 
-  const now = new Date();
-  const diffSec = Math.floor((now.getTime() - date.getTime()) / 1000);
-
-  if (diffSec < 180) { // < 3 minutos é online
-    return { text: 'Online', online: true };
-  }
-
-  const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  const isToday = now.toDateString() === date.toDateString();
-
-  const yesterday = new Date(now);
-  yesterday.setDate(now.getDate() - 1);
-  const isYesterday = yesterday.toDateString() === date.toDateString();
-
-  if (isToday) {
-    return { text: `Visto por último às ${timeStr}`, online: false };
-  } else if (isYesterday) {
-    return { text: `Visto por último ontem às ${timeStr}`, online: false };
-  } else {
-    const dateStr = date.toLocaleDateString([], { day: '2-digit', month: '2-digit' });
-    return { text: `Visto por último em ${dateStr} às ${timeStr}`, online: false };
-  }
-}
 
 function formatChatTimeAgo(isoStringOrTime?: string): string {
   if (!isoStringOrTime) return '';
@@ -239,25 +205,6 @@ export default function ClassChat({
   onBackToHome
 }: ClassChatProps) {
   const myEmailLower = currentUserEmail.toLowerCase().trim();
-
-  // Presence Heartbeat: Update current user's last_seen_at in Supabase
-  useEffect(() => {
-    if (!myEmailLower) return;
-    const updatePresence = async () => {
-      try {
-        const nowIso = new Date().toISOString();
-        await supabase
-          .from('wsm_user_profiles')
-          .update({ last_seen_at: nowIso, updated_at: nowIso })
-          .ilike('email', myEmailLower);
-      } catch (e) {
-        // Graceful fallback
-      }
-    };
-    updatePresence();
-    const interval = setInterval(updatePresence, 30000);
-    return () => clearInterval(interval);
-  }, [myEmailLower]);
 
   // Student Consent Modal states (Termo de Convivência e Monitoramento)
   const [showConsentModal, setShowConsentModal] = useState<boolean>(false);
@@ -1144,14 +1091,9 @@ export default function ClassChat({
       )
       .subscribe();
 
-    // Smooth background refresh every 4 seconds
-    const interval = setInterval(() => {
-      loadConversationMessages(true);
-    }, 4000);
-
+    // Realtime channel handles instant inserts with zero polling cost
     return () => {
       isMounted = false;
-      clearInterval(interval);
       supabase.removeChannel(channel);
     };
   }, [activeContactEmail, myEmailLower, currentUserName, markConversationAsRead]);
@@ -1265,7 +1207,7 @@ export default function ClassChat({
     }
 
     refreshContactsSummary();
-    const interval = setInterval(refreshContactsSummary, 3500);
+    const interval = setInterval(refreshContactsSummary, 30000);
 
     return () => {
       isMounted = false;
@@ -2021,9 +1963,6 @@ export default function ClassChat({
                     }`}>
                       {contact.name.substring(0, 2)}
                     </div>
-                    {contact.isOnline && (
-                      <span className="w-3 h-3 rounded-full bg-emerald-400 border-2 border-neutral-950 absolute bottom-0 right-0 shadow-sm" />
-                    )}
                   </div>
 
                   {/* Contact Info */}
@@ -2088,7 +2027,7 @@ export default function ClassChat({
             !mobileShowSidebar ? 'flex' : 'hidden'
           } md:flex flex-col flex-1 h-full bg-[#050806] relative`}
         >
-          {/* Chat Header (Matching reference) */}
+          {/* Chat Header */}
           <div className="p-3.5 px-5 border-b border-neutral-850/80 bg-neutral-950/95 backdrop-blur-md flex items-center justify-between z-10 shrink-0">
             <div className="flex items-center gap-3 min-w-0">
               {/* Back button on mobile */}
@@ -2100,40 +2039,20 @@ export default function ClassChat({
                 <ArrowLeft className="w-4 h-4" />
               </button>
 
-              {/* Active Contact Avatar & Status */}
-              {(() => {
-                const contactStatus = formatLastSeen(activeContact.lastSeenAt || activeContact.lastMessageTime, activeContact.isOnline);
-                return (
-                  <>
-                    <div className="relative shrink-0">
-                      <div className={`w-11 h-11 rounded-full flex items-center justify-center font-bold text-xs uppercase shadow-sm select-none ${
-                        activeContact.role === 'teacher'
-                          ? 'bg-gradient-to-tr from-emerald-600 to-teal-400 text-neutral-950'
-                          : 'bg-neutral-800 text-emerald-400 border border-neutral-700'
-                      }`}>
-                        {activeContact.name.substring(0, 2)}
-                      </div>
-                      {contactStatus.online && (
-                        <span className="w-3 h-3 rounded-full bg-emerald-400 border-2 border-neutral-950 absolute bottom-0 right-0 shadow-sm" />
-                      )}
-                    </div>
+              {/* Active Contact Avatar & Name */}
+              <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs uppercase shadow-sm select-none shrink-0 ${
+                activeContact.role === 'teacher'
+                  ? 'bg-gradient-to-tr from-emerald-600 to-teal-400 text-neutral-950'
+                  : 'bg-neutral-800 text-emerald-400 border border-neutral-700'
+              }">
+                {activeContact.name.substring(0, 2)}
+              </div>
 
-                    <div className="min-w-0">
-                      <h3 className="text-sm sm:text-base font-bold text-neutral-100 font-display truncate">
-                        {activeContact.name}
-                      </h3>
-                      <p className={`text-[11px] font-sans flex items-center gap-1.5 mt-0.5 ${
-                        contactStatus.online ? 'text-emerald-400' : 'text-neutral-400'
-                      }`}>
-                        <span className={`w-2 h-2 rounded-full ${
-                          contactStatus.online ? 'bg-emerald-400 animate-pulse' : 'bg-neutral-500'
-                        }`} />
-                        <span className="font-medium">{contactStatus.text}</span>
-                      </p>
-                    </div>
-                  </>
-                );
-              })()}
+              <div className="min-w-0">
+                <h3 className="text-sm sm:text-base font-bold text-neutral-100 font-display truncate">
+                  {activeContact.name}
+                </h3>
+              </div>
             </div>
           </div>
 

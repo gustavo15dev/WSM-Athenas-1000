@@ -47,89 +47,23 @@ function getClientBrowserInfo(): string {
 /**
  * Initializes and updates user presence in Supabase Realtime
  */
-export function registerUserPresence(payload: {
+export function registerUserPresence(_payload: {
   email?: string;
   name?: string;
   role?: string;
   turma?: string;
   currentScreen?: string;
 }) {
-  if (typeof window === 'undefined') return;
-
-  try {
-    if (!presenceChannel) {
-      presenceChannel = supabase.channel('athenas-realtime-presence', {
-        config: {
-          presence: {
-            key: CLIENT_SESSION_ID
-          }
-        }
-      });
-
-      presenceChannel.subscribe(async (status: string) => {
-        if (status === 'SUBSCRIBED') {
-          await presenceChannel.track({
-            id: CLIENT_SESSION_ID,
-            email: payload.email || 'visitante@athenas.edu',
-            name: payload.name || 'Visitante',
-            role: payload.role || 'guest',
-            turma: payload.turma || '',
-            currentScreen: payload.currentScreen || 'Portal Home',
-            onlineSince: new Date().toISOString(),
-            lastActive: new Date().toISOString(),
-            browser: getClientBrowserInfo(),
-            platform: navigator.platform || 'Web'
-          });
-        }
-      });
-    } else {
-      // Update track if already connected
-      presenceChannel.track({
-        id: CLIENT_SESSION_ID,
-        email: payload.email || 'visitante@athenas.edu',
-        name: payload.name || 'Visitante',
-        role: payload.role || 'guest',
-        turma: payload.turma || '',
-        currentScreen: payload.currentScreen || 'Portal Home',
-        onlineSince: new Date().toISOString(),
-        lastActive: new Date().toISOString(),
-        browser: getClientBrowserInfo(),
-        platform: navigator.platform || 'Web'
-      });
-    }
-  } catch (err) {
-    console.warn('Presence tracking notice:', err);
-  }
+  // Disabled presence tracking to conserve Supabase Realtime quota & DB resources
+  return;
 }
 
 /**
- * Hook to listen to all active presences across the entire school platform
+ * Hook to listen to active presences across the platform (Disabled for DB economy)
  */
 export function subscribeToAllActivePresences(
   onPresencesChange: (activeUsers: ActiveUserPresence[]) => void
 ) {
-  const channel = supabase.channel('athenas-admin-presence-listener');
-
-  channel
-    .on('presence', { event: 'sync' }, () => {
-      const state = channel.presenceState();
-      const list: ActiveUserPresence[] = [];
-
-      Object.values(state).forEach((presences: any) => {
-        if (Array.isArray(presences)) {
-          presences.forEach((p) => {
-            list.push(p as ActiveUserPresence);
-          });
-        }
-      });
-
-      onPresencesChange(list);
-    })
-    .subscribe();
-
-  return () => {
-    try {
-      supabase.removeChannel(channel);
-    } catch (e) {}
-  };
+  onPresencesChange([]);
+  return () => {};
 }

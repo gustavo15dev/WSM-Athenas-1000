@@ -315,8 +315,9 @@ export async function getStudentVirtualClasses(studentEmail: string, studentTurm
   try {
     const { data: allVClasses, error } = await supabase
       .from('wsm_virtual_classes')
-      .select('*')
-      .order('created_at', { ascending: false });
+      .select('id, name, teacher_email, student_emails, created_at')
+      .order('created_at', { ascending: false })
+      .limit(50);
 
     if (error || !allVClasses) return [];
 
