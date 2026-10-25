@@ -2847,7 +2847,9 @@ export default function StudentDashboard({
           ? 'p-2 sm:p-4 max-w-none' 
           : activeTab === 'wsm_athenas'
             ? 'p-2 md:p-4 max-w-none relative z-50'
-            : 'p-4 md:p-8 max-w-7xl'
+            : activeTab === 'conversas'
+              ? 'p-2 sm:p-3 md:p-4 max-w-none h-full overflow-hidden'
+              : 'p-4 md:p-8 max-w-7xl'
       } w-full ${activeTab === 'wsm_athenas' ? 'relative z-50' : 'z-10'}`}>
         
         {localStorage.getItem('wsm_sys_maintenance_mode') === 'true' && (
@@ -3025,7 +3027,7 @@ export default function StudentDashboard({
         )}
 
         {/* Browser Push Notification Prompt Banner if not granted */}
-        {activeTab !== 'wsm_athenas' && (
+        {activeTab !== 'wsm_athenas' && activeTab !== 'conversas' && (
           <div className="mb-4">
             <BrowserNotificationPrompt userRole="student" />
           </div>
@@ -3056,13 +3058,15 @@ export default function StudentDashboard({
             teachers={teachers}
           />
         ) : activeTab === 'conversas' ? (
-          <ClassChat
-            currentUserEmail={email}
-            currentUserName={profile?.nome_completo || 'Aluno'}
-            currentUserRole="student"
-            userTurma={activeTurma || profile?.turma || ''}
-            onBackToHome={() => handleTabClick('inicio')}
-          />
+          <div className="flex-1 h-full min-h-0 w-full flex flex-col overflow-hidden">
+            <ClassChat
+              currentUserEmail={email}
+              currentUserName={profile?.nome_completo || 'Aluno'}
+              currentUserRole="student"
+              userTurma={activeTurma || profile?.turma || ''}
+              onBackToHome={() => handleTabClick('inicio')}
+            />
+          </div>
         ) : activeTab === 'caderno' ? (
           <VirtualNotebook
             userRole="student"

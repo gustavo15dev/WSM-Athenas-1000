@@ -1877,12 +1877,14 @@ export default function TeacherDashboard({
       <div className={`flex-1 h-full overflow-y-auto flex flex-col ${
         activeTab === 'wsm_athenas' 
           ? 'p-2 md:p-4 relative z-50' 
-          : 'p-4 md:p-8'
+          : activeTab === 'conversas'
+            ? 'p-2 sm:p-3 md:p-4 max-w-none h-full overflow-hidden'
+            : 'p-4 md:p-8'
       } w-full ${activeTab === 'wsm_athenas' ? 'relative z-50' : 'z-10'} min-w-0`}>
         
         {/* Navigation header (responsive) */}
         <header className={`flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-5 mb-6 border-b border-emerald-950/20 ${
-          activeTab === 'wsm_athenas' ? 'md:hidden' : ''
+          activeTab === 'wsm_athenas' || activeTab === 'conversas' ? 'md:hidden' : ''
         }`}>
           <div className="flex items-center gap-3 animate-fadeIn">
             <div className="p-2 md:hidden bg-emerald-500/10 border border-emerald-500/20 rounded-2xl">
@@ -2064,19 +2066,21 @@ export default function TeacherDashboard({
         </header>
 
         {/* Browser Push Notification Banner */}
-        {activeTab !== 'wsm_athenas' && (
+        {activeTab !== 'wsm_athenas' && activeTab !== 'conversas' && (
           <div className="mb-4">
             <BrowserNotificationPrompt userRole="teacher" />
           </div>
         )}
 
         {activeTab === 'conversas' ? (
-          <ClassChat
-            currentUserEmail={email}
-            currentUserName={profile?.nome_completo || 'Professor'}
-            currentUserRole="teacher"
-            userAnosLecionados={allTeacherClasses.length > 0 ? allTeacherClasses : (profile?.anos_lecionados || setAnosLecionados || [])}
-          />
+          <div className="flex-1 h-full min-h-0 w-full flex flex-col overflow-hidden">
+            <ClassChat
+              currentUserEmail={email}
+              currentUserName={profile?.nome_completo || 'Professor'}
+              currentUserRole="teacher"
+              userAnosLecionados={allTeacherClasses.length > 0 ? allTeacherClasses : (profile?.anos_lecionados || setAnosLecionados || [])}
+            />
+          </div>
         ) : activeTab === 'vistos' ? (
           <TeacherNotebooksReview
             teacherEmail={email}

@@ -32,7 +32,11 @@ import {
   ShieldAlert,
   Trash2,
   Pencil,
-  Heart
+  Heart,
+  Phone,
+  Video,
+  ChevronDown,
+  Plus
 } from 'lucide-react';
 import { supabase } from '../supabase';
 import { sendBrowserNotification } from '../utils/browserNotifications';
@@ -50,6 +54,7 @@ export interface ChatContact {
   lastMessageTime?: string;
   unreadCount?: number;
   isOnline?: boolean;
+  lastSeenAt?: string;
 }
 
 export interface ChatMessage {
@@ -97,6 +102,62 @@ interface ClassChatProps {
   userTurma?: string; // For student, e.g. "9A"
   userAnosLecionados?: string[]; // For teacher, e.g. ["Biologia 9A", "Biologia 9B"]
   onBackToHome?: () => void;
+}
+
+function formatLastSeen(lastSeenIso?: string, isOnline?: boolean): { text: string; online: boolean } {
+  if (isOnline) {
+    return { text: 'Online', online: true };
+  }
+  if (!lastSeenIso) {
+    return { text: 'Visto por último recentemente', online: false };
+  }
+  const date = new Date(lastSeenIso);
+  if (isNaN(date.getTime())) {
+    return { text: 'Visto por último recentemente', online: false };
+  }
+
+  const now = new Date();
+  const diffSec = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+  if (diffSec < 180) { // < 3 minutos é online
+    return { text: 'Online', online: true };
+  }
+
+  const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const isToday = now.toDateString() === date.toDateString();
+
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const isYesterday = yesterday.toDateString() === date.toDateString();
+
+  if (isToday) {
+    return { text: `Visto por último às ${timeStr}`, online: false };
+  } else if (isYesterday) {
+    return { text: `Visto por último ontem às ${timeStr}`, online: false };
+  } else {
+    const dateStr = date.toLocaleDateString([], { day: '2-digit', month: '2-digit' });
+    return { text: `Visto por último em ${dateStr} às ${timeStr}`, online: false };
+  }
+}
+
+function formatChatTimeAgo(isoStringOrTime?: string): string {
+  if (!isoStringOrTime) return '';
+  const d = new Date(isoStringOrTime);
+  if (isNaN(d.getTime())) {
+    return isoStringOrTime;
+  }
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffSec = Math.max(0, Math.floor(diffMs / 1000));
+  const diffMin = Math.floor(diffSec / 60);
+  const diffHours = Math.floor(diffMin / 60);
+  const diffDays = Math.floor(diffHours / 24);
+
+  if (diffSec < 60) return 'Agora';
+  if (diffMin < 60) return `${diffMin}m`;
+  if (diffHours < 24) return `${diffHours}h`;
+  if (diffDays < 7) return `${diffDays}d`;
+  return d.toLocaleDateString([], { day: '2-digit', month: '2-digit' });
 }
 
 function parseAnosLecionados(val: any): string[] {
@@ -179,6 +240,25 @@ export default function ClassChat({
 }: ClassChatProps) {
   const myEmailLower = currentUserEmail.toLowerCase().trim();
 
+  // Presence Heartbeat: Update current user's last_seen_at in Supabase
+  useEffect(() => {
+    if (!myEmailLower) return;
+    const updatePresence = async () => {
+      try {
+        const nowIso = new Date().toISOString();
+        await supabase
+          .from('wsm_user_profiles')
+          .update({ last_seen_at: nowIso, updated_at: nowIso })
+          .ilike('email', myEmailLower);
+      } catch (e) {
+        // Graceful fallback
+      }
+    };
+    updatePresence();
+    const interval = setInterval(updatePresence, 30000);
+    return () => clearInterval(interval);
+  }, [myEmailLower]);
+
   // Student Consent Modal states (Termo de Convivência e Monitoramento)
   const [showConsentModal, setShowConsentModal] = useState<boolean>(false);
   const [checkingConsent, setCheckingConsent] = useState<boolean>(currentUserRole === 'student');
@@ -234,6 +314,8 @@ export default function ClassChat({
   const [messageInput, setMessageInput] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [contactFilter, setContactFilter] = useState<'todos' | 'alunos' | 'professores'>('todos');
+  const [showCallModal, setShowCallModal] = useState<boolean>(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Teacher Monitoring Mode state
   const [isMonitoringMode, setIsMonitoringMode] = useState(false);
@@ -705,7 +787,7 @@ export default function ClassChat({
             // Buscar apenas os perfis desses colegas (SEM campo 'escola' para evitar erro 400)
             const { data: cData } = await supabase
               .from('wsm_user_profiles')
-              .select('id, nome_completo, turma, email, role')
+              .select('id, nome_completo, turma, email, role, last_seen_at, updated_at')
               .in('email', classmateEmails);
 
             if (cData) classmateProfiles = cData;
@@ -729,12 +811,16 @@ export default function ClassChat({
           classmateProfiles.forEach(c => {
             const cEmail = (c.email || '').toLowerCase().trim();
             if (cEmail !== myEmailLower && c.role !== 'teacher') {
+              const lastSeen = c.last_seen_at || c.updated_at;
+              const diffSec = lastSeen ? Math.floor((new Date().getTime() - new Date(lastSeen).getTime()) / 1000) : 0;
+              const isOnline = lastSeen ? diffSec < 180 : true;
               mappedContacts.push({
                 email: c.email,
                 name: c.nome_completo || c.email.split('@')[0],
                 role: 'student',
                 turma: c.turma || myTurma || 'Aluno',
-                isOnline: true
+                isOnline,
+                lastSeenAt: lastSeen
               });
             }
           });
@@ -786,7 +872,7 @@ export default function ClassChat({
           // --- FLUXO DO PROFESSOR ---
           const { data: profiles } = await supabase
             .from('wsm_user_profiles')
-            .select('id, nome_completo, turma, anos_lecionados, materia, email, role');
+            .select('id, nome_completo, turma, anos_lecionados, materia, email, role, last_seen_at, updated_at');
 
           let rawList: any[] = profiles || [];
 
@@ -841,6 +927,9 @@ export default function ClassChat({
           mappedContacts = filteredProfiles.map(p => {
             const pTaughtClean = parseAnosLecionados(p.anos_lecionados);
             const isTeacher = p.role === 'teacher' || pTaughtClean.length > 0 || Boolean(p.materia) || (p.email && p.email.toLowerCase().includes('prof'));
+            const lastSeen = p.last_seen_at || p.updated_at;
+            const diffSec = lastSeen ? Math.floor((new Date().getTime() - new Date(lastSeen).getTime()) / 1000) : 0;
+            const isOnline = lastSeen ? diffSec < 180 : true;
 
             return {
               email: p.email,
@@ -848,7 +937,8 @@ export default function ClassChat({
               role: isTeacher ? 'teacher' : 'student',
               turma: isTeacher ? (pTaughtClean.join(', ') || 'Professor') : (p.turma || userTurma || 'Turma'),
               materia: p.materia,
-              isOnline: true
+              isOnline,
+              lastSeenAt: lastSeen
             };
           });
 
@@ -1307,7 +1397,7 @@ export default function ClassChat({
 
   if (isMonitoringMode) {
     return (
-      <div className="h-[calc(100vh-140px)] min-h-[550px] bg-neutral-950 rounded-3xl border border-neutral-900 overflow-hidden flex flex-col shadow-2xl relative">
+      <div className="h-full flex-1 w-full min-h-0 bg-neutral-950/90 rounded-2xl md:rounded-3xl border border-neutral-850/80 overflow-hidden flex flex-col shadow-2xl relative">
         {/* Monitoring Header Banner */}
         <div className="p-4 px-6 bg-gradient-to-r from-amber-950/80 via-neutral-950 to-neutral-950 border-b border-amber-500/20 flex flex-wrap items-center justify-between gap-3 shrink-0">
           <div className="flex items-center gap-3">
@@ -1609,7 +1699,7 @@ export default function ClassChat({
 
   if (currentUserRole === 'student' && checkingConsent) {
     return (
-      <div className="h-[calc(100vh-140px)] min-h-[550px] bg-neutral-950 rounded-3xl border border-neutral-900 flex items-center justify-center p-8">
+      <div className="h-full flex-1 w-full min-h-0 bg-neutral-950/90 rounded-2xl md:rounded-3xl border border-neutral-850/80 flex items-center justify-center p-8">
         <div className="text-center space-y-3">
           <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto" />
           <p className="text-xs text-neutral-400 font-mono">Verificando autorização de acesso ao chat...</p>
@@ -1619,7 +1709,7 @@ export default function ClassChat({
   }
 
   return (
-    <div className="h-[calc(100vh-140px)] min-h-[550px] bg-neutral-950 rounded-3xl border border-neutral-900 overflow-hidden flex flex-col md:flex-row shadow-2xl relative">
+    <div className="h-full flex-1 w-full min-h-0 bg-neutral-950/90 rounded-2xl md:rounded-3xl border border-neutral-850/80 overflow-hidden flex flex-col md:flex-row shadow-2xl relative">
       
       {/* Floating Profanity Warning Tag Banner */}
       <AnimatePresence>
@@ -1763,54 +1853,71 @@ export default function ClassChat({
       <div 
         className={`${
           mobileShowSidebar ? 'flex' : 'hidden'
-        } md:flex flex-col w-full md:w-80 lg:w-96 bg-neutral-950/80 border-r border-neutral-900 shrink-0 h-full`}
+        } md:flex flex-col w-full md:w-80 lg:w-[350px] bg-neutral-950/90 border-r border-neutral-850/80 shrink-0 h-full overflow-hidden`}
       >
-        {/* Sidebar Header */}
-        <div className="p-4 border-b border-neutral-900 space-y-3 bg-neutral-950/90 backdrop-blur-md">
+        {/* Sidebar Header (Inspired by reference) */}
+        <div className="p-4 border-b border-neutral-850/80 space-y-3 bg-neutral-950/95 backdrop-blur-md shrink-0">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center">
-                <MessageSquare className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-sm font-extrabold text-neutral-100 font-display">Conversas da Turma</h3>
-                <p className="text-[10px] text-neutral-400 font-mono">
-                  {currentUserRole === 'teacher' 
-                    ? (resolvedTaughtClasses.length > 0 ? `Turmas: ${resolvedTaughtClasses.join(', ')}` : 'Docente Athenas') 
-                    : (resolvedStudentTurma ? `Turma: ${resolvedStudentTurma}` : 'Estudante Athenas')}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[10px] font-mono font-bold">
-                {filteredContacts.length} contatos
+            <div className="flex items-center gap-2">
+              <h3 className="text-base font-bold text-neutral-100 font-display flex items-center gap-1.5 tracking-tight">
+                <span>Conversas</span>
+                <ChevronDown className="w-4 h-4 text-neutral-400" />
+              </h3>
+              <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-neutral-900 border border-neutral-800 text-neutral-300 font-mono text-[11px] font-bold flex items-center justify-center">
+                {filteredContacts.length}
               </span>
+            </div>
+
+            <div className="flex items-center gap-1.5">
               {contacts.reduce((sum, c) => sum + (c.unreadCount || 0), 0) > 0 && (
                 <span className="px-2 py-0.5 rounded-full bg-emerald-400 text-neutral-950 text-[10px] font-mono font-black shadow-md animate-pulse">
                   {contacts.reduce((sum, c) => sum + (c.unreadCount || 0), 0)} novas
                 </span>
               )}
+              {/* New message / Focus search circular button */}
+              <button
+                type="button"
+                onClick={() => {
+                  setContactFilter('todos');
+                  setSearchTerm('');
+                  searchInputRef.current?.focus();
+                }}
+                className="w-8 h-8 rounded-full bg-emerald-500 hover:bg-emerald-400 text-neutral-950 flex items-center justify-center font-bold shadow-md shadow-emerald-500/25 active:scale-95 transition-all cursor-pointer"
+                title="Nova mensagem / Buscar contato"
+              >
+                <Plus className="w-4 h-4 stroke-[2.5]" />
+              </button>
             </div>
           </div>
 
-          {/* Search Contacts */}
+          {/* Search Contacts (Clean pill) */}
           <div className="relative">
-            <Search className="w-3.5 h-3.5 text-neutral-500 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-3.5 h-3.5 text-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
+              ref={searchInputRef}
               type="text"
-              placeholder="Buscar por nome, matéria ou turma..."
+              placeholder="Buscar mensagens ou colegas..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 bg-neutral-900/90 border border-neutral-800 rounded-xl text-xs text-neutral-200 outline-none focus:border-emerald-500/50"
+              className="w-full pl-9 pr-4 py-2 bg-neutral-900 border border-neutral-800 rounded-full text-xs text-neutral-200 placeholder-neutral-500 outline-none focus:border-emerald-500/50 transition-colors"
             />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-white"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
           </div>
 
-          {/* Filter Pills */}
-          <div className="flex items-center gap-1 bg-neutral-900/60 p-1 rounded-xl border border-neutral-850">
+          {/* Filter Segmented Control */}
+          <div className="flex items-center gap-1 bg-neutral-900/80 p-1 rounded-xl border border-neutral-850">
             <button
               type="button"
               onClick={() => setContactFilter('todos')}
-              className={`flex-1 py-1 rounded-lg text-[10px] font-bold transition-all ${
+              className={`flex-1 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
                 contactFilter === 'todos' ? 'bg-neutral-800 text-emerald-400 shadow-sm' : 'text-neutral-400 hover:text-neutral-200'
               }`}
             >
@@ -1819,7 +1926,7 @@ export default function ClassChat({
             <button
               type="button"
               onClick={() => setContactFilter('alunos')}
-              className={`flex-1 py-1 rounded-lg text-[10px] font-bold transition-all ${
+              className={`flex-1 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
                 contactFilter === 'alunos' ? 'bg-neutral-800 text-emerald-400 shadow-sm' : 'text-neutral-400 hover:text-neutral-200'
               }`}
             >
@@ -1828,7 +1935,7 @@ export default function ClassChat({
             <button
               type="button"
               onClick={() => setContactFilter('professores')}
-              className={`flex-1 py-1 rounded-lg text-[10px] font-bold transition-all ${
+              className={`flex-1 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
                 contactFilter === 'professores' ? 'bg-neutral-800 text-emerald-400 shadow-sm' : 'text-neutral-400 hover:text-neutral-200'
               }`}
             >
@@ -1838,32 +1945,32 @@ export default function ClassChat({
         </div>
 
         {/* Contacts Scrollable List */}
-        <div className="flex-1 overflow-y-auto divide-y divide-neutral-900/50 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto p-1.5 space-y-1 custom-scrollbar">
           {/* Teacher Monitoring Card */}
           {currentUserRole === 'teacher' && (
-            <div className="p-3 bg-neutral-950 border-b border-neutral-900">
+            <div className="p-1 mb-1">
               <button
                 type="button"
                 onClick={() => {
                   setIsMonitoringMode(true);
                   setMobileShowSidebar(false);
                 }}
-                className="w-full p-3 rounded-2xl bg-gradient-to-r from-amber-500/15 via-amber-500/5 to-transparent border border-amber-500/30 hover:border-amber-500/60 flex items-center gap-3 transition-all cursor-pointer group text-left shadow-md hover:shadow-amber-500/10"
+                className="w-full p-2.5 rounded-2xl bg-gradient-to-r from-amber-500/15 via-amber-500/5 to-transparent border border-amber-500/30 hover:border-amber-500/60 flex items-center gap-3 transition-all cursor-pointer group text-left shadow-sm hover:shadow-amber-500/10"
               >
-                <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/30 text-amber-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                <div className="w-9 h-9 rounded-full bg-amber-500/20 border border-amber-500/30 text-amber-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
                   <Eye className="w-4.5 h-4.5 animate-pulse" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-black text-amber-300 font-display truncate">
-                      Monitoramento de conversas
+                    <h4 className="text-xs font-bold text-amber-300 truncate">
+                      Supervisão Pedagógica
                     </h4>
-                    <span className="px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 text-[8px] font-mono font-bold uppercase shrink-0">
-                      Supervisão
+                    <span className="px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[8px] font-mono font-bold uppercase shrink-0">
+                      Monitorar
                     </span>
                   </div>
                   <p className="text-[10px] text-neutral-400 truncate mt-0.5">
-                    Ver chats entre alunos das suas turmas
+                    Ver chats dos alunos das turmas
                   </p>
                 </div>
               </button>
@@ -1886,6 +1993,7 @@ export default function ClassChat({
               const isSelected = activeContact?.email === contact.email;
               const isTeacher = contact.role === 'teacher';
               const hasUnread = Boolean(contact.unreadCount && contact.unreadCount > 0);
+              const relativeTime = formatChatTimeAgo(contact.lastMessageTime);
 
               return (
                 <button
@@ -1896,78 +2004,76 @@ export default function ClassChat({
                     setMobileShowSidebar(false);
                     markConversationAsRead(contact.email);
                   }}
-                  className={`w-full p-3.5 flex items-center gap-3 transition-all text-left cursor-pointer group ${
+                  className={`w-full p-2.5 sm:p-3 rounded-2xl transition-all text-left cursor-pointer flex items-center gap-3 relative group ${
                     isSelected 
-                      ? 'bg-emerald-500/10 border-l-2 border-l-emerald-500' 
+                      ? 'bg-neutral-900 border border-emerald-500/30 shadow-sm' 
                       : hasUnread
-                        ? 'bg-emerald-950/25 hover:bg-emerald-900/30 border-l-2 border-l-emerald-400'
-                        : 'hover:bg-neutral-900/50'
+                        ? 'bg-emerald-950/20 hover:bg-neutral-900/70 border border-emerald-500/20'
+                        : 'hover:bg-neutral-900/50 border border-transparent'
                   }`}
                 >
-                  {/* Avatar */}
+                  {/* Avatar (Circle matching reference) */}
                   <div className="relative shrink-0">
-                    <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-bold text-xs uppercase shadow-sm ${
+                    <div className={`w-11 h-11 rounded-full flex items-center justify-center font-bold text-xs uppercase shadow-sm select-none ${
                       isTeacher 
                         ? 'bg-gradient-to-tr from-emerald-600 to-teal-400 text-neutral-950' 
                         : 'bg-neutral-800 text-emerald-400 border border-neutral-700'
                     }`}>
                       {contact.name.substring(0, 2)}
                     </div>
-                    {hasUnread ? (
-                      <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-emerald-400 text-neutral-950 font-black text-[10px] flex items-center justify-center absolute -bottom-1 -right-1 border-2 border-neutral-950 shadow-md animate-pulse z-10">
-                        {contact.unreadCount! > 99 ? '99+' : contact.unreadCount}
-                      </span>
-                    ) : contact.isOnline ? (
-                      <span className="w-3 h-3 rounded-full bg-emerald-400 border-2 border-neutral-950 absolute -bottom-0.5 -right-0.5 shadow-sm" />
-                    ) : null}
+                    {contact.isOnline && (
+                      <span className="w-3 h-3 rounded-full bg-emerald-400 border-2 border-neutral-950 absolute bottom-0 right-0 shadow-sm" />
+                    )}
                   </div>
 
                   {/* Contact Info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-1">
-                      <h4 className={`text-xs truncate ${
+                      <h4 className={`text-xs sm:text-sm truncate ${
                         hasUnread
                           ? 'font-black text-emerald-300'
-                          : 'font-bold text-neutral-100 group-hover:text-emerald-300'
+                          : isSelected
+                            ? 'font-bold text-white'
+                            : 'font-semibold text-neutral-200 group-hover:text-emerald-300'
                       }`}>
                         {contact.name}
                       </h4>
-                      {contact.lastMessageTime && (
-                        <span className={`text-[9px] font-mono shrink-0 ${
-                          hasUnread ? 'text-emerald-400 font-bold' : 'text-neutral-500'
+                      {relativeTime && (
+                        <span className={`text-[10px] font-sans shrink-0 ${
+                          hasUnread ? 'text-emerald-400 font-bold' : 'text-neutral-400'
                         }`}>
-                          {contact.lastMessageTime}
+                          {relativeTime}
                         </span>
                       )}
                     </div>
 
-                    <div className="flex items-center gap-1.5 mt-0.5">
-                      <span className={`px-1.5 py-0.2 rounded text-[9px] font-mono font-bold ${
-                        isTeacher ? 'bg-teal-500/20 text-teal-300' : 'bg-neutral-800 text-neutral-400'
-                      }`}>
-                        {isTeacher ? `Prof. ${contact.materia || ''}` : `Aluno • ${contact.turma}`}
-                      </span>
-                    </div>
-
-                    {contact.lastMessage && (
-                      <p className={`text-[11px] truncate mt-1 ${
-                        hasUnread ? 'text-emerald-300 font-bold' : 'text-neutral-400'
+                    {contact.lastMessage ? (
+                      <p className={`text-xs truncate mt-0.5 ${
+                        hasUnread ? 'text-emerald-300 font-medium' : 'text-neutral-400'
                       }`}>
                         {censorProfanity(contact.lastMessage).censoredText}
                       </p>
+                    ) : (
+                      <p className="text-xs text-neutral-500 truncate mt-0.5 italic">
+                        Nenhuma mensagem ainda
+                      </p>
                     )}
-                  </div>
 
-                  {hasUnread ? (
-                    <div className="flex flex-col items-end gap-0.5 shrink-0 ml-1">
-                      <span className="min-w-[22px] h-5 px-1.5 rounded-full bg-emerald-400 text-neutral-950 font-black text-[11px] flex items-center justify-center shadow-lg shadow-emerald-500/20 border border-emerald-300">
-                        {contact.unreadCount! > 99 ? '99+' : contact.unreadCount}
+                    {/* Role & Turma Tags (Matching reference tags) */}
+                    <div className="flex items-center gap-1.5 mt-1.5">
+                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-medium ${
+                        isTeacher ? 'bg-teal-500/15 text-teal-300 border border-teal-500/25' : 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20'
+                      }`}>
+                        {isTeacher ? `Prof. ${contact.materia || 'Docente'}` : `Turma ${contact.turma}`}
                       </span>
-                      <span className="text-[8px] font-mono font-black text-emerald-400 uppercase tracking-tighter">
-                        Nova
-                      </span>
+
+                      {hasUnread && (
+                        <span className="px-2 py-0.5 rounded-full bg-emerald-400 text-neutral-950 text-[9px] font-bold shadow-sm">
+                          {contact.unreadCount} novas
+                        </span>
+                      )}
                     </div>
-                  ) : null}
+                  </div>
                 </button>
               );
             })
@@ -1982,9 +2088,9 @@ export default function ClassChat({
             !mobileShowSidebar ? 'flex' : 'hidden'
           } md:flex flex-col flex-1 h-full bg-[#050806] relative`}
         >
-          {/* Chat Header */}
-          <div className="p-3.5 px-5 border-b border-neutral-900 bg-neutral-950/90 backdrop-blur-md flex items-center justify-between z-10 shrink-0">
-            <div className="flex items-center gap-3">
+          {/* Chat Header (Matching reference) */}
+          <div className="p-3.5 px-5 border-b border-neutral-850/80 bg-neutral-950/95 backdrop-blur-md flex items-center justify-between z-10 shrink-0">
+            <div className="flex items-center gap-3 min-w-0">
               {/* Back button on mobile */}
               <button
                 type="button"
@@ -1995,49 +2101,56 @@ export default function ClassChat({
               </button>
 
               {/* Active Contact Avatar & Status */}
-              <div className="w-9 h-9 rounded-xl bg-neutral-800 border border-neutral-700 text-emerald-400 font-bold text-xs uppercase flex items-center justify-center shrink-0">
-                {activeContact.name.substring(0, 2)}
-              </div>
+              {(() => {
+                const contactStatus = formatLastSeen(activeContact.lastSeenAt || activeContact.lastMessageTime, activeContact.isOnline);
+                return (
+                  <>
+                    <div className="relative shrink-0">
+                      <div className={`w-11 h-11 rounded-full flex items-center justify-center font-bold text-xs uppercase shadow-sm select-none ${
+                        activeContact.role === 'teacher'
+                          ? 'bg-gradient-to-tr from-emerald-600 to-teal-400 text-neutral-950'
+                          : 'bg-neutral-800 text-emerald-400 border border-neutral-700'
+                      }`}>
+                        {activeContact.name.substring(0, 2)}
+                      </div>
+                      {contactStatus.online && (
+                        <span className="w-3 h-3 rounded-full bg-emerald-400 border-2 border-neutral-950 absolute bottom-0 right-0 shadow-sm" />
+                      )}
+                    </div>
 
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="text-xs font-black text-neutral-100 font-display">
-                    {activeContact.name}
-                  </h3>
-                  <span className={`px-2 py-0.2 rounded-md text-[9px] font-mono font-extrabold uppercase ${
-                    activeContact.role === 'teacher' ? 'bg-teal-500/20 text-teal-300' : 'bg-emerald-500/15 text-emerald-400'
-                  }`}>
-                    {activeContact.role === 'teacher' ? `Professor (${activeContact.materia || 'Docente'})` : `Aluno (${activeContact.turma})`}
-                  </span>
-                </div>
-                <p className="text-[10px] text-emerald-400 font-mono flex items-center gap-1.5 mt-0.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  <span>Online na plataforma • Canal Seguro da Turma {activeContact.turma}</span>
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className="hidden sm:inline-block px-2.5 py-1 rounded-xl bg-neutral-900 border border-neutral-850 text-[10px] text-neutral-400 font-mono">
-                Conversa Criptografada
-              </span>
+                    <div className="min-w-0">
+                      <h3 className="text-sm sm:text-base font-bold text-neutral-100 font-display truncate">
+                        {activeContact.name}
+                      </h3>
+                      <p className={`text-[11px] font-sans flex items-center gap-1.5 mt-0.5 ${
+                        contactStatus.online ? 'text-emerald-400' : 'text-neutral-400'
+                      }`}>
+                        <span className={`w-2 h-2 rounded-full ${
+                          contactStatus.online ? 'bg-emerald-400 animate-pulse' : 'bg-neutral-500'
+                        }`} />
+                        <span className="font-medium">{contactStatus.text}</span>
+                      </p>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           </div>
 
-          {/* Messages Feed */}
-          <div ref={messagesContainerRef} className="flex-1 p-4 md:p-6 overflow-y-auto space-y-4 custom-scrollbar">
+          {/* Messages Feed (Full height, smooth spacing) */}
+          <div ref={messagesContainerRef} className="flex-1 p-4 md:p-6 overflow-y-auto space-y-3.5 custom-scrollbar min-h-0">
             {loadingMessages ? (
               <div className="py-12 text-center text-xs text-neutral-500 space-y-2">
                 <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto" />
                 <p>Carregando histórico da conversa...</p>
               </div>
             ) : messages.length === 0 ? (
-              <div className="py-16 text-center space-y-2">
-                <div className="w-12 h-12 rounded-2xl bg-neutral-900 border border-neutral-800 flex items-center justify-center mx-auto text-neutral-500">
-                  <MessageSquare className="w-6 h-6 text-emerald-500/50" />
+              <div className="py-16 text-center space-y-3">
+                <div className="w-14 h-14 rounded-full bg-neutral-900 border border-neutral-800 flex items-center justify-center mx-auto text-neutral-500 shadow-md">
+                  <MessageSquare className="w-7 h-7 text-emerald-500/60" />
                 </div>
-                <p className="text-xs font-bold text-neutral-300">Nenhuma mensagem ainda</p>
-                <p className="text-[11px] text-neutral-500 max-w-sm mx-auto">
+                <p className="text-sm font-bold text-neutral-200">Nenhuma mensagem ainda</p>
+                <p className="text-xs text-neutral-500 max-w-sm mx-auto">
                   Envie uma mensagem ou documento para iniciar a conversa com {activeContact.name}.
                 </p>
               </div>
@@ -2052,26 +2165,33 @@ export default function ClassChat({
                 return (
                   <div
                     key={msg.id}
-                    className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} space-y-1 group/msg relative`}
+                    className={`flex items-end gap-2.5 ${isMe ? 'justify-end ml-auto' : 'justify-start mr-auto'} max-w-[85%] sm:max-w-[72%] group/msg relative`}
                   >
-                    {/* Sender Name badge for group context */}
+                    {/* Incoming sender avatar on left (Matching reference) */}
                     {!isMe && (
-                      <span className="text-[10px] font-mono font-bold text-neutral-400 px-1">
-                        {msg.sender_name}
-                      </span>
+                      <div className="w-8 h-8 rounded-full bg-neutral-800 border border-neutral-700 text-emerald-400 font-bold text-[11px] flex items-center justify-center shrink-0 mb-1 select-none shadow-sm">
+                        {msg.sender_name.substring(0, 2).toUpperCase()}
+                      </div>
                     )}
 
-                    <div className="relative max-w-[85%] sm:max-w-[70%]">
-                      {/* Message Bubble */}
+                    <div className="relative min-w-0">
+                      {/* Sender Name badge for incoming messages */}
+                      {!isMe && (
+                        <span className="text-[10px] font-medium text-neutral-400 px-1 mb-1 block">
+                          {msg.sender_name}
+                        </span>
+                      )}
+
+                      {/* Message Bubble (Matching reference: soft rounded corners) */}
                       <div
-                        className={`p-3.5 rounded-2xl space-y-2 shadow-lg relative ${
+                        className={`p-3.5 px-4 rounded-2xl space-y-2 shadow-md relative transition-all ${
                           isMe
-                            ? 'bg-emerald-600/90 text-white rounded-br-none border border-emerald-500/40'
-                            : 'bg-neutral-900 text-neutral-100 rounded-bl-none border border-neutral-800'
+                            ? 'bg-emerald-600/95 hover:bg-emerald-600 text-white rounded-tr-sm border border-emerald-500/30'
+                            : 'bg-neutral-900 hover:bg-neutral-900/90 text-neutral-100 rounded-tl-sm border border-neutral-800/90'
                         }`}
                       >
                         {/* 3-Dots Options Trigger Icon in Corner */}
-                        <div className={`absolute top-2.5 ${isMe ? 'right-2.5' : 'right-2.5'} z-20`}>
+                        <div className="absolute top-2 right-2 z-20">
                           <button
                             type="button"
                             onClick={(e) => {
@@ -2100,7 +2220,7 @@ export default function ClassChat({
                                   isMe ? 'right-0' : 'left-0'
                                 } w-56 sm:w-60 bg-neutral-900/98 border border-neutral-750 backdrop-blur-2xl rounded-2xl shadow-2xl p-2 z-[100] text-neutral-200 space-y-1.5 font-sans`}
                               >
-                                {/* Option 3: Reagir (With reaction emojis on the side) */}
+                                {/* Option 3: Reagir */}
                                 <div className="p-2.5 rounded-xl bg-neutral-950/90 border border-neutral-800 space-y-1.5">
                                   <div className="flex items-center justify-between text-[11px] font-extrabold text-neutral-300">
                                     <span className="flex items-center gap-1.5">
@@ -2245,7 +2365,7 @@ export default function ClassChat({
                           </div>
                         ) : (
                           msg.content && (
-                            <p className="text-xs leading-relaxed whitespace-pre-wrap break-words pr-5">
+                            <p className="text-xs sm:text-sm leading-relaxed whitespace-pre-wrap break-words pr-5">
                               {censorProfanity(msg.content).censoredText}
                             </p>
                           )
@@ -2253,7 +2373,7 @@ export default function ClassChat({
 
                         {/* Footer Timestamp & Edit Status */}
                         <div className={`flex items-center justify-end gap-1.5 text-[9px] font-mono ${
-                          isMe ? 'text-emerald-200' : 'text-neutral-500'
+                          isMe ? 'text-emerald-100/80' : 'text-neutral-400'
                         }`}>
                           {msg.is_edited && (
                             <span className="italic opacity-80">(editada)</span>
@@ -2263,7 +2383,7 @@ export default function ClassChat({
                         </div>
                       </div>
 
-                      {/* FLOATING REACTION PILL BADGE ATTACHED AT BOTTOM CORNER (Matching attached image!) */}
+                      {/* FLOATING REACTION PILL BADGE ATTACHED AT BOTTOM CORNER */}
                       {msg.reactions && Object.keys(msg.reactions).length > 0 && (
                         <div className={`absolute -bottom-3 ${isMe ? 'right-2' : 'left-2'} z-20 flex items-center gap-1`}>
                           <button
@@ -2292,6 +2412,13 @@ export default function ClassChat({
                         </div>
                       )}
                     </div>
+
+                    {/* Outgoing user avatar on right (Matching reference) */}
+                    {isMe && (
+                      <div className="w-8 h-8 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 font-bold text-[11px] flex items-center justify-center shrink-0 mb-1 select-none shadow-sm">
+                        {currentUserName.substring(0, 2).toUpperCase()}
+                      </div>
+                    )}
                   </div>
                 );
               })
@@ -2356,77 +2483,152 @@ export default function ClassChat({
             </div>
           )}
 
-          {/* Chat Input Bar */}
-          <form
-            onSubmit={handleSendMessage}
-            className="p-3.5 px-4 pb-3.5 bg-neutral-950 border-t border-neutral-900 flex items-center gap-2 shrink-0 relative z-50 transition-all duration-300"
-          >
-            {/* Hidden File Input */}
-            <input
-              ref={fileInputRef}
-              type="file"
-              className="hidden"
-              accept="image/*,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.zip,.rar"
-              onChange={handleFileChange}
-            />
-
-            {/* Attach File Button */}
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="p-2.5 bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-emerald-400 rounded-xl border border-neutral-850 transition-all cursor-pointer active:scale-95"
-              title="Anexar Imagem ou Documento"
+          {/* Chat Input Bar (Sleek pill matching reference) */}
+          <div className="p-3 sm:p-4 bg-gradient-to-t from-neutral-950 via-neutral-950/95 to-transparent shrink-0">
+            <form
+              onSubmit={handleSendMessage}
+              className="flex items-center gap-2 bg-neutral-900/95 border border-neutral-800 rounded-2xl p-2 pl-3 shadow-2xl focus-within:border-emerald-500/50 transition-all relative z-50"
             >
-              <Paperclip className="w-4 h-4" />
-            </button>
+              {/* Hidden File Input */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                className="hidden"
+                accept="image/*,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.zip,.rar"
+                onChange={handleFileChange}
+              />
 
-            {/* Quick Emoji Toggle Button */}
-            <button
-              type="button"
-              onClick={() => setShowEmojiPicker(prev => !prev)}
-              className={`p-2.5 rounded-xl border transition-all cursor-pointer active:scale-95 ${
-                showEmojiPicker 
-                  ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' 
-                  : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-400 border-neutral-850'
-              }`}
-              title="Inserir Emoji"
-            >
-              <Smile className="w-4 h-4" />
-            </button>
+              {/* Attach File Button */}
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="p-2 text-neutral-400 hover:text-emerald-400 hover:bg-neutral-800/80 rounded-xl transition-all cursor-pointer active:scale-95 shrink-0"
+                title="Anexar Imagem ou Documento"
+              >
+                <Paperclip className="w-4 h-4" />
+              </button>
 
-            {/* Textarea / Input */}
-            <input
-              type="text"
-              placeholder={`Escrever mensagem para ${activeContact.name}...`}
-              value={messageInput}
-              onChange={(e) => setMessageInput(e.target.value)}
-              className="flex-1 px-4 py-2.5 bg-neutral-900 border border-neutral-850 rounded-xl text-xs text-neutral-100 placeholder-neutral-500 outline-none focus:border-emerald-500/50"
-            />
+              {/* Quick Emoji Toggle Button */}
+              <button
+                type="button"
+                onClick={() => setShowEmojiPicker(prev => !prev)}
+                className={`p-2 rounded-xl transition-all cursor-pointer active:scale-95 shrink-0 ${
+                  showEmojiPicker 
+                    ? 'bg-emerald-500/20 text-emerald-400' 
+                    : 'text-neutral-400 hover:text-emerald-400 hover:bg-neutral-800/80'
+                }`}
+                title="Inserir Emoji"
+              >
+                <Smile className="w-4 h-4" />
+              </button>
 
-            {/* Send Button */}
-            <button
-              type="submit"
-              disabled={!messageInput.trim() && !selectedFile}
-              className={`relative z-50 p-2.5 rounded-xl font-extrabold transition-all flex items-center justify-center cursor-pointer active:scale-95 ${
-                messageInput.trim() || selectedFile
-                  ? 'bg-emerald-500 hover:bg-emerald-400 text-neutral-950 shadow-lg shadow-emerald-500/20'
-                  : 'bg-neutral-900 text-neutral-600 border border-neutral-850 cursor-not-allowed'
-              }`}
-              title="Enviar Mensagem"
-            >
-              <Send className="w-4 h-4" />
-            </button>
-          </form>
+              {/* Text Input */}
+              <input
+                type="text"
+                placeholder={`Escreva uma mensagem para ${activeContact.name}...`}
+                value={messageInput}
+                onChange={(e) => setMessageInput(e.target.value)}
+                className="flex-1 bg-transparent text-xs sm:text-sm text-neutral-100 placeholder-neutral-500 outline-none px-2 py-1 min-w-0"
+              />
+
+              {/* Send Button */}
+              <button
+                type="submit"
+                disabled={!messageInput.trim() && !selectedFile}
+                className={`p-2.5 rounded-xl font-bold transition-all flex items-center justify-center cursor-pointer active:scale-95 shrink-0 ${
+                  messageInput.trim() || selectedFile
+                    ? 'bg-emerald-500 hover:bg-emerald-400 text-neutral-950 shadow-md shadow-emerald-500/25'
+                    : 'bg-neutral-800/60 text-neutral-600 cursor-not-allowed'
+                }`}
+                title="Enviar Mensagem"
+              >
+                <Send className="w-4 h-4" />
+              </button>
+            </form>
+          </div>
         </div>
       ) : (
         <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-neutral-500 space-y-3 bg-[#050806]">
-          <MessageSquare className="w-12 h-12 text-neutral-700" />
+          <div className="w-14 h-14 rounded-full bg-neutral-900 border border-neutral-800 flex items-center justify-center shadow-md">
+            <MessageSquare className="w-7 h-7 text-neutral-600" />
+          </div>
           <h3 className="text-sm font-bold text-neutral-300">Selecione uma conversa</h3>
-          <p className="text-xs text-neutral-500 max-w-xs">
+          <p className="text-xs text-neutral-500 max-w-xs leading-relaxed">
             Escolha um colega ou professor na lista ao lado para iniciar um chat privado da turma.
           </p>
         </div>
       )}
+
+      {/* Educational Call Modal */}
+      <AnimatePresence>
+        {showCallModal && activeContact && (
+          <div className="fixed inset-0 z-[400] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className="max-w-md w-full bg-neutral-900 border border-neutral-800 rounded-3xl p-6 shadow-2xl relative space-y-4 text-neutral-200"
+            >
+              <div className="flex items-center justify-between pb-3 border-b border-neutral-800">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                    <Phone className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-white">Chamada Escolar Monitorada</h3>
+                    <p className="text-[10px] text-neutral-400 font-mono">Canal Pedagógico Athenas</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowCallModal(false)}
+                  className="p-1.5 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800 transition-colors cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-neutral-950 border border-neutral-800 text-center space-y-3">
+                <div className="w-14 h-14 rounded-full bg-neutral-850 border border-neutral-750 text-emerald-400 font-bold text-lg mx-auto flex items-center justify-center">
+                  {activeContact.name.substring(0, 2).toUpperCase()}
+                </div>
+                <div>
+                  <h4 className="text-sm font-extrabold text-white">{activeContact.name}</h4>
+                  <p className="text-xs text-emerald-400 mt-0.5">Disponível na plataforma da turma</p>
+                </div>
+                <p className="text-[11px] text-neutral-400 leading-relaxed">
+                  As chamadas entre membros da comunidade escolar são pedagógicas e supervisionadas para a segurança e monitoramento contínuo dos responsáveis e professores.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    alert(`Iniciando solicitação de chamada de áudio com ${activeContact.name}...`);
+                    setShowCallModal(false);
+                  }}
+                  className="p-3 rounded-2xl bg-neutral-800 hover:bg-neutral-750 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
+                >
+                  <Phone className="w-4 h-4 text-emerald-400" />
+                  <span>Áudio</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    alert(`Iniciando solicitação de chamada de vídeo com ${activeContact.name}...`);
+                    setShowCallModal(false);
+                  }}
+                  className="p-3 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-neutral-950 font-black text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-lg shadow-emerald-500/20"
+                >
+                  <Video className="w-4 h-4 stroke-[2.5]" />
+                  <span>Vídeo</span>
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Lightbox Modal for Image Preview */}
       <AnimatePresence>
