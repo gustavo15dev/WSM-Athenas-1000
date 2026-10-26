@@ -1,6 +1,6 @@
 {
-  "summary":  "Plano de implementação para o alinhamento visual dos 3 cards de ação, preenchimento de prompt sem envio automático, novo placeholder da caixa de mensagem e recurso de menção com '@' para anexar provas e simulados pendentes da turma do aluno.",
-  "updatedAt":  "2026-10-22T17:33:59.555580102Z",
+  "summary":  "Plano de implementação detalhado da Conta dos Pais (Parent Portal) no WSM Athenas.\nInclui o fluxo de cadastro e login de responsáveis, código de vínculo de 4 dígitos (gerado pelo aluno nas configurações com limite de 5 responsáveis por aluno), suporte a múltiplos filhos para os pais, bloqueio de navegação sem aluno vinculado, tela com passo a passo e tag 'NOVO' na Home pública, e dashboard com métricas completas e réplica visual do chat de IA da Athenas. Contém também o script SQL pronto para execução no Supabase.",
+  "updatedAt":  "2026-10-25T20:13:22.656203421Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

@@ -10,6 +10,7 @@ import PortalHome from './components/PortalHome';
 import LoginModal from './components/LoginModal';
 import StudentDashboard from './components/StudentDashboard';
 import TeacherDashboard from './components/TeacherDashboard';
+import ParentDashboard from './components/ParentDashboard';
 import SleekDashboard from './components/SleekDashboard';
 import AdminPortal from './components/AdminPortal';
 import { supabase } from './supabase';
@@ -52,6 +53,8 @@ export default function App() {
           setScreen('STUDENT_DASHBOARD');
         } else if (savedRole === 'teacher') {
           setScreen('TEACHER_DASHBOARD');
+        } else if (savedRole === 'parent') {
+          setScreen('PARENT_DASHBOARD');
         }
         return;
       }
@@ -77,6 +80,8 @@ export default function App() {
             setScreen('STUDENT_DASHBOARD');
           } else if (role === 'teacher') {
             setScreen('TEACHER_DASHBOARD');
+          } else if (role === 'parent') {
+            setScreen('PARENT_DASHBOARD');
           }
         }
       } catch (err) {
@@ -194,6 +199,8 @@ export default function App() {
       setScreen('STUDENT_DASHBOARD');
     } else if (activeRole === 'teacher') {
       setScreen('TEACHER_DASHBOARD');
+    } else if (activeRole === 'parent') {
+      setScreen('PARENT_DASHBOARD');
     } else {
       setScreen('DASHBOARD_EMPTY');
     }
@@ -254,7 +261,7 @@ export default function App() {
   };
 
   return (
-    <div className="bg-[#050706] min-h-screen max-w-full overflow-x-hidden text-neutral-100 selection:bg-emerald-500/30 selection:text-emerald-100">
+    <div className="bg-[#050706] min-h-screen w-full text-neutral-100 selection:bg-emerald-500/30 selection:text-emerald-100">
       <AnimatePresence mode="wait">
         {screen === 'PORTAL_HOME' && (
           <motion.div
@@ -326,6 +333,22 @@ export default function App() {
           </motion.div>
         )}
 
+        {screen === 'PARENT_DASHBOARD' && (
+          <motion.div
+            key="parent-dashboard"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            transition={{ duration: 0.3 }}
+            className="w-full"
+          >
+            <ParentDashboard
+              email={userEmail}
+              onLogout={handleLogout}
+            />
+          </motion.div>
+        )}
+
         {screen === 'DASHBOARD_EMPTY' && (
           <motion.div
             key="dashboard-empty"
@@ -361,6 +384,8 @@ export default function App() {
                     setScreen('STUDENT_DASHBOARD');
                   } else if (activeRole === 'teacher') {
                     setScreen('TEACHER_DASHBOARD');
+                  } else if (activeRole === 'parent') {
+                    setScreen('PARENT_DASHBOARD');
                   } else {
                     setScreen('DASHBOARD_EMPTY');
                   }

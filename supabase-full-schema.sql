@@ -38,7 +38,7 @@ SET session_replication_role = 'origin';
 CREATE TABLE public.wsm_user_profiles (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     email TEXT NOT NULL UNIQUE,
-    role TEXT NOT NULL CHECK (role IN ('student', 'teacher')),
+    role TEXT NOT NULL CHECK (role IN ('student', 'teacher', 'admin', 'parent')),
     nome_completo TEXT NOT NULL,
     turma TEXT,
     numero_chamada INTEGER,
@@ -294,7 +294,29 @@ WITH CHECK (true);
 
 
 -- -------------------------------------------------------------------------
--- PASSO 13: CRIAÇÃO DOS ÍNDICES DE DESEMPENHO E VELOCIDADE
+-- PASSO 13: CRIAÇÃO DA TABELA DE VÍNCULOS COM PAIS (wsm_student_parent_links)
+-- -------------------------------------------------------------------------
+CREATE TABLE public.wsm_student_parent_links (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    student_email TEXT NOT NULL,
+    student_name TEXT,
+    parent_email TEXT,
+    link_code TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'active', 'revoked')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
+    linked_at TIMESTAMPTZ
+);
+
+ALTER TABLE public.wsm_student_parent_links ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Acesso total a vinculos de pais"
+ON public.wsm_student_parent_links FOR ALL
+USING (true)
+WITH CHECK (true);
+
+
+-- -------------------------------------------------------------------------
+-- PASSO 14: CRIAÇÃO DOS ÍNDICES DE DESEMPENHO E VELOCIDADE
 -- -------------------------------------------------------------------------
 CREATE INDEX IF NOT EXISTS idx_wsm_profiles_email ON public.wsm_user_profiles(email);
 CREATE INDEX IF NOT EXISTS idx_wsm_profiles_turma ON public.wsm_user_profiles(turma);

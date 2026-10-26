@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   ArrowLeft, User, Lock, Sparkles, Key, AlertCircle, CheckCircle, UserPlus, LogIn, 
   Database, CloudLightning, Hash, BookOpen, Building2, RotateCcw, ShieldCheck, Mail, Send,
-  MapPin, Search, ChevronDown, Check, GraduationCap
+  MapPin, Search, ChevronDown, Check, GraduationCap, Users
 } from 'lucide-react';
 import { PortalRole } from '../types';
 import { supabase } from '../supabase';
@@ -53,12 +53,16 @@ interface LoginModalProps {
 
 export default function LoginModal({ role, onBack, onLoginSuccess }: LoginModalProps) {
   const isStudent = role === 'student';
+  const isParent = role === 'parent';
+  const isTeacher = role === 'teacher';
   
   // Tab control: 'signin' | 'signup'
   const [activeTab, setActiveTab] = useState<'signin' | 'signup'>('signin');
 
   // Custom smart default suggestion
-  const defaultEmail = isStudent ? 'gustavo.aluno@athenas.edu.br' : 'athena.prof@athenas.edu.br';
+  const defaultEmail = isStudent 
+    ? 'gustavo.aluno@athenas.edu.br' 
+    : (isParent ? 'pais@exemplo.com' : 'athena.prof@athenas.edu.br');
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -234,16 +238,16 @@ export default function LoginModal({ role, onBack, onLoginSuccess }: LoginModalP
 
   const isPasswordValid = password.length >= 6;
   const isConfirmValid = activeTab === 'signin' || (password === confirmPassword && confirmPassword.length >= 6);
-  const isEscolaValid = activeTab === 'signin' || (
+  const isEscolaValid = isParent || activeTab === 'signin' || (
     escola.trim().length > 0 && 
     (!isStudent || (estado.trim().length > 0 && cidade.trim().length > 0))
   );
-  const isStudentValid = !isStudent || activeTab === 'signin' || (
+  const isStudentValid = !isStudent || isParent || activeTab === 'signin' || (
     nomeAluno.trim().length > 0 &&
     numeroChamada.trim().length > 0 &&
     parseInt(numeroChamada) > 0
   );
-  const isTeacherValid = isStudent || activeTab === 'signin' || (
+  const isTeacherValid = !isTeacher || isParent || activeTab === 'signin' || (
     nomeProfessor.trim().length > 0 &&
     materiaProfessor.trim().length > 0
   );
@@ -481,7 +485,7 @@ export default function LoginModal({ role, onBack, onLoginSuccess }: LoginModalP
         return;
       }
 
-      if (!escola.trim()) {
+      if (!isParent && !escola.trim()) {
         setError('Por favor, informe a sua Escola / Instituição de Ensino.');
         return;
       }
@@ -542,17 +546,20 @@ export default function LoginModal({ role, onBack, onLoginSuccess }: LoginModalP
           .maybeSingle();
 
         if (existingProfile) {
-          const roleLabel = existingProfile.role === 'student' ? 'Aluno' : 'Professor';
-          setError(`Este e-mail (${targetEmail}) já está cadastrado como ${roleLabel}. Não é possível cadastrá-lo como ${role === 'student' ? 'Aluno' : 'Professor'}.`);
+          const roleLabel = existingProfile.role === 'student' ? 'Aluno' : (existingProfile.role === 'parent' ? 'Responsável' : 'Professor');
+          const requestedLabel = role === 'student' ? 'Aluno' : (role === 'parent' ? 'Responsável' : 'Professor');
+          setError(`Este e-mail (${targetEmail}) já está cadastrado como ${roleLabel}. Não é possível cadastrá-lo como ${requestedLabel}.`);
           setIsLoading(false);
           return;
         }
 
-        const fullEscolaData = isStudent && estado && cidade
-          ? (schoolSelected?.codigoInep && schoolSelected.codigoInep !== 'Não informado'
-              ? `${schoolSelected.nome} (INEP: ${schoolSelected.codigoInep}) - ${cidade}/${estado}`
-              : `${escola.trim()} - ${cidade}/${estado}`)
-          : escola.trim();
+        const fullEscolaData = isParent
+          ? 'Responsável'
+          : (isStudent && estado && cidade
+              ? (schoolSelected?.codigoInep && schoolSelected.codigoInep !== 'Não informado'
+                  ? `${schoolSelected.nome} (INEP: ${schoolSelected.codigoInep}) - ${cidade}/${estado}`
+                  : `${escola.trim()} - ${cidade}/${estado}`)
+              : escola.trim());
 
         const { data, error: suError } = await supabase.auth.signUp({
           email: targetEmail,
@@ -560,7 +567,7 @@ export default function LoginModal({ role, onBack, onLoginSuccess }: LoginModalP
           options: {
             data: {
               role: role,
-              nome_completo: role === 'student' ? nomeAluno.trim() : nomeProfessor.trim(),
+              nome_completo: role === 'student' ? nomeAluno.trim() : (role === 'parent' ? 'Responsável' : nomeProfessor.trim()),
               escola: fullEscolaData,
               turma: role === 'student' ? validClassName : null,
               numero_chamada: role === 'student' ? parseInt(numeroChamada, 10) : null,
@@ -588,7 +595,7 @@ export default function LoginModal({ role, onBack, onLoginSuccess }: LoginModalP
             id: data.user.id,
             email: targetEmail,
             role: role,
-            nome_completo: role === 'student' ? nomeAluno.trim() : nomeProfessor.trim(),
+            nome_completo: role === 'student' ? nomeAluno.trim() : (role === 'parent' ? 'Responsável' : nomeProfessor.trim()),
             escola: fullEscolaData,
             turma: role === 'student' ? validClassName : null,
             numero_chamada: role === 'student' ? parseInt(numeroChamada, 10) : null,
@@ -603,14 +610,16 @@ export default function LoginModal({ role, onBack, onLoginSuccess }: LoginModalP
             console.error('Error creating/updating profile row:', profileError);
             let pMsg = profileError.message || 'Erro ao registrar os dados do perfil acadêmico.';
             if (
-              pMsg.toLowerCase().includes('numero_chamada') ||
-              pMsg.toLowerCase().includes('duplicate') ||
-              pMsg.toLowerCase().includes('unique') ||
-              pMsg.toLowerCase().includes('violates')
+              role === 'student' && (
+                pMsg.toLowerCase().includes('numero_chamada') ||
+                pMsg.toLowerCase().includes('chamada')
+              )
             ) {
               pMsg = `O número de chamada ${numeroChamada} já está em uso na turma "${validClassName}". Por favor, confirme seu número correto de chamada ou consulte a coordenação.`;
             }
-            throw new Error(pMsg);
+            if (role !== 'parent') {
+              throw new Error(pMsg);
+            }
           }
           
           if (role === 'student' && turma) {
@@ -653,7 +662,8 @@ export default function LoginModal({ role, onBack, onLoginSuccess }: LoginModalP
 
         // Cache locally for instant access
         localStorage.setItem('wsm_authenticated_user_email', loginEmail);
-        localStorage.setItem(`wsm_profile_nome_${loginEmail}`, role === 'student' ? nomeAluno.trim() : nomeProfessor.trim());
+        localStorage.setItem(`wsm_profile_role_${loginEmail}`, role);
+        localStorage.setItem(`wsm_profile_nome_${loginEmail}`, role === 'student' ? nomeAluno.trim() : (role === 'parent' ? 'Responsável' : nomeProfessor.trim()));
         localStorage.setItem(`wsm_profile_escola_${loginEmail}`, fullEscolaData);
         if (role === 'student') {
           localStorage.setItem(`wsm_profile_chamada_${loginEmail}`, String(numeroChamada.trim()));
@@ -704,14 +714,14 @@ export default function LoginModal({ role, onBack, onLoginSuccess }: LoginModalP
           const cachedNome = localStorage.getItem(`wsm_profile_nome_${userEmail}`) || '';
           const cachedEscola = localStorage.getItem(`wsm_profile_escola_${userEmail}`) || '';
 
-          const resolvedRole = (profile?.role || userMeta.role || role) as 'student' | 'teacher';
+          const resolvedRole = (profile?.role || userMeta.role || role) as PortalRole;
           const resolvedTurma = profile?.turma || userMeta.turma || cachedTurma || '';
           const resolvedChamada = profile?.numero_chamada !== undefined && profile?.numero_chamada !== null
             ? profile.numero_chamada
             : (userMeta.numero_chamada !== undefined && userMeta.numero_chamada !== null
               ? userMeta.numero_chamada
               : cachedChamada);
-          const resolvedNome = profile?.nome_completo || userMeta.nome_completo || cachedNome || (resolvedRole === 'student' ? 'Estudante' : 'Docente');
+          const resolvedNome = profile?.nome_completo || userMeta.nome_completo || cachedNome || (resolvedRole === 'student' ? 'Estudante' : (resolvedRole === 'parent' ? 'Responsável' : 'Docente'));
           const resolvedEscola = profile?.escola || userMeta.escola || cachedEscola || '';
 
           // Re-sync and persist the authenticated user profile
@@ -775,8 +785,9 @@ export default function LoginModal({ role, onBack, onLoginSuccess }: LoginModalP
           if (profile) {
             if (profile.role && profile.role !== role) {
               await supabase.auth.signOut();
-              const reqText = role === 'student' ? 'Aluno' : 'Professor';
-              const curText = profile.role === 'student' ? 'Aluno' : 'Professor';
+              const getRoleLabel = (r: string) => r === 'student' ? 'Aluno' : (r === 'parent' ? 'Responsável' : 'Professor');
+              const reqText = getRoleLabel(role);
+              const curText = getRoleLabel(profile.role);
               setError(`Este e-mail está cadastrado como ${curText} e não possui permissão para acessar a área do ${reqText}.`);
               setIsLoading(false);
               return;
@@ -820,7 +831,7 @@ export default function LoginModal({ role, onBack, onLoginSuccess }: LoginModalP
   };
 
   return (
-    <div className="relative min-h-screen w-full flex flex-col justify-start sm:justify-center items-center p-4 sm:p-6 md:p-8 overflow-y-auto uiverse-dark-grid text-white py-6 sm:py-12">
+    <div className="relative min-h-screen w-full flex flex-col justify-start sm:justify-center items-center p-4 sm:p-6 md:p-8 uiverse-dark-grid text-white py-4 sm:py-6 md:py-8">
       {/* Background decor */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(2,195,154,0.08),transparent_70%)] pointer-events-none" />
       <div 
@@ -835,9 +846,9 @@ export default function LoginModal({ role, onBack, onLoginSuccess }: LoginModalP
         transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
         className="w-full max-w-5xl relative z-10 rounded-3xl bg-neutral-950/60 border border-neutral-800/80 backdrop-blur-2xl shadow-3xl overflow-visible my-auto"
       >
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-0 md:min-h-[600px]">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-0 md:min-h-[540px]">
           {/* Lado do Formulário */}
-          <div className="col-span-1 md:col-span-6 p-6 sm:p-8 md:p-10 flex flex-col justify-between relative">
+          <div className="col-span-1 md:col-span-6 p-6 sm:p-8 flex flex-col justify-between relative">
             <div>
               {/* Glow corner decorations */}
               <div className="absolute -top-10 -right-10 w-40 h-40 bg-[#02c39a]/10 rounded-full blur-3xl pointer-events-none" />
@@ -867,7 +878,7 @@ export default function LoginModal({ role, onBack, onLoginSuccess }: LoginModalP
                 </div>
                 <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#02c39a]/10 border border-[#02c39a]/20 text-[#02c39a] rounded-full text-xs font-mono font-medium mb-3">
                   <Sparkles className="w-3.5 h-3.5 animate-pulse" />
-                  <span>Portal do {isStudent ? 'Aluno' : 'Professor'}</span>
+                  <span>{isParent ? 'Área dos Pais & Responsáveis' : `Portal do ${isStudent ? 'Aluno' : 'Professor'}`}</span>
                 </div>
                 <h2 className="text-2xl font-extrabold text-neutral-100 font-display tracking-tight">
                   {showForgot ? (forgotStep === 1 ? 'Esqueceu a senha?' : 'Redefinir Senha') : activeTab === 'signin' ? 'Acesse sua área' : 'Crie sua conta'}
@@ -1255,7 +1266,7 @@ export default function LoginModal({ role, onBack, onLoginSuccess }: LoginModalP
                         </div>
 
                         {/* Generic school input only for teachers */}
-                        {!isStudent && (
+                        {!isStudent && !isParent && (
                           <div className="animate-slideDown">
                             <label className="block text-xs font-semibold text-neutral-400 tracking-wider uppercase mb-1.5">
                               Escola / Instituição de Ensino
@@ -1286,6 +1297,19 @@ export default function LoginModal({ role, onBack, onLoginSuccess }: LoginModalP
                           </div>
                         )}
                       </>
+                    )}
+
+                    {/* Parent signup info note */}
+                    {isParent && activeTab === 'signup' && (
+                      <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl text-xs text-emerald-200 space-y-1.5 animate-slideDown">
+                        <p className="font-bold flex items-center gap-1.5 text-emerald-400">
+                          <Users className="w-4 h-4 shrink-0 text-emerald-400" />
+                          <span>Cadastro Rápido de Pais & Responsáveis</span>
+                        </p>
+                        <p className="leading-relaxed text-neutral-300 text-[11.5px]">
+                          Basta cadastrar seu <strong>e-mail e senha</strong>. Logo após entrar, você informará o código de 4 dígitos gerado pelo seu filho para vincular a conta e ter acesso completo às notas, simulados e ao chat da IA!
+                        </p>
+                      </div>
                     )}
 
                     {/* Student fields */}
@@ -1609,7 +1633,7 @@ export default function LoginModal({ role, onBack, onLoginSuccess }: LoginModalP
                     )}
 
                     {/* Teacher fields */}
-                    {!isStudent && activeTab === 'signup' && (
+                    {!isStudent && !isParent && activeTab === 'signup' && (
                       <div className="space-y-4 animate-slideDown">
                         <div>
                           <label className="block text-xs font-semibold text-neutral-400 tracking-wider uppercase mb-1.5">
@@ -1735,7 +1759,7 @@ export default function LoginModal({ role, onBack, onLoginSuccess }: LoginModalP
 
           {/* Lado da Imagem com cantos arredondados */}
           <div className="hidden md:block md:col-span-6 p-4">
-            <div className="relative w-full h-full min-h-[500px] rounded-2xl overflow-hidden shadow-2xl border border-neutral-800/40">
+            <div className="relative w-full h-full min-h-[460px] rounded-2xl overflow-hidden shadow-2xl border border-neutral-800/40">
               <img
                 src="https://i.ibb.co/dsNgMZMN/2.jpg"
                 alt="Arte Athenas"

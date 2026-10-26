@@ -1,96 +1,166 @@
-# Menção de Provas com '@' e Ajuste dos Cards de Ação
+# Conta dos Pais (Parent Portal) & Vínculo Familiar — WSM Athenas
 
-Alinhamento visual dos cartões de ação na tela inicial do chat, comportamento de preenchimento de texto na caixa de entrada sem disparo automático, novo placeholder intuitivo e implementação do menu flutuante de menção com `@` para anexar provas e simulados pendentes da turma com injeção contextual de conteúdo de estudos na IA Athenas.
+Implementação completa do portal para pais e responsáveis no WSM Athenas, permitindo o acompanhamento em tempo real das métricas acadêmicas, simulados, notas e visualização fidedigna das conversas do aluno com a IA Athenas, com sistema seguro de vínculo por código de 4 dígitos.
 
-### User Review & Critical Decisions
+---
+
+## Decisões Críticas & Validações
 
 > [!IMPORTANT]
-> Decisões alinhadas diretamente com as instruções e respostas do usuário:
-
-- **Confirmed Decision 1 - Alinhamento Visual dos Cards**: Ajuste de flexbox/grid (`items-stretch`, `h-full`, alinhamento superior com títulos e descrições na mesma linha) para que o 3º card ("Revise para prova") não fique deslocado verticalmente para baixo em relação aos outros dois.
-- **Confirmed Decision 2 - Preenchimento sem Envio Automático**: Clicar nos botões agora apenas insere o texto pré-definido correspondente no campo de digitação e foca o cursor no final do texto, sem enviar a mensagem:
-  - **Crie Simulados**: `"Crie um simulado pra mim sobre "`
-  - **Aprenda Conteúdo**: `"Quero aprender sobre: "`
-  - **Revise para prova**: `"Quero estudar para prova. A Matéria é "`
-- **Confirmed Decision 3 - Novo Placeholder da Caixa de Entrada**: Substituição do placeholder `"Pergunte alguma coisa"` por `"Digite algo ou @ para anexar alguma prova..."`.
-- **Confirmed Decision 4 - Menu Flutuante ao Digitar '@'**: Ao digitar `@` no campo de texto, abre-se um popover flutuante suspenso acima do input (estilo Gemini/Google, adaptado ao tema escuro Athenas) listando as provas presenciais e simulados pendentes da turma do aluno.
-- **Confirmed Decision 5 - Destaque em Negrito Verde-Água & Contexto para IA**: A prova selecionada é inserida na mensagem como `@NomeDaProva` destacada em negrito verde-água. Ao submeter a mensagem, o conteúdo programático/descrição cadastrado pelo professor para aquela avaliação é injetado como contexto na IA Athenas para guiar os estudos e simulados.
+> **Segurança e Isolamento**: 
+> - O aluno gera um código de 4 caracteres alfanuméricos maiúsculos (ex: `K7A9`) na aba *Ajustes/Configurações*.
+> - Cada aluno pode ter no máximo **5 responsáveis vinculados**.
+> - Cada conta de pai/mãe pode vincular **ilimitados filhos** e alternar entre eles instantaneamente.
+> - Sem pelo menos 1 aluno vinculado, os pais ficam restritos à tela inicial de vínculo.
+> - O chat da IA é espelhado em modo de leitura com a mesma interface visual, preservando mensagens, anexos e raciocínio da IA.
 
 ---
 
-### 1. Overview & Core Concept
+## 1. Visão Geral & Escopo do Produto
 
-- **What It Does**: Facilita a interação do estudante com o chat da IA por meio de botões que preparam prompts com um toque e permite que o aluno mencione diretamente avaliações pendentes digitando `@`, abrindo um menu de seleção inteligente com dados da sua turma.
-- **Target Audience / Persona**: Estudantes do WSM Athenas que desejam direcionar suas dúvidas e simulados especificamente para as provas marcadas por seus professores.
-- **Key Value**: Elimina o trabalho manual de copiar o conteúdo da prova para a IA e padroniza a preparação focada nas matérias oficiais do calendário escolar.
-
----
-
-### 2. User Experience & Visual Design
-
-#### Key User Flows
-1. **Cards da Tela Inicial**:
-   - O estudante vê os 3 cards perfeitamente alinhados lado a lado, com ícones no topo, títulos alinhados no mesmo nível e descrições com leitura limpa.
-   - Ao clicar em um card, o texto é preenchido imediatamente na caixa de envio e o teclado/cursor é ativado.
-2. **Uso da Menção '@'**:
-   - O aluno digita `@` em qualquer ponto do campo de entrada.
-   - Um card suspenso flutuante surge acima do input exibindo a lista de **Provas e Simulados Pendentes da sua turma**.
-   - Cada item do menu apresenta:
-     - Ícone temático (Calendário para Prova Presencial, Computador/Troféu para Simulado Online).
-     - Título da prova em destaque (`text-sm font-semibold text-white`).
-     - Data e disciplina (`text-xs text-neutral-400`).
-   - O aluno clica (ou navega com as setas) e seleciona a prova.
-   - O `@` é substituído pela tag `@NomeDaProva`, estilizada visualmente em negrito verde-água (`text-emerald-400 font-bold`).
-3. **Envio da Mensagem com Contexto Delimitado**:
-   - Ao enviar a mensagem (ex: *"Quero estudar para a prova de @História - Era Vargas"*), o sistema extrai o conteúdo delimitado que a professora cadastrou para a prova e envia para a IA com `studyExamTheme` e `studyExamContent`.
-   - A IA Athenas responde no modo focado socrático com base no plano de aula e conteúdo daquela avaliação específica.
-
-#### Visual Identity & Theme
-- **Cards Superiores**:
-  - `grid-cols-1 sm:grid-cols-3 gap-3 items-stretch`.
-  - Altura uniforme, alinhamento flexível `flex flex-col justify-start items-start`, garantindo que os títulos e textos comecem no mesmo ponto vertical.
-- **Menu Popover do '@'**:
-  - `bg-[#121622] border border-neutral-800 rounded-2xl shadow-2xl p-2 max-h-64 overflow-y-auto`.
-  - Cabeçalho do menu: `text-[11px] font-bold text-neutral-400 uppercase tracking-wider px-3 py-1.5`.
-  - Itens: `px-3 py-2 rounded-xl hover:bg-neutral-800/80 text-left transition-colors cursor-pointer`.
-  - Badge de status e data em `text-xs text-emerald-400/80 font-mono`.
+- **Público-Alvo**: Pais, mães e responsáveis legais de alunos matriculados nas turmas do WSM Athenas.
+- **Proposta de Valor**: Transparência pedagógica e tranquilidade para a família. Os pais acompanham a evolução dos filhos, frequência de estudos, notas em simulados e a interação com a tutora inteligente (Athenas AI) sem interferir no aprendizado direto do estudante.
+- **Novos Papéis**: Expansão do sistema de autenticação para suportar `role: 'parent'` em conjunto com `student`, `teacher` e `admin`.
 
 ---
 
-### 3. Key Product Decisions & Trade-Offs
+## 2. Experiência do Usuário (UX) & Fluxos Visuais
 
-- **Decision 1 - Alinhamento dos Cards de Ação**:
-  - *Chosen Approach*: Mudar a estrutura interna de cada card de `justify-between` para `justify-start` com espaçamento padrão (`gap-1.5` ou `space-y-1.5`), garantindo que tanto o título quanto a descrição iniciem exatamente na mesma altura horizontal.
-  - *Why*: Evita o desnivelamento quando um card tem mais ou menos linhas que os outros.
+### Fluxo 1: Descoberta na Página Inicial (`PortalHome.tsx`)
+- Logo abaixo do título "Athenas", é exibido um card exclusivo em destaque com a tag **`NOVO`** (estilizada em verde-esmeralda/âmbar vibrante).
+- O card traz o tutorial visual ilustrado passo a passo:
+  1. *Peça ao seu filho para abrir o WSM Athenas e acessar os Ajustes.*
+  2. *Na aba "Vínculo com Pais", ele clica em "Gerar Código de 4 Dígitos".*
+  3. *Crie sua conta de Responsável ou faça login.*
+  4. *Insira o código de 4 dígitos para acompanhar tudo em tempo real!*
+- No cabeçalho da Home, além de "Entrar Aluno" e "Entrar Professor", há o novo botão de ação: **`Área dos Pais`** (com ícone familiar / escudo de proteção).
 
-- **Decision 2 - Interceptação do Caractere '@' no Input**:
-  - *Chosen Approach*: Monitorar o valor do `inputText` no `onChange` e `onKeyDown`. Quando o caractere `@` é digitado, ativa `showExamPicker = true`. Se apagado ou após seleção, oculta o popover.
-  - *Why*: Interface ágil e sem fricção, idêntica ao padrão de menções modernas.
+### Fluxo 2: Cadastro e Primeiro Acesso dos Pais (`LoginModal.tsx`)
+- Formulário simples e direto: **E-mail** e **Senha**.
+- Ao criar a conta e entrar pela primeira vez:
+  - Abre um modal de onboarding ilustrado explicando detalhadamente o passo a passo para obter o código com o filho.
+  - Botão **`Avançar`** que fecha a explicação e leva à tela inicial do painel.
 
-- **Decision 3 - Origem dos Dados de Provas e Simulados**:
-  - *Chosen Approach*: Passar a lista de `exams` e `mockExams` de `StudentDashboard` para `WsmChat`, com fallback de busca no Supabase (`wsm_exams` e `wsm_mock_exams`) caso o chat seja acessado diretamente.
-  - *Why*: Resposta instantânea sem recarregar a rede ao abrir o menu de menções.
+### Fluxo 3: Tela Inicial dos Pais com Bloqueio de Segurança (`ParentDashboard.tsx`)
+- Se o responsável ainda não tiver nenhum filho vinculado:
+  - Fica restrito à tela de boas-vindas com o card central em destaque para digitação do código de 4 dígitos (letras maiúsculas e números, auto-capitalizados).
+  - Abaixo do card de inserção, repete o tutorial passo a passo para consulta imediata.
+  - O menu e as demais abas do dashboard permanecem bloqueados até que o primeiro vínculo seja estabelecido com sucesso.
+
+### Fluxo 4: Aluno Gerando o Código nos Ajustes (`StudentDashboard.tsx`)
+- Dentro do modal de **Ajustes** do aluno, é adicionada a aba **`Vínculo com Pais`**.
+- Mostra o indicador de vagas: `X de 5 responsáveis vinculados`.
+- Botão interativo para gerar/renovar o código de 4 dígitos (ex: `H8N2`) com botão de copiar em um clique.
+- Lista dos pais já vinculados com e-mail, data do vínculo e opção do aluno remover o vínculo caso necessário.
+- Caso atinja o limite de 5 responsáveis, a geração de novos códigos é bloqueada e informa o limite atingido.
+
+### Fluxo 5: Dashboard Completo dos Pais (Pós-Vínculo)
+- **Seletor de Filhos (Multi-filhos)**: Barra superior elegante com abas ou dropdown para trocar entre os filhos vinculados (ex: *Lucas Silva - 8ºA*, *Mariana Silva - 6ºB*), com botão "+ Vincular outro filho".
+- **Aba 1: Métricas & Progresso**: Integração direta com o componente `StudentProgress`, exibindo tempo ativo de estudo, engajamento, radar de habilidades e taxa de acertos.
+- **Aba 2: Notas & Simulados**: Histórico de todos os simulados realizados pelo filho, notas obtidas, comparação com a média e devolutivas dos professores.
+- **Aba 3: Chat Athenas AI (Fidedigno)**: Réplica visual exata da interface do WSM Chat (mascote da coruja com animação de piscar, mensagens do aluno à direita, respostas da IA à esquerda com tempo de reflexão e raciocínio expansível), permitindo que os pais leiam na íntegra as dúvidas e interações do filho com a IA.
 
 ---
 
-### 4. Technical Architecture & Data Strategy
+## 3. Arquitetura do Sistema & Diagrama de Dados
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                       StudentDashboard.tsx                      │
-│  - exams (provas presenciais) & mockExams (simulados)           │
-│  - Passa como props para WsmChat                                │
-└────────────────────────────────┬────────────────────────────────┘
-                                 │
-                                 ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                           WsmChat.tsx                           │
-│  - 3 Cards com alinhamento vertical uniforme (justify-start)    │
-│  - onClick dos cards: preenche inputText e foca inputRef        │
-│  - Placeholder: "Digite algo ou @ para anexar alguma prova..."  │
-│  - Estado showExamMentionPopup: abre ao digitar '@'             │
-│  - FloatingExamMentionCard: lista provas pendentes              │
-│  - Ao selecionar: insere "@NomeDaProva" e armazena metadados    │
-│  - Ao enviar: transmite studyExamTheme e studyExamContent à IA  │
-└─────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────┐
+│                          PORTAL HOME                                   │
+│  [Entrar Aluno]   [Entrar Professor]   [Área dos Pais (NOVO Card)]     │
+└──────────────────────────────────┬─────────────────────────────────────┘
+                                   │
+         ┌─────────────────────────┴────────────────────────┐
+         ▼                                                  ▼
+┌──────────────────┐                              ┌──────────────────┐
+│ StudentDashboard │                              │ ParentDashboard  │
+│ - Ajustes        │                              │ - Onboarding     │
+│ - Aba Vínculo    │                              │ - Código 4 chars │
+│ - Gerar Código   │                              │ - Troca de Filho │
+│ - Limite: 5 pais │                              │ - Métricas       │
+└────────┬─────────┘                              │ - Simulados      │
+         │                                        │ - Chat IA Fiel   │
+         │ Cria código pendente                   └────────┬─────────┘
+         ▼                                                 │
+┌────────────────────────────────────────────────────────┐ │ Consulta
+│       Tabela Supabase: wsm_student_parent_links        │◄┘ e Ativa
+│ - id: UUID                                             │
+│ - student_email: TEXT                                  │
+│ - student_name: TEXT                                   │
+│ - parent_email: TEXT                                   │
+│ - link_code: VARCHAR(4) [A-Z0-9]                       │
+│ - status: 'pending' | 'active'                         │
+│ - created_at, linked_at: TIMESTAMPTZ                   │
+└────────────────────────────────────────────────────────┘
 ```
+
+---
+
+## 4. Script SQL para o Supabase
+
+Abaixo está o script SQL que deverá ser executado no console SQL do Supabase para criar a infraestrutura necessária:
+
+```sql
+-- 1. Criação da tabela de vínculos entre alunos e pais/responsáveis
+CREATE TABLE IF NOT EXISTS wsm_student_parent_links (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  student_email TEXT NOT NULL,
+  student_name TEXT,
+  parent_email TEXT,
+  link_code VARCHAR(4) NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending', -- 'pending' | 'active'
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  linked_at TIMESTAMPTZ
+);
+
+-- 2. Criação de índices otimizados para rápida verificação sem sobrecarregar o banco
+CREATE INDEX IF NOT EXISTS idx_parent_links_student ON wsm_student_parent_links(student_email);
+CREATE INDEX IF NOT EXISTS idx_parent_links_parent ON wsm_student_parent_links(parent_email);
+CREATE INDEX IF NOT EXISTS idx_parent_links_code ON wsm_student_parent_links(link_code);
+
+-- 3. Habilitação de Row Level Security (RLS) permissivo para a aplicação
+ALTER TABLE wsm_student_parent_links ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Politica de acesso publico para links de pais e alunos" ON wsm_student_parent_links;
+CREATE POLICY "Politica de acesso publico para links de pais e alunos" 
+  ON wsm_student_parent_links 
+  FOR ALL 
+  USING (true) 
+  WITH CHECK (true);
+```
+
+---
+
+## 5. Plano de Implementação em Arquivos
+
+1. **`src/types.ts`**:
+   - Atualizar `PortalRole` para `'student' | 'teacher' | 'parent'`.
+   - Atualizar `ScreenType` para incluir `'PARENT_DASHBOARD'`.
+   - Criar interface `StudentParentLink`.
+
+2. **`src/components/PortalHome.tsx`**:
+   - Adicionar o botão "Área dos Pais" no topo.
+   - Adicionar o card com a tag **`NOVO`** abaixo do título com o tutorial passo a passo dos pais.
+
+3. **`src/components/LoginModal.tsx`**:
+   - Suporte ao papel de `parent`: cadastro com apenas e-mail e senha (sem necessidade de turma/número de chamada).
+   - Card explicativo de primeiro acesso para pais com botão "Avançar".
+
+4. **`src/components/StudentDashboard.tsx`**:
+   - Na seção de Ajustes, criar a aba "Vínculo com Pais".
+   - Gerador do código de 4 dígitos (letras maiúsculas e números aleatórios).
+   - Validador do teto de 5 responsáveis vinculados.
+   - Lista dos pais atualmente vinculados.
+
+5. **`src/components/ParentDashboard.tsx` (Novo componente)**:
+   - Seletor de filhos ativos (com suporte a alternância instantânea).
+   - Bloqueio inicial se não tiver filho vinculado (mostrando o input de 4 dígitos e passo a passo).
+   - Exibição de Minhas Métricas (`StudentProgress`).
+   - Exibição de Simulados e Notas.
+   - Visualizador fidedigno do chat da IA Athenas em primeira mão (com todas as conversas e respostas).
+
+6. **`src/App.tsx`**:
+   - Roteamento e persistência de sessão para o perfil de `parent` e tela `PARENT_DASHBOARD`.
+
+7. **Verificação & Testes**:
+   - Execução de `compile_applet` e `lint_applet` para validação rigorosa de tipos e compilação.

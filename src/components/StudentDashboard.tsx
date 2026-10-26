@@ -43,7 +43,10 @@ import {
   Headphones,
   Key,
   Users,
-  School
+  School,
+  Copy,
+  Check,
+  ShieldCheck
 } from 'lucide-react';
 import { matchesStudentTarget, matchesStudentExam, formatTargetDisplayName } from '../utils/targetMatcher';
 import { parseExamSettings, cleanExamContent, cleanNotificationMessage, formatExamDateDisplay, cleanExamObservations, extractExamTime } from '../utils/examSettings';
@@ -72,7 +75,14 @@ import VirtualNotebook from './VirtualNotebook';
 import StudentProgress from './StudentProgress';
 import { startRealtimeNotificationListener } from '../utils/browserNotifications';
 import { supabase } from '../supabase';
-import { safeUpsertUserProfile, areTurmasMatching, setWelcomeModalDismissedInDb } from '../utils/profileDb';
+import { 
+  safeUpsertUserProfile, 
+  areTurmasMatching, 
+  setWelcomeModalDismissedInDb,
+  fetchStudentParentLinks,
+  generateParentLinkCode,
+  removeStudentParentLink
+} from '../utils/profileDb';
 import { getStudentTeachers } from '../utils/studentTeachers';
 
 interface StudentDashboardProps {
@@ -189,7 +199,58 @@ export default function StudentDashboard({
   const [savingGmail, setSavingGmail] = useState(false);
   const [gmailStatus, setGmailStatus] = useState<{ type: 'success' | 'error', msg: string } | null>(null);
   const [isEditingGmail, setIsEditingGmail] = useState(false);
-  const [activeSettingsTab, setActiveSettingsTab] = useState<'profile' | 'notifications'>('profile');
+  const [activeSettingsTab, setActiveSettingsTab] = useState<'profile' | 'notifications' | 'vincular_pais'>('profile');
+  
+  // Parent linking states for student
+  const [studentParentLinks, setStudentParentLinks] = useState<any[]>([]);
+  const [pendingParentCode, setPendingParentCode] = useState<string | null>(null);
+  const [loadingParentLinks, setLoadingParentLinks] = useState(false);
+  const [generatingParentCode, setGeneratingParentCode] = useState(false);
+  const [parentLinkError, setParentLinkError] = useState<string | null>(null);
+  const [copiedCodeSuccess, setCopiedCodeSuccess] = useState(false);
+
+  const loadParentLinks = async () => {
+    if (!email) return;
+    setLoadingParentLinks(true);
+    setParentLinkError(null);
+    try {
+      const { active, pendingCode } = await fetchStudentParentLinks(email);
+      setStudentParentLinks(active || []);
+      setPendingParentCode(pendingCode || null);
+    } catch (err: any) {
+      console.warn('Erro ao carregar vínculos com os pais:', err);
+    } finally {
+      setLoadingParentLinks(false);
+    }
+  };
+
+  const handleGenerateCode = async () => {
+    if (!email) return;
+    setGeneratingParentCode(true);
+    setParentLinkError(null);
+    try {
+      const res = await generateParentLinkCode(email, profile?.nome_completo || setName || 'Aluno(a)');
+      if (!res.success) {
+        setParentLinkError(res.error || 'Não foi possível gerar o código.');
+      } else {
+        setPendingParentCode(res.code || null);
+      }
+    } catch (err: any) {
+      setParentLinkError('Erro ao gerar código.');
+    } finally {
+      setGeneratingParentCode(false);
+    }
+  };
+
+  const handleRemoveParentLink = async (linkId: string) => {
+    if (!confirm('Deseja desvincular este responsável?')) return;
+    try {
+      await removeStudentParentLink(linkId);
+      await loadParentLinks();
+    } catch (err) {
+      console.error('Erro ao desvincular:', err);
+    }
+  };
   const [isGmailCardDismissed, setIsGmailCardDismissed] = useState(() => {
     try {
       const clean = (email || '').toLowerCase().trim();
@@ -3741,6 +3802,26 @@ export default function StudentDashboard({
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
                 )}
               </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveSettingsTab('vincular_pais');
+                  loadParentLinks();
+                }}
+                className={`pb-2 text-xs font-bold transition-all relative flex items-center gap-1.5 ${
+                  activeSettingsTab === 'vincular_pais'
+                    ? 'text-amber-400 border-b-2 border-amber-500'
+                    : 'text-neutral-500 hover:text-neutral-300'
+                }`}
+              >
+                <Users className="w-3.5 h-3.5 text-amber-400" />
+                <span>Vínculo com Pais</span>
+                {studentParentLinks.length > 0 && (
+                  <span className="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded-full font-mono font-bold">
+                    {studentParentLinks.length}/5
+                  </span>
+                )}
+              </button>
             </div>
 
             {activeSettingsTab === 'profile' && (
@@ -4025,6 +4106,152 @@ export default function StudentDashboard({
                     {gmailStatus.msg}
                   </p>
                 )}
+              </div>
+            )}
+
+            {activeSettingsTab === 'vincular_pais' && (
+              <div className="space-y-4 animate-fadeIn text-left">
+                <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/25 relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/10 rounded-full blur-xl pointer-events-none" />
+                  <div className="flex items-start gap-3">
+                    <div className="p-2.5 bg-amber-500/15 border border-amber-500/30 text-amber-400 rounded-xl shrink-0 mt-0.5">
+                      <Users className="w-5 h-5" />
+                    </div>
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-bold text-amber-200 uppercase tracking-wider font-mono">
+                          Vínculo com Pais & Responsáveis
+                        </h4>
+                        <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                          {studentParentLinks.length} de 5 utilizados
+                        </span>
+                      </div>
+                      <p className="text-[11.5px] text-neutral-300 leading-relaxed">
+                        Gere um código de 4 dígitos (letras maiúsculas e números) para passar aos seus pais. Eles poderão acompanhar seu progresso, notas nos simulados e suas conversas com a IA Athenas.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {parentLinkError && (
+                  <div className="p-3 bg-red-500/10 border border-red-500/25 rounded-xl text-xs text-red-400 flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{parentLinkError}</span>
+                  </div>
+                )}
+
+                {/* Box do Código de 4 Dígitos */}
+                <div className="p-4 rounded-2xl bg-neutral-950/70 border border-neutral-850 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider font-mono">
+                      Código de Vínculo Atual
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleGenerateCode}
+                      disabled={generatingParentCode || studentParentLinks.length >= 5}
+                      className="px-3 py-1.5 bg-neutral-900 hover:bg-neutral-850 text-amber-300 hover:text-amber-200 border border-amber-500/30 rounded-xl text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center gap-1.5"
+                    >
+                      <Key className="w-3.5 h-3.5" />
+                      <span>{generatingParentCode ? 'Gerando...' : (pendingParentCode ? 'Gerar Novo Código' : 'Gerar Código de 4 Dígitos')}</span>
+                    </button>
+                  </div>
+
+                  {pendingParentCode ? (
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3.5 rounded-xl bg-neutral-900/90 border border-amber-500/40">
+                      <div className="flex items-center gap-3">
+                        <div className="px-4 py-2 bg-neutral-950 border border-amber-500/40 rounded-xl text-center">
+                          <span className="text-2xl font-black font-mono tracking-widest text-amber-400 selection:bg-amber-500 selection:text-neutral-950">
+                            {pendingParentCode}
+                          </span>
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-neutral-100">Código pronto para envio</p>
+                          <p className="text-[11px] text-neutral-400">Passe estes 4 dígitos para o seu responsável</p>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            await navigator.clipboard.writeText(pendingParentCode);
+                            setCopiedCodeSuccess(true);
+                            setTimeout(() => setCopiedCodeSuccess(false), 2500);
+                          } catch {}
+                        }}
+                        className="w-full sm:w-auto px-3.5 py-2 bg-amber-500 hover:bg-amber-400 text-neutral-950 text-xs font-extrabold rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-md shadow-amber-500/10 cursor-pointer"
+                      >
+                        {copiedCodeSuccess ? (
+                          <>
+                            <Check className="w-3.5 h-3.5" />
+                            <span>Copiado!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3.5 h-3.5" />
+                            <span>Copiar Código</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="text-center py-4 px-3 rounded-xl border border-dashed border-neutral-800 text-neutral-500 text-xs">
+                      {studentParentLinks.length >= 5 ? (
+                        <p className="text-amber-400 font-semibold">Você já atingiu o limite máximo de 5 responsáveis vinculados.</p>
+                      ) : (
+                        <p>Nenhum código gerado no momento. Clique em <strong className="text-neutral-300">"Gerar Código"</strong> para criar um código de 4 dígitos para seus pais.</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Lista de Responsáveis Vinculados */}
+                <div className="space-y-2.5">
+                  <h4 className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider font-mono">
+                    Responsáveis Conectados ({studentParentLinks.length}/5)
+                  </h4>
+
+                  {loadingParentLinks ? (
+                    <div className="p-4 text-center text-xs text-neutral-500 font-mono animate-pulse">
+                      Carregando vínculos...
+                    </div>
+                  ) : studentParentLinks.length === 0 ? (
+                    <div className="p-4 rounded-xl bg-neutral-950/40 border border-neutral-850 text-center text-xs text-neutral-500">
+                      Nenhum responsável vinculado ainda à sua conta.
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {studentParentLinks.map((link: any) => (
+                        <div
+                          key={link.id}
+                          className="p-3 rounded-xl bg-neutral-950/60 border border-neutral-850 flex items-center justify-between gap-3 text-xs"
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+                              <ShieldCheck className="w-4 h-4" />
+                            </div>
+                            <div className="truncate">
+                              <p className="font-semibold text-neutral-200 truncate">{link.parent_email}</p>
+                              <p className="text-[10px] text-neutral-500 font-mono">
+                                Conectado em {link.linked_at ? new Date(link.linked_at).toLocaleDateString('pt-BR') : 'Data recente'}
+                              </p>
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveParentLink(link.id)}
+                            className="p-1.5 text-neutral-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer shrink-0"
+                            title="Desvincular responsável"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </motion.div>
