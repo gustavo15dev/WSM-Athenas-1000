@@ -10,6 +10,7 @@ import {
   Trophy, 
   Send, 
   UserPlus, 
+  User,
   Plus, 
   BookOpen, 
   Bell, 
@@ -39,6 +40,7 @@ import {
   EyeOff,
   MessageSquare,
   X,
+  Check,
   CheckCheck,
   BellOff,
   Inbox,
@@ -814,7 +816,7 @@ export default function TeacherDashboard({
           .filter(st => st.id)
           .map(st => ({
             user_id: st.id,
-            title: `📢 Novo Comunicado: ${newAnnTitle.trim()}`,
+            title: `Novo Comunicado: ${newAnnTitle.trim()}`,
             message: `${newAnnMessage.trim()}\n\nTurma: ${targetClassName}\nProfessor(a): ${profile?.nome_completo || 'Docente'}`,
             is_read: false
           }));
@@ -838,7 +840,7 @@ export default function TeacherDashboard({
       setAnnSuccess(`Aviso publicado com sucesso para a turma ${targetClassName}!`);
       
       // Dispara a notificação push no navegador do professor/dispositivos
-      sendBrowserNotification(`📢 Aviso Publicado: ${newAnnTitle.trim()}`, {
+      sendBrowserNotification(`Aviso Publicado: ${newAnnTitle.trim()}`, {
         body: `Publicado com sucesso para os alunos da turma ${targetClassName}.`,
         tag: `pub-ann-${Date.now()}`
       });
@@ -1503,11 +1505,7 @@ export default function TeacherDashboard({
   };
 
   return (
-    <div className="h-screen w-full overflow-hidden bg-[#040605] text-neutral-200 font-sans flex relative">
-      {/* Background decorations */}
-      <div className="absolute top-0 right-1/4 w-80 h-80 bg-emerald-500/5 rounded-full blur-[100px] pointer-events-none" />
-      <div className="absolute bottom-1/3 left-10 w-80 h-80 bg-emerald-600/5 rounded-full blur-[100px] pointer-events-none" />
-
+    <div className="h-screen w-full overflow-hidden bg-[#0B0F0E] text-[#F1F5F3] font-sans flex relative">
       {/* Modern Sidebar for desktop */}
       <aside 
         ref={sidebarRef}
@@ -1515,7 +1513,7 @@ export default function TeacherDashboard({
         data-collapsed={isSidebarCollapsed}
         className={`${
           isSidebarCollapsed ? 'w-24 px-2.5 py-6' : 'w-64 p-6'
-        } h-screen max-h-screen border-r border-emerald-950/20 bg-neutral-950/60 hidden md:flex flex-col shrink-0 justify-between z-30 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-neutral-800/70 scrollbar-track-transparent hover:scrollbar-thumb-neutral-700 transition-all duration-300`}
+        } h-screen max-h-screen border-r border-[#27322D] bg-[#111715] hidden md:flex flex-col shrink-0 justify-between z-30 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-neutral-800/70 scrollbar-track-transparent hover:scrollbar-thumb-neutral-700 transition-all duration-300`}
       >
         <div className={hideTopBrand ? "space-y-4" : "space-y-8"}>
           {!hideTopBrand && (
@@ -2215,7 +2213,7 @@ export default function TeacherDashboard({
                                           ann.category === 'Evento' ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' :
                                           'bg-neutral-800 text-neutral-300 border border-neutral-700'
                                         }`}>
-                                          {ann.category === 'Urgent' ? '🚨 Urgente' : ann.category === 'Prova' ? '📝 Prova' : ann.category === 'Evento' ? '🎉 Evento' : '📢 Geral'}
+                                          {ann.category === 'Urgent' ? 'Urgente' : ann.category === 'Prova' ? 'Prova' : ann.category === 'Evento' ? 'Evento' : 'Geral'}
                                         </span>
                                         <span className="text-[10px] text-neutral-500 font-mono">
                                           {ann.created_at ? new Date(ann.created_at).toLocaleDateString('pt-BR', {hour: '2-digit', minute:'2-digit'}) : ''}
@@ -2233,7 +2231,7 @@ export default function TeacherDashboard({
                                         >
                                           <img src={ann.image_url} alt="Imagem do Aviso" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" referrerPolicy="no-referrer" />
                                           <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                            <span className="text-[11px] font-bold text-white bg-black/60 px-2 py-1 rounded-lg">Clique para ampliar 🔍</span>
+                                            <span className="text-[11px] font-bold text-white bg-black/60 px-2 py-1 rounded-lg">Clique para ampliar</span>
                                           </div>
                                         </div>
                                       )}
@@ -2242,7 +2240,7 @@ export default function TeacherDashboard({
                                     <div className="flex items-center justify-between pt-3 border-t border-neutral-850/60">
                                       <div className="flex items-center gap-2">
                                         <div className="flex items-center gap-1 bg-emerald-500/10 text-emerald-400 px-2.5 py-0.5 rounded-full border border-emerald-500/10 text-[11px] font-bold font-mono">
-                                          <span>👍</span>
+                                          
                                           <span>{ann.likes_count || 0}</span>
                                         </div>
                                         <button
@@ -2297,7 +2295,7 @@ export default function TeacherDashboard({
                                       ann.category === 'Evento' ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' :
                                       'bg-neutral-800 text-neutral-300 border border-neutral-700'
                                     }`}>
-                                      {ann.category === 'Urgent' ? '🚨 Urgente' : ann.category === 'Prova' ? '📝 Prova' : ann.category === 'Evento' ? '🎉 Evento' : '📢 Geral'}
+                                      {ann.category === 'Urgent' ? 'Urgente' : ann.category === 'Prova' ? 'Prova' : ann.category === 'Evento' ? 'Evento' : 'Geral'}
                                     </span>
                                     <span className="text-[10px] text-neutral-500 font-mono">
                                       {ann.created_at ? new Date(ann.created_at).toLocaleDateString('pt-BR', {hour: '2-digit', minute:'2-digit'}) : ''}
@@ -2315,7 +2313,7 @@ export default function TeacherDashboard({
                                     >
                                       <img src={ann.image_url} alt="Imagem do Aviso" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" referrerPolicy="no-referrer" />
                                       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                        <span className="text-[11px] font-bold text-white bg-black/60 px-2 py-1 rounded-lg">Clique para ampliar 🔍</span>
+                                        <span className="text-[11px] font-bold text-white bg-black/60 px-2 py-1 rounded-lg">Clique para ampliar</span>
                                       </div>
                                     </div>
                                   )}
@@ -2324,7 +2322,7 @@ export default function TeacherDashboard({
                                 <div className="flex items-center justify-between pt-3 border-t border-neutral-850/60">
                                   <div className="flex items-center gap-2">
                                     <div className="flex items-center gap-1 bg-emerald-500/10 text-emerald-400 px-2.5 py-0.5 rounded-full border border-emerald-500/10 text-[11px] font-bold font-mono">
-                                      <span>👍</span>
+                                      
                                       <span>{ann.likes_count || 0}</span>
                                     </div>
                                     <button
@@ -2384,7 +2382,7 @@ export default function TeacherDashboard({
               <div className="lg:col-span-1 space-y-6">
                 <div className="p-6 rounded-3xl bg-neutral-950/50 border border-neutral-900 backdrop-blur-md">
                   <h3 className="text-base font-bold text-neutral-200 mb-4 font-display">
-                    {editingExamId ? '📝 Editar Detalhes da Prova' : '➕ Agendar Nova Prova'}
+                    {editingExamId ? 'Editar Detalhes da Prova' : 'Agendar Nova Prova'}
                   </h3>
 
                   <form onSubmit={handleExamSubmit} className="space-y-4">
@@ -2548,7 +2546,7 @@ export default function TeacherDashboard({
                               const isAdded = selectedClasses.includes(st.email);
                               return (
                                 <option key={st.id || st.email} value={st.email} disabled={isAdded}>
-                                  {st.nome_completo} ({st.turma || 'Sem turma'}) {isAdded ? '✓ Adicionado' : ''}
+                                  {st.nome_completo} ({st.turma || 'Sem turma'}) {isAdded ? 'Adicionado' : ''}
                                 </option>
                               );
                             })}
@@ -2566,7 +2564,7 @@ export default function TeacherDashboard({
                                   className="text-[10px] font-mono bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded cursor-pointer hover:bg-red-950/20 hover:text-red-400 hover:border-red-500/25 transition-all text-center"
                                   title="Clique para remover"
                                 >
-                                  👤 {matchStud ? matchStud.nome_completo : mail} ✕
+                                  {matchStud ? matchStud.nome_completo : mail} ✕
                                 </span>
                               );
                             })}
@@ -2669,7 +2667,7 @@ export default function TeacherDashboard({
               <div className="lg:col-span-2 space-y-6">
                 <div className="p-6 rounded-3xl bg-neutral-950/50 border border-neutral-900 backdrop-blur-md">
                   <h3 className="text-base font-bold text-neutral-200 mb-4 font-display">
-                    🗓️ Provas Presenciais Marcadas ({postedExams.length})
+                    Provas Presenciais Marcadas ({postedExams.length})
                   </h3>
 
                   {postedExams.length === 0 ? (
@@ -3119,7 +3117,7 @@ export default function TeacherDashboard({
                       <CheckCircle className="w-5 h-5" />
                     </div>
                     <p className="text-sm font-semibold text-neutral-200">
-                      ✨ Nenhuma notificação pendente no momento
+                      Nenhuma notificação pendente no momento
                     </p>
                     <p className="text-xs text-neutral-400 max-w-md mx-auto">
                       Você está em dia com todas as mensagens de alunos, entregas de simulados e avisos publicados.
@@ -3285,10 +3283,10 @@ export default function TeacherDashboard({
                 onChange={(e) => setNewAnnCategory(e.target.value as any)}
                 className="w-full px-3 py-2.5 bg-neutral-950 border border-neutral-800 rounded-xl text-xs text-neutral-200 outline-none cursor-pointer"
               >
-                <option value="Geral">☕ Geral</option>
-                <option value="Urgent">🚨 Urgente</option>
-                <option value="Prova">📝 Prova</option>
-                <option value="Evento">🎉 Evento</option>
+                <option value="Geral">Geral</option>
+                <option value="Urgent">Urgente</option>
+                <option value="Prova">Prova</option>
+                <option value="Evento">Evento</option>
               </select>
             </div>
           </div>
@@ -3404,7 +3402,7 @@ export default function TeacherDashboard({
                 selectedAnnouncementDetail.category === 'Evento' ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' :
                 'bg-neutral-800 text-neutral-300 border border-neutral-700'
               }`}>
-                {selectedAnnouncementDetail.category === 'Urgent' ? '🚨 Urgente' : selectedAnnouncementDetail.category === 'Prova' ? '📝 Prova' : selectedAnnouncementDetail.category === 'Evento' ? '🎉 Evento' : '📢 Geral'}
+                {selectedAnnouncementDetail.category === 'Urgent' ? 'Urgente' : selectedAnnouncementDetail.category === 'Prova' ? 'Prova' : selectedAnnouncementDetail.category === 'Evento' ? 'Evento' : 'Geral'}
               </span>
               {selectedAnnouncementDetail.class_name && (
                 <span className="text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 px-2.5 py-0.5 rounded-full">
@@ -3445,14 +3443,14 @@ export default function TeacherDashboard({
                 referrerPolicy="no-referrer"
               />
               <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                <span className="text-xs font-bold text-white bg-black/70 px-3 py-1.5 rounded-xl">Ampliar imagem 🔍</span>
+                <span className="text-xs font-bold text-white bg-black/70 px-3 py-1.5 rounded-xl">Ampliar imagem</span>
               </div>
             </div>
           )}
 
           <div className="flex items-center justify-between pt-2 border-t border-neutral-850/60">
             <div className="flex items-center gap-1.5 text-xs text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20 font-bold font-mono">
-              <span>👍 Curtidas:</span>
+              <span>Curtidas:</span>
               <span>{selectedAnnouncementDetail.likes_count || 0}</span>
             </div>
 
@@ -3470,195 +3468,272 @@ export default function TeacherDashboard({
   )}
 
   {isSettingsOpen && (
-    <div className="fixed inset-0 bg-neutral-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-      <motion.div 
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="bg-neutral-900 border border-neutral-800 rounded-3xl w-full max-w-md p-6 overflow-hidden relative shadow-2xl"
-      >
-        <div className="flex items-center justify-between mb-6 border-b border-neutral-800 pb-4">
-          <div className="flex items-center gap-2.5">
-            <Settings className="w-5 h-5 text-emerald-400" />
+    <div className="fixed inset-0 z-50 bg-[#0B0F0E] text-[#F1F5F3] flex flex-col overflow-y-auto">
+      {/* Top Bar Navigation */}
+      <header className="sticky top-0 z-30 bg-[#111715] border-b border-[#27322D] px-4 sm:px-8 py-4">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#171E1B] border border-[#27322D] flex items-center justify-center text-[#55E6B5]">
+              <Settings className="w-5 h-5 text-[#55E6B5]" />
+            </div>
             <div>
-              <h3 className="text-sm font-extrabold text-neutral-100 font-display">Ajustes do Docente</h3>
-              <p className="text-[10px] text-neutral-500 font-mono">Gerenciar seus dados e preferências</p>
+              <h2 className="text-base sm:text-lg font-bold text-[#F1F5F3] leading-none">Ajustes do Docente</h2>
+              <p className="text-xs text-[#A5B0AA] mt-1">Gerencie seus dados profissionais, turmas lecionadas e preferências da conta</p>
             </div>
           </div>
+
           <button 
             type="button"
             onClick={() => setIsSettingsOpen(false)}
-            className="text-neutral-450 hover:text-neutral-200 text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-neutral-950/40 border border-neutral-850 hover:border-neutral-800 transition-colors cursor-pointer"
+            className="px-4 py-2 bg-[#171E1B] hover:bg-[#1D2723] text-[#F1F5F3] text-xs font-semibold rounded-xl border border-[#27322D] transition-colors cursor-pointer flex items-center gap-2"
           >
-            Voltar
+            <ArrowLeft className="w-4 h-4 text-[#A5B0AA]" />
+            <span>Voltar ao Portal</span>
           </button>
         </div>
+      </header>
 
-        {settingsStatus && (
-          <div className={`mb-4 p-3.5 rounded-xl text-xs border flex items-center justify-between gap-2.5 animate-fadeIn ${
-            settingsStatus.type === 'success' 
-              ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-400 font-medium' 
-              : settingsStatus.type === 'info'
-              ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-300 font-medium shadow-sm shadow-cyan-950/30'
-              : 'bg-red-500/10 border-red-500/25 text-red-400'
-          }`}>
-            <div className="flex items-center gap-2">
-              {settingsStatus.type === 'success' ? (
-                <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
-              ) : settingsStatus.type === 'info' ? (
-                <Info className="w-4 h-4 text-cyan-400 shrink-0" />
-              ) : (
-                <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+      {/* Main Horizontal Content */}
+      <div className="max-w-7xl mx-auto w-full px-4 sm:px-8 py-8 flex-1">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          
+          {/* Left Column: Teacher Profile Card */}
+          <div className="lg:col-span-4 space-y-6">
+            <div className="p-6 rounded-xl bg-[#111715] border border-[#27322D] space-y-4">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-xl bg-[#171E1B] border border-[#55E6B5]/30 flex items-center justify-center font-bold text-lg text-[#55E6B5] uppercase shrink-0">
+                  {(profile ? profile.nome_completo : email).substring(0, 2).toUpperCase()}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] bg-[#55E6B5]/15 text-[#55E6B5] border border-[#55E6B5]/30 px-2 py-0.5 rounded font-semibold uppercase">
+                      Professor(a)
+                    </span>
+                    <span className="text-[10px] bg-[#171E1B] text-[#A5B0AA] border border-[#27322D] px-2 py-0.5 rounded font-semibold">
+                      {profile?.materia || 'Docente'}
+                    </span>
+                  </div>
+                  <h3 className="text-base font-bold text-[#F1F5F3] mt-1.5 truncate" title={profile?.nome_completo || email}>
+                    {profile?.nome_completo || email}
+                  </h3>
+                  <p className="text-xs text-[#A5B0AA] truncate" title={email}>{email}</p>
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-[#27322D] space-y-2 text-xs">
+                <div className="flex items-center justify-between text-[#A5B0AA]">
+                  <span>Escola:</span>
+                  <span className="font-semibold text-[#F1F5F3] truncate max-w-[200px]">{profile?.escola || 'Não informada'}</span>
+                </div>
+                <div className="flex items-start justify-between text-[#A5B0AA] gap-2">
+                  <span className="shrink-0">Turmas:</span>
+                  <span className="font-semibold text-[#F1F5F3] text-right">
+                    {profile?.anos_lecionados && profile.anos_lecionados.length > 0
+                      ? profile.anos_lecionados.join(', ')
+                      : 'Nenhuma cadastrada'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-2 rounded-xl bg-[#111715] border border-[#27322D]">
+              <button
+                type="button"
+                className="w-full flex items-center gap-2.5 px-4 py-3 rounded-lg text-xs font-semibold bg-[#55E6B5] text-[#07110D] text-left cursor-default"
+              >
+                <User className="w-4 h-4" />
+                <span>Perfil Profissional</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Right Column: Wide Form Card */}
+          <div className="lg:col-span-8">
+            <div className="p-6 sm:p-8 rounded-xl bg-[#111715] border border-[#27322D] space-y-6">
+              <div className="border-b border-[#27322D] pb-4">
+                <h3 className="text-base font-bold text-[#F1F5F3]">Dados Cadastrais do Docente</h3>
+                <p className="text-xs text-[#A5B0AA] mt-1">Atualize seus dados de identificação, credenciais de acesso e turmas em que leciona.</p>
+              </div>
+
+              {settingsStatus && (
+                <div className={`p-4 rounded-xl text-xs border flex items-center justify-between gap-3 animate-fadeIn ${
+                  settingsStatus.type === 'success' 
+                    ? 'bg-[#111F1A] border-[#1E3A2F] text-[#55E6B5] font-medium' 
+                    : settingsStatus.type === 'info'
+                    ? 'bg-[#171E1B] border-[#27322D] text-[#55E6B5] font-medium'
+                    : 'bg-[#201416] border-[#3B2024] text-[#FF8585]'
+                }`}>
+                  <div className="flex items-center gap-2.5">
+                    {settingsStatus.type === 'success' ? (
+                      <CheckCircle className="w-4 h-4 text-[#55E6B5] shrink-0" />
+                    ) : settingsStatus.type === 'info' ? (
+                      <Info className="w-4 h-4 text-[#55E6B5] shrink-0" />
+                    ) : (
+                      <AlertCircle className="w-4 h-4 text-[#FF8585] shrink-0" />
+                    )}
+                    <span>{settingsStatus.msg}</span>
+                  </div>
+                  {settingsStatus.type === 'error' && (
+                    <button
+                      type="button"
+                      onClick={(e) => handleUpdateSettings(e as any)}
+                      disabled={savingSettings}
+                      className="px-3 py-1 bg-[#3B2024] hover:bg-[#50282E] text-[#FF8585] font-bold rounded-lg text-xs transition cursor-pointer flex items-center gap-1.5 shrink-0"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>Tentar Novamente</span>
+                    </button>
+                  )}
+                </div>
               )}
-              <span>{settingsStatus.msg}</span>
+
+              <form onSubmit={handleUpdateSettings} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div>
+                    <label className="block text-[11px] text-[#A5B0AA] uppercase font-semibold tracking-wider mb-2">Nome Completo</label>
+                    <input
+                      type="text"
+                      required
+                      value={setName}
+                      onChange={(e) => setSetName(e.target.value)}
+                      className="w-full bg-[#171E1B] border border-[#27322D] rounded-xl px-4 py-2.5 text-xs text-[#F1F5F3] placeholder-[#77827C] focus:outline-none focus:border-[#55E6B5] font-medium"
+                      placeholder="Seu nome"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] text-[#A5B0AA] uppercase font-semibold tracking-wider mb-2">Escola / Instituição de Ensino</label>
+                    <input
+                      type="text"
+                      value={setEscola}
+                      onChange={(e) => setSetEscola(e.target.value)}
+                      className="w-full bg-[#171E1B] border border-[#27322D] rounded-xl px-4 py-2.5 text-xs text-[#F1F5F3] placeholder-[#77827C] focus:outline-none focus:border-[#55E6B5] font-medium"
+                      placeholder="Nome da sua Escola (Opcional)"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] text-[#A5B0AA] uppercase font-semibold tracking-wider mb-2">Endereço de E-mail</label>
+                    <input
+                      type="email"
+                      required
+                      value={setMail}
+                      onChange={(e) => setSetMail(e.target.value)}
+                      className="w-full bg-[#171E1B] border border-[#27322D] rounded-xl px-4 py-2.5 text-xs text-[#F1F5F3] placeholder-[#77827C] focus:outline-none focus:border-[#55E6B5] font-medium"
+                      placeholder="Seu e-mail"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] text-[#A5B0AA] uppercase font-semibold tracking-wider mb-2">Nova Senha (Opcional)</label>
+                    <div className="relative">
+                      <input
+                        type={showPwd ? "text" : "password"}
+                        value={setPassword}
+                        onChange={(e) => setSetPassword(e.target.value)}
+                        className="w-full bg-[#171E1B] border border-[#27322D] rounded-xl pl-4 pr-10 py-2.5 text-xs text-[#F1F5F3] placeholder-[#77827C] focus:outline-none focus:border-[#55E6B5]"
+                        placeholder="Deixe em branco para manter"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPwd(!showPwd)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[#77827C] hover:text-[#55E6B5] transition-colors cursor-pointer"
+                      >
+                        {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] text-[#A5B0AA] uppercase font-semibold tracking-wider mb-2">Matéria Principal</label>
+                    <input
+                      type="text"
+                      required
+                      value={setMateria}
+                      onChange={(e) => setSetMateria(e.target.value)}
+                      className="w-full bg-[#171E1B] border border-[#27322D] rounded-xl px-4 py-2.5 text-xs text-[#F1F5F3] focus:outline-none focus:border-[#55E6B5] font-medium"
+                      placeholder="Ex: Biologia, Matemática"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] text-[#A5B0AA] uppercase font-semibold tracking-wider mb-2">Turmas Lecionadas (Separadas por vírgula)</label>
+                    <input
+                      type="text"
+                      required
+                      value={setAnosLecionados.join(', ')}
+                      onChange={(e) => setSetAnosLecionados(e.target.value.split(',').map(cls => cls.trim()).filter(Boolean))}
+                      className="w-full bg-[#171E1B] border border-[#27322D] rounded-xl px-4 py-2.5 text-xs text-[#F1F5F3] focus:outline-none focus:border-[#55E6B5]"
+                      placeholder="Ex: 1º Ano A, 2º Ano B"
+                    />
+                  </div>
+                </div>
+
+                {/* Theme Section */}
+                <div className="pt-2 border-t border-[#27322D]">
+                  <label className="block text-[11px] text-[#A5B0AA] uppercase font-semibold tracking-wider mb-2.5">Tema da Plataforma</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setThemePreference('escuro');
+                        setSettingsStatus({ type: 'info', msg: 'Tema escuro selecionado (padrão do portal).' });
+                        setTimeout(() => setSettingsStatus(prev => prev?.type === 'info' ? null : prev), 3500);
+                      }}
+                      className={`p-3.5 text-xs font-semibold rounded-xl border transition-all flex items-center justify-between cursor-pointer ${
+                        themePreference === 'escuro'
+                          ? 'bg-[#171E1B] border-[#55E6B5] text-[#55E6B5]'
+                          : 'bg-transparent border-[#27322D] text-[#77827C] hover:text-[#F1F5F3]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <Moon className="w-4 h-4" />
+                        <span>Escuro (Ativo)</span>
+                      </div>
+                      <span className="w-2 h-2 rounded-full bg-[#55E6B5]" />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSettingsStatus({
+                          type: 'info',
+                          msg: 'O tema claro está em desenvolvimento e será liberado em breve! Por enquanto, utilize o tema escuro padrão.'
+                        });
+                        setTimeout(() => setSettingsStatus(prev => prev?.type === 'info' ? null : prev), 5000);
+                      }}
+                      className="p-3.5 text-xs font-semibold rounded-xl border transition-all flex items-center justify-between bg-[#171E1B]/40 border-[#27322D] text-[#77827C] hover:text-[#F1F5F3] cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <Sun className="w-4 h-4" />
+                        <span>Claro</span>
+                      </div>
+                      <span className="text-[10px] bg-[#201C14] text-[#FFD175] border border-[#3B3220] px-2 py-0.5 rounded uppercase">Em breve</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="pt-4 flex items-center justify-end">
+                  <button
+                    type="submit"
+                    disabled={savingSettings}
+                    className="px-6 py-3 bg-[#55E6B5] hover:bg-[#7AF0C8] disabled:opacity-50 text-[#07110D] font-bold rounded-xl transition-all text-xs cursor-pointer flex items-center gap-2"
+                  >
+                    {savingSettings ? (
+                      <span>Gravando dados...</span>
+                    ) : (
+                      <>
+                        <Check className="w-4 h-4" />
+                        <span>Salvar Preferências</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
             </div>
-            {settingsStatus.type === 'error' && (
-              <button
-                type="button"
-                onClick={(e) => handleUpdateSettings(e as any)}
-                disabled={savingSettings}
-                className="px-2.5 py-1 bg-red-500/20 hover:bg-red-500/30 text-red-300 font-bold rounded-lg text-[10px] transition cursor-pointer flex items-center gap-1 shrink-0"
-              >
-                <RotateCcw className="w-3 h-3" />
-                <span>Tentar Novamente</span>
-              </button>
-            )}
           </div>
-        )}
-
-        <form onSubmit={handleUpdateSettings} className="space-y-4">
-          <div>
-            <label className="block text-[10px] text-neutral-450 uppercase font-mono tracking-widest mb-1.5 font-bold">Nome Completo</label>
-            <input
-              type="text"
-              required
-              value={setName}
-              onChange={(e) => setSetName(e.target.value)}
-              className="w-full bg-neutral-950 border border-neutral-850 rounded-xl px-3.5 py-2 text-xs text-neutral-200 placeholder-neutral-600 focus:outline-none focus:border-emerald-500/30 font-medium"
-              placeholder="Seu nome"
-            />
-          </div>
-
-          <div>
-            <label className="block text-[10px] text-neutral-450 uppercase font-mono tracking-widest mb-1.5 font-bold">Escola / Instituição de Ensino</label>
-            <input
-              type="text"
-              value={setEscola}
-              onChange={(e) => setSetEscola(e.target.value)}
-              className="w-full bg-neutral-950 border border-neutral-850 rounded-xl px-3.5 py-2 text-xs text-neutral-200 placeholder-neutral-600 focus:outline-none focus:border-emerald-500/30 font-medium"
-              placeholder="Nome da sua Escola (Opcional)"
-            />
-          </div>
-
-          <div>
-            <label className="block text-[10px] text-neutral-450 uppercase font-mono tracking-widest mb-1.5 font-bold">Endereço de E-mail</label>
-            <input
-              type="email"
-              required
-              value={setMail}
-              onChange={(e) => setSetMail(e.target.value)}
-              className="w-full bg-neutral-950 border border-neutral-850 rounded-xl px-3.5 py-2 text-xs text-neutral-200 placeholder-neutral-600 focus:outline-none focus:border-emerald-500/30 font-medium"
-              placeholder="Seu e-mail"
-            />
-          </div>
-
-          <div>
-            <label className="block text-[10px] text-neutral-450 uppercase font-mono tracking-widest mb-1.5 font-bold">Nova Senha (Opcional - deixe em branco para não alterar)</label>
-            <div className="relative">
-              <input
-                type={showPwd ? "text" : "password"}
-                value={setPassword}
-                onChange={(e) => setSetPassword(e.target.value)}
-                className="w-full bg-neutral-950 border border-neutral-850 rounded-xl pl-3.5 pr-10 py-2 text-xs text-neutral-100 placeholder-neutral-600 focus:outline-none focus:border-emerald-500/30 font-mono"
-                placeholder="Deixe em branco para manter a senha atual"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPwd(!showPwd)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-emerald-400 transition-colors"
-              >
-                {showPwd ? (
-                  <EyeOff className="w-3.5 h-3.5" />
-                ) : (
-                  <Eye className="w-3.5 h-3.5" />
-                )}
-              </button>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[10px] text-neutral-450 uppercase font-mono tracking-widest mb-1.5 font-bold">Matéria</label>
-              <input
-                type="text"
-                required
-                value={setMateria}
-                onChange={(e) => setSetMateria(e.target.value)}
-                className="w-full bg-neutral-950 border border-neutral-850 rounded-xl px-3.5 py-2 text-xs text-neutral-200 focus:outline-none focus:border-emerald-500/30 font-medium"
-              />
-            </div>
-            <div>
-              <label className="block text-[10px] text-neutral-450 uppercase font-mono tracking-widest mb-1.5 font-bold font-semibold">Turmas (Sep. Vírgula)</label>
-              <input
-                type="text"
-                required
-                value={setAnosLecionados.join(', ')}
-                onChange={(e) => setSetAnosLecionados(e.target.value.split(',').map(cls => cls.trim()).filter(Boolean))}
-                className="w-full bg-neutral-950 border border-neutral-850 rounded-xl px-3.5 py-2 text-xs text-neutral-200 focus:outline-none focus:border-emerald-500/30 font-mono"
-                placeholder="Ex: 1º Ano, Física A"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-[10px] text-neutral-450 uppercase font-mono tracking-widest mb-1.5 font-bold">Tema do Portal</label>
-            <div className="grid grid-cols-2 gap-2 mt-1">
-              <button
-                type="button"
-                onClick={() => {
-                  setThemePreference('escuro');
-                  setSettingsStatus({ type: 'info', msg: '🌙 Tema Escuro selecionado (padrão do portal).' });
-                  setTimeout(() => setSettingsStatus(prev => prev?.type === 'info' ? null : prev), 3500);
-                }}
-                className={`px-3 py-2 text-[10px] font-bold font-mono uppercase tracking-wider rounded-xl border transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                  themePreference === 'escuro'
-                    ? 'bg-neutral-950 border-emerald-500/30 text-emerald-400 shadow-sm shadow-emerald-950'
-                    : 'bg-transparent border-neutral-850 text-neutral-550 hover:text-neutral-400'
-                }`}
-              >
-                <Moon className="w-3.5 h-3.5" />
-                <span>Escuro (Padrão)</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setSettingsStatus({
-                    type: 'info',
-                    msg: '☀️ O tema claro está em desenvolvimento e será liberado em breve! Por enquanto, utilize o tema escuro padrão.'
-                  });
-                  setTimeout(() => setSettingsStatus(prev => prev?.type === 'info' ? null : prev), 5000);
-                }}
-                title="Funcionalidade em desenvolvimento — o tema claro estará disponível em breve!"
-                className="px-3 py-2 text-[10px] font-bold font-mono uppercase tracking-wider rounded-xl border transition-all flex items-center justify-center gap-1.5 bg-neutral-950/40 border-neutral-850/70 text-neutral-400 hover:text-amber-300 hover:border-amber-500/30 cursor-pointer group"
-              >
-                <Sun className="w-3.5 h-3.5 text-neutral-500 group-hover:text-amber-400 transition-colors" />
-                <span>Claro</span>
-                <span className="text-[8px] bg-amber-500/15 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded uppercase tracking-normal font-sans font-bold">Em breve</span>
-              </button>
-            </div>
-          </div>
-
-          <div className="pt-3">
-            <button
-              type="submit"
-              onClick={() => handleUpdateSettings()}
-              disabled={savingSettings}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-neutral-900 font-bold rounded-xl transition-all text-xs shadow-[0_0_15px_rgba(30, 185, 150,0.1)] cursor-pointer"
-            >
-              {savingSettings ? 'Gravando dados...' : 'Salvar Preferências'}
-            </button>
-          </div>
-        </form>
-      </motion.div>
+        </div>
+      </div>
     </div>
   )}
 

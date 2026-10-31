@@ -6,6 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { ScreenType, PortalRole, SubjectGrade, Announcement, Task } from './types';
+import { ShieldCheck } from 'lucide-react';
 import PortalHome from './components/PortalHome';
 import LoginModal from './components/LoginModal';
 import StudentDashboard from './components/StudentDashboard';
@@ -13,6 +14,7 @@ import TeacherDashboard from './components/TeacherDashboard';
 import ParentDashboard from './components/ParentDashboard';
 import SleekDashboard from './components/SleekDashboard';
 import AdminPortal from './components/AdminPortal';
+import ProjectsPage from './components/ProjectsPage';
 import { supabase } from './supabase';
 import FullscreenImageViewer from './components/FullscreenImageViewer';
 import StudyMusicPlayer from './components/StudyMusicPlayer';
@@ -261,7 +263,7 @@ export default function App() {
   };
 
   return (
-    <div className="bg-[#050706] min-h-screen w-full text-neutral-100 selection:bg-emerald-500/30 selection:text-emerald-100">
+    <div className="bg-[#0B0F0E] min-h-screen w-full text-[#F1F5F3] selection:bg-[#55E6B5]/25 selection:text-[#55E6B5] font-sans">
       <AnimatePresence mode="wait">
         {screen === 'PORTAL_HOME' && (
           <motion.div
@@ -272,7 +274,23 @@ export default function App() {
             transition={{ duration: 0.3 }}
             className="w-full"
           >
-            <PortalHome onSelectRole={handleSelectRole} />
+            <PortalHome
+              onSelectRole={handleSelectRole}
+              onOpenProjects={() => setScreen('PROJECTS')}
+            />
+          </motion.div>
+        )}
+
+        {screen === 'PROJECTS' && (
+          <motion.div
+            key="projects-page"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            transition={{ duration: 0.3 }}
+            className="w-full"
+          >
+            <ProjectsPage onBack={() => setScreen('PORTAL_HOME')} />
           </motion.div>
         )}
 
@@ -401,20 +419,20 @@ export default function App() {
       {/* Secret floating password prompt challenge */}
       <AnimatePresence>
         {showAdminPasswordPortal && (
-          <div className="fixed inset-0 bg-[#000000ea] backdrop-blur-sm flex items-center justify-center z-[9999] p-4 text-xs font-sans">
+          <div className="fixed inset-0 bg-[#0B0F0E]/90 flex items-center justify-center z-[9999] p-4 text-xs font-sans">
             <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
+              initial={{ scale: 0.98, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="p-6 rounded-3xl bg-[#060807] border border-red-500/20 w-full max-w-sm text-center relative space-y-4 shadow-red-500/5 shadow-2xl"
+              exit={{ scale: 0.98, opacity: 0 }}
+              className="p-6 rounded-xl bg-[#111715] border border-[#27322D] w-full max-w-sm text-center relative space-y-4"
             >
-              <div className="mx-auto w-12 h-12 bg-red-500/10 border border-red-500/30 rounded-full flex items-center justify-center mb-1">
-                <span className="text-xl">🛡️</span>
+              <div className="mx-auto w-11 h-11 bg-[#171E1B] border border-[#27322D] rounded-xl flex items-center justify-center mb-1 text-[#55E6B5]">
+                <ShieldCheck className="w-5 h-5" />
               </div>
 
               <div>
-                <h3 className="text-sm font-black text-neutral-100 uppercase tracking-wider">Acesso Administrativo Restrito</h3>
-                <p className="text-[10px] text-neutral-450 mt-1 leading-relaxed">Este módulo requer autenticação de segurança. Digite a senha administrativa de 4 dígitos para prosseguir.</p>
+                <h3 className="text-sm font-semibold text-[#F1F5F3]">Acesso Administrativo Restrito</h3>
+                <p className="text-xs text-[#A5B0AA] mt-1 leading-relaxed">Este módulo requer autenticação de segurança. Digite a senha administrativa de 4 dígitos para prosseguir.</p>
               </div>
 
               <form onSubmit={handleAdminPasswordSubmit} className="space-y-4">
@@ -423,26 +441,26 @@ export default function App() {
                   placeholder="Senha de 4 dígitos..."
                   value={adminPasswordValue}
                   onChange={(e) => setAdminPasswordValue(e.target.value)}
-                  className="w-full px-4 py-3 bg-neutral-900 border border-neutral-850 focus:border-red-500/30 rounded-xl text-center text-lg font-mono font-black tracking-widest outline-none text-red-500 placeholder-neutral-700"
+                  className="w-full px-4 py-2.5 bg-[#171E1B] border border-[#27322D] focus:border-[#55E6B5] rounded-lg text-center text-base font-sans font-semibold tracking-widest outline-none text-[#F1F5F3] placeholder-[#77827C]"
                   required
                   autoFocus
                 />
 
                 {adminErrorMsg && (
-                  <p className="text-[10.5px] text-red-400 font-semibold animate-fadeIn">{adminErrorMsg}</p>
+                  <p className="text-xs text-rose-400 font-medium">{adminErrorMsg}</p>
                 )}
 
-                <div className="grid grid-cols-2 gap-2 pt-1 font-semibold text-xs">
+                <div className="grid grid-cols-2 gap-2 pt-1 font-medium text-xs">
                   <button
                     type="button"
                     onClick={() => setShowAdminPasswordPortal(false)}
-                    className="py-2.5 bg-neutral-900 hover:bg-neutral-850 text-neutral-400 hover:text-white border border-neutral-850 rounded-xl transition-all cursor-pointer"
+                    className="py-2 bg-[#171E1B] hover:bg-[#1D2723] text-[#A5B0AA] hover:text-[#F1F5F3] border border-[#27322D] rounded-lg transition-colors cursor-pointer"
                   >
                     Fechar
                   </button>
                   <button
                     type="submit"
-                    className="py-2.5 bg-red-500 hover:bg-red-400 text-neutral-950 rounded-xl font-bold transition-all cursor-pointer"
+                    className="py-2 bg-[#55E6B5] hover:bg-[#7AF0C8] text-[#07110D] rounded-lg font-semibold transition-colors cursor-pointer"
                   >
                     Entrar no Painel
                   </button>

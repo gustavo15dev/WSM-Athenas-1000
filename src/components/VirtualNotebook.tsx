@@ -72,25 +72,25 @@ const AVAILABLE_STAMPS: {
   },
   {
     type: 'foco',
-    label: '🔥 FOCO TOTAL!',
+    label: 'FOCO TOTAL!',
     subLabel: 'Grande dedicação',
     color: '#ea580c'
   },
   {
     type: 'nota10',
-    label: '💯 NOTA 10!',
+    label: 'NOTA 10!',
     subLabel: 'Trabalho perfeito',
     color: '#7c3aed'
   },
   {
     type: 'revisar',
-    label: '⚠️ REVISAR CONTEÚDO',
+    label: 'REVISAR CONTEÚDO',
     subLabel: 'Completar notas',
     color: '#dc2626'
   },
   {
     type: 'parabens',
-    label: '👏 MUITO BOM!',
+    label: 'MUITO BOM!',
     subLabel: 'Excelente resumo',
     color: '#0d9488'
   }
@@ -934,11 +934,11 @@ export default function VirtualNotebook({
       setNotebookStatus('pending_review');
       setRequestReviewModalOpen(false);
       setReviewMessage('');
-      alert(`✅ Pedido de Visto Enviado!\n\nA Folha ${requestReviewPageIndex + 1} ("${pageToSubmit.title || 'Anotações'}") do seu caderno foi enviada com sucesso.`);
+      alert(`Pedido de Visto Enviado!\n\nA Folha ${requestReviewPageIndex + 1} ("${pageToSubmit.title || 'Anotações'}") do seu caderno foi enviada com sucesso.`);
     } catch (e) {
       setNotebookStatus('pending_review');
       setRequestReviewModalOpen(false);
-      alert('✅ Pedido de visto registrado!');
+      alert('Pedido de visto registrado!');
     } finally {
       setIsSubmittingReview(false);
     }
@@ -1356,7 +1356,7 @@ export default function VirtualNotebook({
               }`}
             >
               <Save className="w-4 h-4" />
-              <span>{isSaving ? 'Salvando...' : hasUnsavedChanges ? 'Salvar Caderno' : 'Salvo ✓'}</span>
+              <span>{isSaving ? 'Salvando...' : hasUnsavedChanges ? 'Salvar Caderno' : 'Salvo'}</span>
             </button>
           )}
 
@@ -1538,7 +1538,7 @@ export default function VirtualNotebook({
                         </div>
                       </div>
                       <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">
-                        ✓ Avaliado
+                        Avaliado
                       </span>
                     </div>
                   )}

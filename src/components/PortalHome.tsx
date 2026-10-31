@@ -5,7 +5,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { GraduationCap, Sparkles, Trophy, Users, ArrowRight, ChevronDown, CheckCircle2, MessageSquare, BarChart3, ShieldCheck } from 'lucide-react';
+import { GraduationCap, Trophy, Users, ArrowRight, ChevronDown, CheckCircle2, MessageSquare, BarChart3, ShieldCheck, Award, Sparkles, Flame } from 'lucide-react';
 import { PortalRole } from '../types';
 
 const LOGO_OPEN = "https://res.cloudinary.com/dqx8p8orf/image/upload/f_auto/q_auto/gallery_image_20260927_114822-sem-mexer-em-mais-nada-nesse-boneco-mantenha-a-con-removebg-preview_3_ewaz6x.png";
@@ -13,11 +13,10 @@ const LOGO_CLOSED = "https://res.cloudinary.com/dqx8p8orf/image/upload/f_auto/q_
 
 interface PortalHomeProps {
   onSelectRole: (role: PortalRole) => void;
+  onOpenProjects?: () => void;
 }
 
-export default function PortalHome({ onSelectRole }: PortalHomeProps) {
-  const [gifSrc, setGifSrc] = useState("https://i.ibb.co/CKrqwX3f/Adobe-Express-503402de-b8ec-479e-9cb6-dfa44fa80675-1.gif");
-  const [gifError, setGifError] = useState(false);
+export default function PortalHome({ onSelectRole, onOpenProjects }: PortalHomeProps) {
   const [isBlinking, setIsBlinking] = useState(false);
 
   // Preload and manage the mascot double-blink cycle:
@@ -36,22 +35,22 @@ export default function PortalHome({ onSelectRole }: PortalHomeProps) {
 
     const step1OpenLong = () => {
       setIsBlinking(false);
-      timer = setTimeout(step2CloseFirst, 3000); // 3 segundos aberta
+      timer = setTimeout(step2CloseFirst, 3000);
     };
 
     const step2CloseFirst = () => {
       setIsBlinking(true);
-      timer = setTimeout(step3OpenShort, 200); // 0.2 segundos fechada
+      timer = setTimeout(step3OpenShort, 200);
     };
 
     const step3OpenShort = () => {
       setIsBlinking(false);
-      timer = setTimeout(step4CloseSecond, 1000); // 1 segundo aberta
+      timer = setTimeout(step4CloseSecond, 1000);
     };
 
     const step4CloseSecond = () => {
       setIsBlinking(true);
-      timer = setTimeout(step1OpenLong, 200); // 0.2 segundos fechada -> volta ao início
+      timer = setTimeout(step1OpenLong, 200);
     };
 
     step1OpenLong();
@@ -61,248 +60,263 @@ export default function PortalHome({ onSelectRole }: PortalHomeProps) {
     };
   }, []);
 
-  const handleGifError = () => {
-    setGifError(true);
-  };
-
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.12,
-        delayChildren: 0.2,
-      },
-    },
-  };
-
-  const letterVariants = {
-    hidden: { opacity: 0, y: 30, filter: 'blur(10px)' },
-    visible: {
-      opacity: 1,
-      y: 0,
-      filter: 'blur(0px)',
-      transition: {
-        type: "spring",
-        stiffness: 100,
-        damping: 10,
-      } as any,
-    },
-  };
-
   return (
-    <div className="relative min-h-screen flex flex-col justify-between p-4 sm:p-6 md:p-8 uiverse-dark-grid font-sans text-white select-none">
-      
-      {/* Background Decorative Elements */}
-      <div className="absolute top-[-10%] right-[-10%] w-[300px] md:w-[500px] h-[300px] md:h-[500px] bg-[#1eb996] opacity-10 rounded-full blur-[80px] md:blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-[-5%] left-[-5%] w-[250px] md:w-[400px] h-[250px] md:h-[400px] bg-[#0c4f42] opacity-20 rounded-full blur-[70px] md:blur-[100px] pointer-events-none" />
+    <div className="relative min-h-screen flex flex-col justify-between p-4 sm:p-6 md:p-8 bg-[#0B0F0E] font-sans text-[#F1F5F3] select-none">
       
       {/* Top Header Navbar */}
-      <header className="w-full max-w-7xl mx-auto flex items-center justify-between py-3.5 px-4 sm:px-6 z-20 border border-neutral-800/80 bg-neutral-950/60 backdrop-blur-xl rounded-2xl shadow-xl">
+      <header className="w-full max-w-5xl mx-auto flex items-center justify-between py-3 px-5 z-20 border border-[#27322D] bg-[#111715] rounded-full">
         <div className="flex items-center gap-3">
           <img
-            src="https://res.cloudinary.com/dqx8p8orf/image/upload/f_auto/q_auto/gallery_image_20260927_114822-sem-mexer-em-mais-nada-nesse-boneco-mantenha-a-con-removebg-preview_3_ewaz6x.png"
-            alt="WSM Athenas Mascot"
+            src={LOGO_OPEN}
+            alt="Mascote WSM Athenas"
             referrerPolicy="no-referrer"
-            className="w-9 h-9 sm:w-11 sm:h-11 object-contain select-none drop-shadow-[0_0_12px_rgba(30,185,150,0.35)]"
+            className="w-8 h-8 object-contain select-none shrink-0"
           />
-          <div className="flex items-center gap-1.5">
-            <span className="text-base sm:text-xl font-extrabold tracking-tight font-sans text-white">
-              <span className="text-emerald-400">WSM</span> Athenas
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-bold tracking-tight text-[#F1F5F3]">
+              WSM Athenas
             </span>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 sm:gap-3 flex-wrap justify-end">
+        <div className="flex items-center gap-2 sm:gap-2.5">
+          <button 
+            id="btn-projetos"
+            onClick={onOpenProjects}
+            className="px-4 py-1.5 bg-[#171E1B] hover:bg-[#1D2723] border border-[#27322D] text-[#F1F5F3] font-medium text-xs rounded-full transition-colors cursor-pointer"
+          >
+            Projetos
+          </button>
+
           <button 
             id="btn-entrar-aluno"
             onClick={() => onSelectRole('student')}
-            className="px-3 sm:px-4 py-2 sm:py-2.5 bg-emerald-500 hover:bg-emerald-400 text-neutral-950 font-bold text-xs sm:text-sm rounded-xl transition-all shadow-md hover:shadow-emerald-500/25 active:scale-95 cursor-pointer flex items-center gap-1.5"
+            className="px-4 py-1.5 bg-[#55E6B5] hover:bg-[#7AF0C8] text-[#07110D] font-bold text-xs rounded-full transition-colors active:scale-98 cursor-pointer shadow-[0_0_15px_rgba(85,230,181,0.2)]"
           >
-            <GraduationCap className="w-4 h-4" />
-            <span>Entrar Aluno</span>
+            Entrar Aluno
           </button>
           
           <button 
             id="btn-entrar-professor"
             onClick={() => onSelectRole('teacher')}
-            className="px-3 sm:px-4 py-2 sm:py-2.5 bg-neutral-900/90 hover:bg-neutral-800 border border-emerald-500/30 text-emerald-300 hover:text-emerald-200 font-semibold text-xs sm:text-sm rounded-xl transition-all active:scale-95 cursor-pointer flex items-center gap-1.5 backdrop-blur-md shadow-sm"
+            className="px-4 py-1.5 bg-[#171E1B] hover:bg-[#1D2723] border border-[#27322D] text-[#F1F5F3] font-medium text-xs rounded-full transition-colors active:scale-98 cursor-pointer hidden sm:inline-block"
           >
-            <Trophy className="w-4 h-4 text-emerald-400" />
-            <span>Entrar Professor</span>
+            Entrar Professor
           </button>
 
           <button 
             id="btn-entrar-pais"
             onClick={() => onSelectRole('parent')}
-            className="px-3 sm:px-4 py-2 sm:py-2.5 bg-[#02c39a]/15 hover:bg-[#02c39a]/25 border border-[#02c39a]/40 text-[#02c39a] hover:text-white font-semibold text-xs sm:text-sm rounded-xl transition-all active:scale-95 cursor-pointer flex items-center gap-1.5 backdrop-blur-md shadow-sm"
+            className="px-4 py-1.5 bg-[#171E1B] hover:bg-[#1D2723] border border-[#27322D] text-[#F1F5F3] hover:text-[#55E6B5] font-medium text-xs rounded-full transition-colors active:scale-98 cursor-pointer hidden sm:inline-block"
           >
-            <Users className="w-4 h-4 text-[#02c39a]" />
-            <span>Área dos Pais</span>
+            Área dos Pais
           </button>
         </div>
       </header>
 
-      {/* Center Branding Hero - Full height above the fold */}
-      <div className="min-h-[calc(100vh-160px)] flex flex-col items-center justify-center space-y-5 z-10 py-10 relative">
-        {/* Dynamic staggered title: "Athenas" */}
+      {/* Center Branding Hero Container */}
+      <div className="w-full max-w-5xl mx-auto min-h-[calc(100vh-160px)] flex flex-col items-center justify-center relative py-12 px-4 z-10">
+        
+        {/* Floating Side Card 1: Left (DESEMPENHO) */}
         <motion.div
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-          className="flex items-center justify-center gap-1 sm:gap-2"
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.5 }}
+          className="hidden xl:flex flex-col p-4 w-52 rounded-xl bg-[#111715] border border-[#27322D] shadow-2xl absolute left-0 top-1/2 -translate-y-1/2 -translate-x-12 -rotate-6 hover:rotate-0 transition-transform duration-300 pointer-events-auto z-10 text-left"
         >
-          {/* Logo Mascote Oficial com efeito piscar dinâmico */}
-          <motion.img
-            variants={letterVariants}
-            src={isBlinking ? LOGO_CLOSED : LOGO_OPEN}
-            alt="Mascote WSM Athenas"
-            referrerPolicy="no-referrer"
-            className="w-28 h-28 sm:w-40 sm:h-40 md:w-48 md:h-48 object-contain select-none drop-shadow-[0_0_20px_rgba(30,185,150,0.35)] -mr-3 sm:-mr-6 md:-mr-8 transition-all duration-75"
-          />
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[#77827C]">
+              DESEMPENHO
+            </span>
+            <span className="px-1.5 py-0.5 rounded bg-[#111F1A] border border-[#1E3A2F] text-[10px] font-bold text-[#55E6B5]">
+              92% ↑
+            </span>
+          </div>
 
-          <div className="flex items-center justify-center">
-            <motion.span
-              variants={letterVariants}
-              className="text-7xl sm:text-9xl md:text-[135px] font-normal leading-none mb-1 select-none animate-glow"
-              style={{
-                fontFamily: "'Brother Signature', 'Mr De Haviland', 'Monsieur La Doulaise', cursive",
-                background: "linear-gradient(180deg, #FFFFFF 40%, #1eb996 120%)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                paddingRight: "16px",
-              }}
-            >
-              Athenas
-            </motion.span>
+          {/* Activity Bar Chart */}
+          <div className="flex items-end justify-between gap-1.5 h-10 px-1 py-1">
+            <div className="w-2.5 rounded-full bg-[#55E6B5]/40 h-2" />
+            <div className="w-2.5 rounded-full bg-[#55E6B5]/60 h-4" />
+            <div className="w-2.5 rounded-full bg-[#55E6B5]/50 h-3" />
+            <div className="w-2.5 rounded-full bg-[#55E6B5]/80 h-6" />
+            <div className="w-2.5 rounded-full bg-[#55E6B5]/70 h-5" />
+            <div className="w-2.5 rounded-full bg-[#55E6B5] h-8" />
+          </div>
+
+          <span className="text-[11px] text-[#A5B0AA] font-medium mt-2">
+            +12% essa semana
+          </span>
+        </motion.div>
+
+        {/* Floating Side Card 2: Top Right (Streak 14 dias) */}
+        <motion.div
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.5, delay: 0.1 }}
+          className="hidden xl:flex flex-col p-4 w-60 rounded-xl bg-[#111715] border border-[#27322D] shadow-2xl absolute right-0 top-10 translate-x-8 rotate-6 hover:rotate-0 transition-transform duration-300 pointer-events-auto z-10 text-left"
+        >
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-8 h-8 rounded-full bg-[#111F1A] border border-[#1E3A2F] flex items-center justify-center text-[#55E6B5] shrink-0">
+              <Flame className="w-4 h-4 text-[#55E6B5]" />
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-[#F1F5F3] leading-tight">Streak 14 dias</h4>
+              <p className="text-[10px] text-[#A5B0AA]">Você está voando!</p>
+            </div>
+          </div>
+
+          <div className="w-full bg-[#171E1B] border border-[#27322D] h-2 rounded-full overflow-hidden">
+            <div className="bg-[#55E6B5] h-full rounded-full w-4/5" />
           </div>
         </motion.div>
-        
-        <motion.p
-          initial={{ opacity: 0, y: 15 }}
-          animate={{ opacity: 0.8, y: 0 }}
-          transition={{ delay: 0.8, duration: 0.6 }}
-          className="text-xs sm:text-sm md:text-base text-neutral-300 font-sans tracking-wide max-w-md text-center leading-relaxed"
-        >
-          Acesse sua plataforma inteligente de aprendizagem e estudos
-        </motion.p>
 
-        {/* Quick action buttons on hero */}
+        {/* Floating Side Card 3: Bottom Right (SIMULADO ENEM) */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1.0, duration: 0.6 }}
-          className="flex items-center gap-3 pt-3 flex-wrap justify-center"
+          transition={{ duration: 0.5, delay: 0.2 }}
+          className="hidden xl:flex flex-col p-4 w-56 rounded-xl bg-[#111715] border border-[#27322D] shadow-2xl absolute right-0 bottom-6 translate-x-12 rotate-2 hover:rotate-0 transition-transform duration-300 pointer-events-auto z-10 text-left"
         >
-          <button
-            onClick={() => onSelectRole('student')}
-            className="px-5 py-3 bg-[#02c39a] hover:bg-[#02b18c] text-neutral-950 font-black text-xs sm:text-sm rounded-xl transition-all shadow-lg shadow-[#02c39a]/20 hover:scale-105 active:scale-95 cursor-pointer flex items-center gap-2"
-          >
-            <GraduationCap className="w-4 h-4" />
-            <span>Área do Aluno</span>
-          </button>
-          <button
-            onClick={() => onSelectRole('teacher')}
-            className="px-5 py-3 bg-neutral-900/90 hover:bg-neutral-850 border border-neutral-700 text-neutral-200 hover:text-white font-bold text-xs sm:text-sm rounded-xl transition-all hover:scale-105 active:scale-95 cursor-pointer flex items-center gap-2"
-          >
-            <Trophy className="w-4 h-4 text-emerald-400" />
-            <span>Área do Professor</span>
-          </button>
-          <button
-            onClick={() => onSelectRole('parent')}
-            className="px-5 py-3 bg-[#02c39a]/15 hover:bg-[#02c39a]/25 border border-[#02c39a]/40 text-[#02c39a] hover:text-white font-bold text-xs sm:text-sm rounded-xl transition-all hover:scale-105 active:scale-95 cursor-pointer flex items-center gap-2"
-          >
-            <Users className="w-4 h-4" />
-            <span>Área dos Pais</span>
-          </button>
+          <span className="text-[10px] font-bold uppercase tracking-wider text-[#77827C]">
+            SIMULADO ENEM
+          </span>
+          <div className="text-2xl font-bold text-[#F1F5F3] mt-1 tracking-tight">
+            780 pts
+          </div>
+          <span className="text-xs text-[#55E6B5] font-semibold mt-1">
+            Top 3% da sua turma
+          </span>
         </motion.div>
 
-        {/* Scroll down indicator to discover parent section */}
-        <motion.a
-          href="#secao-pais"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 0.7 }}
-          transition={{ delay: 1.3, duration: 0.8 }}
-          className="absolute bottom-4 flex flex-col items-center gap-1 text-[11px] font-mono text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer group"
-        >
-          <span>Conheça a nova Área dos Pais</span>
-          <ChevronDown className="w-4 h-4 animate-bounce text-emerald-400 group-hover:translate-y-0.5 transition-transform" />
-        </motion.a>
+        {/* Center Hero Content Box */}
+        <div className="flex flex-col items-center justify-center space-y-5 max-w-2xl mx-auto text-center z-20">
+
+          {/* Mascot & Main Single Line Title */}
+          <div className="flex items-center justify-center gap-4 sm:gap-6 my-1">
+            <motion.img
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.2 }}
+              src={isBlinking ? LOGO_CLOSED : LOGO_OPEN}
+              alt="Mascote WSM Athenas"
+              referrerPolicy="no-referrer"
+              className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 object-contain select-none shrink-0"
+            />
+            <h1 className="text-4xl sm:text-6xl md:text-7xl font-bold tracking-tight text-[#F1F5F3] whitespace-nowrap leading-none">
+              WSM Athenas
+            </h1>
+          </div>
+
+          {/* Description */}
+          <p className="text-sm sm:text-base text-[#A5B0AA] max-w-xl leading-relaxed font-normal">
+            Acesse sua plataforma de aprendizagem e estudos
+          </p>
+
+          {/* Action Pill Buttons */}
+          <div className="flex items-center justify-center gap-3 pt-3 flex-wrap">
+            <button
+              onClick={onOpenProjects}
+              className="px-5 py-2.5 bg-[#171E1B] hover:bg-[#1D2723] border border-[#27322D] text-[#F1F5F3] font-medium text-xs sm:text-sm rounded-full transition-colors cursor-pointer"
+            >
+              Projetos
+            </button>
+
+            <button
+              onClick={() => onSelectRole('student')}
+              className="px-6 py-2.5 bg-[#55E6B5] hover:bg-[#7AF0C8] text-[#07110D] font-bold text-xs sm:text-sm rounded-full transition-colors cursor-pointer active:scale-98 shadow-[0_0_20px_rgba(85,230,181,0.25)]"
+            >
+              Área do Aluno
+            </button>
+
+            <button
+              onClick={() => onSelectRole('teacher')}
+              className="px-5 py-2.5 bg-[#171E1B] hover:bg-[#1D2723] border border-[#27322D] text-[#F1F5F3] font-medium text-xs sm:text-sm rounded-full transition-colors cursor-pointer"
+            >
+              Área do Professor
+            </button>
+
+            <button
+              onClick={() => onSelectRole('parent')}
+              className="px-5 py-2.5 bg-[#171E1B] hover:bg-[#1D2723] border border-[#27322D] text-[#F1F5F3] hover:text-[#55E6B5] font-medium text-xs sm:text-sm rounded-full transition-colors cursor-pointer"
+            >
+              Área dos Pais
+            </button>
+          </div>
+
+          {/* Scroll Link */}
+          <a
+            href="#secao-pais"
+            className="pt-6 flex flex-col items-center gap-1.5 text-xs text-[#77827C] hover:text-[#55E6B5] transition-colors cursor-pointer group"
+          >
+            <span>Conheça a Área dos Pais</span>
+            <ChevronDown className="w-4 h-4 text-[#55E6B5] group-hover:translate-y-0.5 transition-transform" />
+          </a>
+        </div>
       </div>
 
-      {/* SEÇÃO DEDICADA: Área dos Pais & Responsáveis (Apenas visível rolando para baixo) */}
-      <section id="secao-pais" className="w-full max-w-5xl mx-auto py-16 sm:py-24 z-10 px-2 sm:px-4">
-        <motion.div
-          initial={{ opacity: 0, y: 35 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-100px" }}
-          transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-          className="p-6 sm:p-10 rounded-3xl bg-neutral-950/85 border border-[#02c39a]/35 backdrop-blur-2xl shadow-3xl relative overflow-hidden text-left"
-        >
-          {/* Subtle verde água glow background */}
-          <div className="absolute top-0 right-0 w-80 h-80 bg-[#02c39a]/10 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute bottom-0 left-0 w-80 h-80 bg-teal-600/5 rounded-full blur-3xl pointer-events-none" />
-
+      {/* SEÇÃO DEDICADA: Área dos Pais & Responsáveis */}
+      <section id="secao-pais" className="w-full max-w-5xl mx-auto py-16 sm:py-20 z-10 px-2 sm:px-4">
+        <div className="p-6 sm:p-10 rounded-xl bg-[#111715] border border-[#27322D] text-left">
+          
           {/* Section Header */}
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pb-6 border-b border-neutral-800/80">
-            <div>
-              <div className="flex items-center gap-2.5 mb-2">
-                <span className="px-2.5 py-0.5 rounded-md bg-[#02c39a] text-neutral-950 text-[10.5px] font-black uppercase tracking-wider font-mono shadow-md shadow-[#02c39a]/20">
-                  NOVO
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pb-6 border-b border-[#27322D]">
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="px-2 py-0.5 rounded bg-[#171E1B] border border-[#27322D] text-[#55E6B5] text-[11px] font-medium uppercase tracking-wide">
+                  Recurso
                 </span>
-                <span className="text-xs font-mono font-medium text-[#02c39a] flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5" />
-                  Conexão Família & Escola
+                <span className="text-xs text-[#A5B0AA]">
+                  Acompanhamento Acadêmico
                 </span>
               </div>
-              <h2 className="text-xl sm:text-2xl md:text-3xl font-extrabold text-neutral-100 font-display tracking-tight flex items-center gap-3">
-                <Users className="w-6 h-6 text-[#02c39a]" />
-                Acompanhamento em Tempo Real para Pais & Responsáveis
+              <h2 className="text-xl sm:text-2xl font-bold text-[#F1F5F3] tracking-tight flex items-center gap-2.5">
+                <Users className="w-5 h-5 text-[#55E6B5]" />
+                Área dos Pais & Responsáveis
               </h2>
-              <p className="text-xs sm:text-sm text-neutral-400 mt-1.5 max-w-2xl leading-relaxed">
-                Transparência completa na evolução acadêmica dos seus filhos. Acompanhe notas, simulados, métricas de estudo e visualize em primeira mão todas as interações com a IA Athenas.
+              <p className="text-xs sm:text-sm text-[#A5B0AA] max-w-2xl leading-relaxed">
+                Acompanhe notas de simulados, ranking, frequência e conversas de estudo dos seus filhos com o tutor Athenas.
               </p>
             </div>
 
             <button
               id="btn-secao-pais-acessar"
               onClick={() => onSelectRole('parent')}
-              className="px-5 py-3 bg-[#02c39a] hover:bg-[#02b18c] text-neutral-950 font-black text-xs sm:text-sm rounded-xl transition-all shadow-lg shadow-[#02c39a]/20 hover:scale-105 active:scale-95 cursor-pointer flex items-center gap-2 shrink-0 self-start md:self-center"
+              className="px-4 py-2.5 bg-[#55E6B5] hover:bg-[#7AF0C8] text-[#07110D] font-semibold text-xs sm:text-sm rounded-lg transition-colors cursor-pointer flex items-center gap-2 shrink-0 self-start md:self-center"
             >
-              <span>Acessar Portal dos Pais</span>
+              <span>Acessar Área dos Pais</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>
 
           {/* Feature Highlights Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 mt-6 mb-8">
-            <div className="p-4 rounded-2xl bg-neutral-900/60 border border-neutral-800/90 flex items-start gap-3">
-              <div className="p-2.5 rounded-xl bg-[#02c39a]/10 border border-[#02c39a]/20 text-[#02c39a] shrink-0">
+            <div className="p-4 rounded-lg bg-[#171E1B] border border-[#27322D] flex items-start gap-3">
+              <div className="p-2 rounded-md bg-[#111715] border border-[#27322D] text-[#55E6B5] shrink-0">
                 <MessageSquare className="w-4 h-4" />
               </div>
               <div>
-                <h4 className="text-xs font-bold text-neutral-100">Espelho do Chat com IA</h4>
-                <p className="text-[11px] text-neutral-400 mt-1 leading-snug">Visualização idêntica em primeira mão de todas as conversas e dúvidas do aluno com o tutor inteligente.</p>
+                <h4 className="text-xs font-semibold text-[#F1F5F3]">Espelho de Tutoria</h4>
+                <p className="text-xs text-[#A5B0AA] mt-1 leading-relaxed">Acesso às conversas acadêmicas e dúvidas do aluno com o assistente Athenas.</p>
               </div>
             </div>
 
-            <div className="p-4 rounded-2xl bg-neutral-900/60 border border-neutral-800/90 flex items-start gap-3">
-              <div className="p-2.5 rounded-xl bg-[#02c39a]/10 border border-[#02c39a]/20 text-[#02c39a] shrink-0">
+            <div className="p-4 rounded-lg bg-[#171E1B] border border-[#27322D] flex items-start gap-3">
+              <div className="p-2 rounded-md bg-[#111715] border border-[#27322D] text-[#55E6B5] shrink-0">
                 <BarChart3 className="w-4 h-4" />
               </div>
               <div>
-                <h4 className="text-xs font-bold text-neutral-100">Notas & Minhas Métricas</h4>
-                <p className="text-[11px] text-neutral-400 mt-1 leading-snug">Acesso a todas as notas de simulados, ranking de aproveitamento, horas de estudo e consistência.</p>
+                <h4 className="text-xs font-semibold text-[#F1F5F3]">Notas & Métricas</h4>
+                <p className="text-xs text-[#A5B0AA] mt-1 leading-relaxed">Desempenho em simulados, horas de estudo, evolução e consistência pedagógica.</p>
               </div>
             </div>
 
-            <div className="p-4 rounded-2xl bg-neutral-900/60 border border-neutral-800/90 flex items-start gap-3">
-              <div className="p-2.5 rounded-xl bg-[#02c39a]/10 border border-[#02c39a]/20 text-[#02c39a] shrink-0">
+            <div className="p-4 rounded-lg bg-[#171E1B] border border-[#27322D] flex items-start gap-3">
+              <div className="p-2 rounded-md bg-[#111715] border border-[#27322D] text-[#55E6B5] shrink-0">
                 <ShieldCheck className="w-4 h-4" />
               </div>
               <div>
-                <h4 className="text-xs font-bold text-neutral-100">Múltiplos Filhos & Segurança</h4>
-                <p className="text-[11px] text-neutral-400 mt-1 leading-snug">Alterne entre mais de 2 filhos com facilidade. Cada aluno tem limite de até 5 vínculos protegidos.</p>
+                <h4 className="text-xs font-semibold text-[#F1F5F3]">Vínculo Seguro</h4>
+                <p className="text-xs text-[#A5B0AA] mt-1 leading-relaxed">Conexão protegida por código de autorização gerado diretamente pelo aluno.</p>
               </div>
             </div>
           </div>
@@ -310,117 +324,105 @@ export default function PortalHome({ onSelectRole }: PortalHomeProps) {
           {/* Passo a Passo Card Grid */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-neutral-400 font-mono flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-[#02c39a]" />
-                Passo a Passo para Vincular sua Conta
+              <span className="text-xs font-semibold uppercase tracking-wider text-[#77827C] flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#55E6B5]" />
+                Passos para Vinculação de Conta
               </span>
-              <span className="text-[11px] text-neutral-500 font-mono">Simples, rápido e seguro</span>
+              <span className="text-xs text-[#77827C]">Processo em 3 etapas</span>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-              <div className="p-4 rounded-2xl bg-neutral-900/80 border border-emerald-500/20 hover:border-emerald-500/40 transition-all flex flex-col justify-between group">
+              <div className="p-4 rounded-lg bg-[#171E1B] border border-[#27322D] flex flex-col justify-between">
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="px-2 py-0.5 rounded-md bg-[#02c39a]/10 border border-[#02c39a]/25 text-[#02c39a] text-[10px] font-mono font-bold">
-                      1º PASSO
+                    <span className="px-2 py-0.5 rounded bg-[#111715] border border-[#27322D] text-[#55E6B5] text-[10px] font-semibold">
+                      Passo 1
                     </span>
-                    <span className="text-xs text-neutral-500 font-mono">Na conta do aluno</span>
+                    <span className="text-[11px] text-[#77827C]">Conta do aluno</span>
                   </div>
-                  <h4 className="text-xs font-bold text-neutral-100 mb-1.5">Aluno Acessa os Ajustes</h4>
-                  <p className="text-[11.5px] text-neutral-300 leading-relaxed">
-                    Peça ao seu filho para entrar na conta dele do Athenas e clicar no ícone de <strong className="text-[#02c39a] font-semibold">Ajustes / Perfil</strong> no topo da página.
+                  <h4 className="text-xs font-semibold text-[#F1F5F3] mb-1">Acesso aos Ajustes</h4>
+                  <p className="text-xs text-[#A5B0AA] leading-relaxed">
+                    O aluno acessa a plataforma e abre a seção de Perfil / Vínculo com Pais.
                   </p>
                 </div>
-                <div className="pt-3 mt-3 border-t border-neutral-800/80 text-[10.5px] text-neutral-500 flex items-center gap-1">
-                  <CheckCircle2 className="w-3 h-3 text-[#02c39a]" />
-                  <span>Aba "Vínculo com Pais"</span>
+                <div className="pt-3 mt-3 border-t border-[#27322D] text-[11px] text-[#77827C] flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3 text-[#55E6B5]" />
+                  <span>Aba Vínculo com Pais</span>
                 </div>
               </div>
 
-              <div className="p-4 rounded-2xl bg-neutral-900/80 border border-emerald-500/20 hover:border-emerald-500/40 transition-all flex flex-col justify-between group">
+              <div className="p-4 rounded-lg bg-[#171E1B] border border-[#27322D] flex flex-col justify-between">
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="px-2 py-0.5 rounded-md bg-[#02c39a]/10 border border-[#02c39a]/25 text-[#02c39a] text-[10px] font-mono font-bold">
-                      2º PASSO
+                    <span className="px-2 py-0.5 rounded bg-[#111715] border border-[#27322D] text-[#55E6B5] text-[10px] font-semibold">
+                      Passo 2
                     </span>
-                    <span className="text-xs text-neutral-500 font-mono">Código exclusivo</span>
+                    <span className="text-[11px] text-[#77827C]">Código de 4 dígitos</span>
                   </div>
-                  <h4 className="text-xs font-bold text-neutral-100 mb-1.5">Gera Código de 4 Dígitos</h4>
-                  <p className="text-[11.5px] text-neutral-300 leading-relaxed">
-                    O aluno clica em <strong className="text-[#02c39a] font-semibold">"Gerar Novo Código"</strong>. Será exibido um código de 4 caracteres (números e letras maiúsculas, ex: <span className="font-mono text-emerald-300 font-bold">A7K2</span>).
+                  <h4 className="text-xs font-semibold text-[#F1F5F3] mb-1">Gerar Código</h4>
+                  <p className="text-xs text-[#A5B0AA] leading-relaxed">
+                    O aluno gera um código de 4 caracteres para autorizar o acesso da família.
                   </p>
                 </div>
-                <div className="pt-3 mt-3 border-t border-neutral-800/80 text-[10.5px] text-neutral-500 flex items-center gap-1">
-                  <CheckCircle2 className="w-3 h-3 text-[#02c39a]" />
-                  <span>Máximo de 5 vínculos por aluno</span>
+                <div className="pt-3 mt-3 border-t border-[#27322D] text-[11px] text-[#77827C] flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3 text-[#55E6B5]" />
+                  <span>Até 5 responsáveis por aluno</span>
                 </div>
               </div>
 
-              <div className="p-4 rounded-2xl bg-neutral-900/80 border border-emerald-500/20 hover:border-emerald-500/40 transition-all flex flex-col justify-between group">
+              <div className="p-4 rounded-lg bg-[#171E1B] border border-[#27322D] flex flex-col justify-between">
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="px-2 py-0.5 rounded-md bg-[#02c39a]/10 border border-[#02c39a]/25 text-[#02c39a] text-[10px] font-mono font-bold">
-                      3º PASSO
+                    <span className="px-2 py-0.5 rounded bg-[#111715] border border-[#27322D] text-[#55E6B5] text-[10px] font-semibold">
+                      Passo 3
                     </span>
-                    <span className="text-xs text-neutral-500 font-mono">Na área dos pais</span>
+                    <span className="text-[11px] text-[#77827C]">Área dos pais</span>
                   </div>
-                  <h4 className="text-xs font-bold text-neutral-100 mb-1.5">Conecte e Acompanhe</h4>
-                  <p className="text-[11.5px] text-neutral-300 leading-relaxed">
-                    Cadastre sua conta com <strong className="text-neutral-100 font-semibold">e-mail e senha</strong>, insira os 4 dígitos na tela inicial e pronto! O dashboard do seu filho é liberado instantaneamente.
+                  <h4 className="text-xs font-semibold text-[#F1F5F3] mb-1">Inserir e Conectar</h4>
+                  <p className="text-xs text-[#A5B0AA] leading-relaxed">
+                    O responsável cadastra sua conta e insere o código para desbloquear os dados.
                   </p>
                 </div>
-                <div className="pt-3 mt-3 border-t border-neutral-800/80 text-[10.5px] text-neutral-500 flex items-center gap-1">
-                  <CheckCircle2 className="w-3 h-3 text-[#02c39a]" />
-                  <span>Sem limite de filhos por pai</span>
+                <div className="pt-3 mt-3 border-t border-[#27322D] text-[11px] text-[#77827C] flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3 text-[#55E6B5]" />
+                  <span>Acesso instantâneo</span>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Bottom Action Footer within section */}
-          <div className="mt-8 pt-6 border-t border-neutral-850 flex flex-col sm:flex-row items-center justify-between gap-4 bg-neutral-900/40 p-4 rounded-2xl border border-neutral-800">
+          <div className="mt-6 pt-5 border-t border-[#27322D] flex flex-col sm:flex-row items-center justify-between gap-4 bg-[#171E1B] p-4 rounded-lg border border-[#27322D]">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-[#02c39a]/15 border border-[#02c39a]/30 flex items-center justify-center shrink-0">
-                <Users className="w-5 h-5 text-[#02c39a]" />
+              <div className="w-8 h-8 rounded-md bg-[#111715] border border-[#27322D] flex items-center justify-center shrink-0">
+                <Users className="w-4 h-4 text-[#55E6B5]" />
               </div>
-              <p className="text-xs text-neutral-300">
-                Já possui o código fornecido pelo seu filho? Comece a acompanhar o progresso acadêmico agora mesmo.
+              <p className="text-xs text-[#A5B0AA]">
+                Já possui o código fornecido pelo aluno? Conecte-se para iniciar o acompanhamento.
               </p>
             </div>
             <button
               onClick={() => onSelectRole('parent')}
-              className="px-4 py-2 bg-[#02c39a] hover:bg-[#02b18c] text-neutral-950 font-extrabold text-xs rounded-xl transition-all shadow-md hover:shadow-[#02c39a]/25 active:scale-95 cursor-pointer shrink-0 flex items-center gap-1.5"
+              className="px-3.5 py-2 bg-[#55E6B5] hover:bg-[#7AF0C8] text-[#07110D] font-semibold text-xs rounded-lg transition-colors cursor-pointer shrink-0 flex items-center gap-1.5"
             >
               <span>Vincular Conta de Aluno</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>
-        </motion.div>
+        </div>
       </section>
-
-      {/* Subtle Corner Detail */}
-      <div className="absolute bottom-0 right-0 p-4 hidden md:block pointer-events-none">
-        <div className="w-16 h-16 border-r-2 border-b-2 border-[#1eb996]/20" />
-      </div>
 
       {/* Preloaders */}
       <img
         src={LOGO_OPEN}
-        alt="Preloader Mascote Aberto"
+        alt=""
         referrerPolicy="no-referrer"
         className="hidden"
         aria-hidden="true"
       />
       <img
         src={LOGO_CLOSED}
-        alt="Preloader Mascote Fechado"
-        referrerPolicy="no-referrer"
-        className="hidden"
-        aria-hidden="true"
-      />
-      <img
-        src="https://i.ibb.co/dsNgMZMN/2.jpg"
-        alt="Preloader Arte Athenas"
+        alt=""
         referrerPolicy="no-referrer"
         className="hidden"
         aria-hidden="true"
@@ -428,4 +430,3 @@ export default function PortalHome({ onSelectRole }: PortalHomeProps) {
     </div>
   );
 }
-

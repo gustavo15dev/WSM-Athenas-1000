@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export type ScreenType = 'PORTAL_HOME' | 'LOGIN' | 'STUDENT_DASHBOARD' | 'TEACHER_DASHBOARD' | 'PARENT_DASHBOARD' | 'DASHBOARD_EMPTY' | 'ADMIN_PORTAL';
+export type ScreenType = 'PORTAL_HOME' | 'PROJECTS' | 'LOGIN' | 'STUDENT_DASHBOARD' | 'TEACHER_DASHBOARD' | 'PARENT_DASHBOARD' | 'DASHBOARD_EMPTY' | 'ADMIN_PORTAL';
 export type PortalRole = 'student' | 'teacher' | 'parent';
 
 export interface StudentParentLink {

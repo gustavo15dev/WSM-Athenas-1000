@@ -46,7 +46,9 @@ import {
   School,
   Copy,
   Check,
-  ShieldCheck
+  ShieldCheck,
+  ArrowLeft,
+  User
 } from 'lucide-react';
 import { matchesStudentTarget, matchesStudentExam, formatTargetDisplayName } from '../utils/targetMatcher';
 import { parseExamSettings, cleanExamContent, cleanNotificationMessage, formatExamDateDisplay, cleanExamObservations, extractExamTime } from '../utils/examSettings';
@@ -118,7 +120,7 @@ export default function StudentDashboard({
 
   const handleTabClick = (tab: typeof activeTab) => {
     if (isExamActive) {
-      alert("⚠️ PROVA EM ANDAMENTO!\n\nVocê está realizando um simulado. Para navegar pelo site, você deve primeiro concluir e enviar a sua prova utilizando o botão 'Finalizar e Entregar Prova'.");
+      alert("Atenção: Prova em andamento!\n\nVocê está realizando um simulado. Para navegar pelo site, você deve primeiro concluir e enviar a sua prova utilizando o botão 'Finalizar e Entregar Prova'.");
       return;
     }
     if (activeTab === 'caderno' && tab !== 'caderno' && hasUnsavedNotebook) {
@@ -772,9 +774,9 @@ export default function StudentDashboard({
     if (diffDays < 0) {
       return { text: "Já ocorreu", className: "text-neutral-500 bg-neutral-900 border-neutral-850", iconClass: "text-neutral-600" };
     } else if (diffDays === 0) {
-      return { text: "Hoje! 🚨", className: "text-rose-450 bg-rose-500/15 border-rose-500/25 font-bold animate-pulse", iconClass: "text-rose-400" };
+      return { text: "Hoje", className: "text-rose-450 bg-rose-500/15 border-rose-500/25 font-bold animate-pulse", iconClass: "text-rose-400" };
     } else if (diffDays === 1) {
-      return { text: "Amanhã! ⚠️", className: "text-amber-450 bg-amber-500/15 border-amber-500/25 font-bold", iconClass: "text-amber-400" };
+      return { text: "Amanhã", className: "text-amber-450 bg-amber-500/15 border-amber-500/25 font-bold", iconClass: "text-amber-400" };
     } else {
       return { text: `Faltam ${diffDays} dias`, className: "text-emerald-400 bg-emerald-500/10 border-emerald-500/25 font-semibold", iconClass: "text-emerald-400" };
     }
@@ -990,7 +992,7 @@ export default function StudentDashboard({
           const isDeleted = localStorage.getItem(`deleted_${notifId}_${email.toLowerCase()}`) === 'true';
           return {
             id: notifId,
-            title: `🎉 Bem-vindo(a) ao Athenas!`,
+            title: `Bem-vindo(a) ao Athenas!`,
             message: `Olá! O(A) professor(a) ${teacher.nome_completo || 'Docente'} já está cadastrado(a) no sistema e leciona para sua turma (${profile?.turma || ''}).\n\nNesta aba de Notificações, você receberá alertas automáticos em tempo real sempre que novos simulados forem agendados ou quando novas provas físicas forem marcadas! Bons estudos!`,
             is_read: isRead,
             is_deleted: isDeleted,
@@ -1969,7 +1971,7 @@ export default function StudentDashboard({
       localStorage.setItem(`wsm_active_student_class_${cleanEmail}`, vClass.name);
       setWelcomeModalDismissedInDb(cleanEmail, profile?.id);
 
-      setWelcomeJoinSuccess(`🎉 Sucesso! Você ingressou na turma "${vClass.name}". Carregando seus conteúdos...`);
+      setWelcomeJoinSuccess(`Sucesso! Você ingressou na turma "${vClass.name}". Carregando seus conteúdos...`);
       setWelcomeJoinCode('');
       setTimeout(async () => {
         await loadData(vClass.name);
@@ -2575,11 +2577,7 @@ export default function StudentDashboard({
   };
 
   return (
-    <div className="h-screen w-full overflow-hidden bg-[#040605] text-neutral-200 font-sans flex relative">
-      {/* Background elegant overlays */}
-      <div className="absolute top-0 right-1/4 w-80 h-80 bg-emerald-500/5 rounded-full blur-[100px] pointer-events-none" />
-      <div className="absolute bottom-1/3 left-10 w-80 h-80 bg-emerald-600/5 rounded-full blur-[100px] pointer-events-none" />
-
+    <div className="h-screen w-full overflow-hidden bg-[#0B0F0E] text-[#F1F5F3] font-sans flex relative">
       {/* Modern Sidebar for desktop */}
       {!isExamActive && (
         <aside 
@@ -2588,7 +2586,7 @@ export default function StudentDashboard({
           data-collapsed={isSidebarCollapsed}
           className={`${
             isSidebarCollapsed ? 'w-24 px-2.5 py-6' : 'w-64 p-6'
-          } h-screen max-h-screen border-r border-emerald-950/20 bg-neutral-950/60 hidden md:flex flex-col shrink-0 justify-between z-30 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-neutral-800/70 scrollbar-track-transparent hover:scrollbar-thumb-neutral-700 transition-all duration-300`}
+          } h-screen max-h-screen border-r border-[#27322D] bg-[#111715] hidden md:flex flex-col shrink-0 justify-between z-30 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-neutral-800/70 scrollbar-track-transparent hover:scrollbar-thumb-neutral-700 transition-all duration-300`}
         >
         <div className={hideTopBrand ? "space-y-4" : "space-y-8"}>
           {!hideTopBrand && (
@@ -2634,7 +2632,7 @@ export default function StudentDashboard({
               id="student-tab-chat"
               onClick={() => {
                 if (isExamActive) {
-                  alert("⚠️ PROVA EM ANDAMENTO!\n\nVocê está realizando um simulado. Para navegar pelo site, você deve primeiro concluir e enviar a sua prova utilizando o botão 'Finalizar e Entregar Prova'.");
+                  alert("Atenção: Prova em andamento!\n\nVocê está realizando um simulado. Para navegar pelo site, você deve primeiro concluir e enviar a sua prova utilizando o botão 'Finalizar e Entregar Prova'.");
                   return;
                 }
                 setStudyExamTheme(undefined);
@@ -2930,7 +2928,7 @@ export default function StudentDashboard({
             ? "shrink-0 p-6 sm:p-8 rounded-3xl bg-neutral-950/40 border border-neutral-900/80 backdrop-blur-md relative mb-6 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 min-h-fit overflow-visible"
             : "shrink-0 flex flex-col md:hidden items-start gap-4 pb-4 mb-6 border-b border-emerald-950/20"
         }>
-          {activeTab === 'inicio' && <div className="absolute top-0 right-0 w-48 h-48 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />}
+          
           
           {activeTab === 'inicio' ? (
             <div className="flex items-start sm:items-center gap-4 animate-fadeIn relative z-10 w-full xl:w-auto min-h-fit">
@@ -2942,7 +2940,7 @@ export default function StudentDashboard({
                   <h1 className="text-xl md:text-2xl font-black text-neutral-100 font-display tracking-tight">Athenas</h1>
                   <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-0.5 rounded-full font-mono uppercase font-bold">Portal do Aluno</span>
                 </div>
-                <h2 className="text-2xl md:text-3xl font-black bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent tracking-tight">
+                <h2 className="text-2xl md:text-3xl font-black text-[#F1F5F3] tracking-tight">
                   Olá, {profile ? profile.nome_completo : email}!
                 </h2>
               </div>
@@ -3049,7 +3047,7 @@ export default function StudentDashboard({
             <button
               onClick={() => {
                 if (isExamActive) {
-                  alert("⚠️ PROVA EM ANDAMENTO!\n\nVocê está realizando um simulado. Para navegar pelo site, você deve primeiro concluir e enviar a sua prova utilizando o botão 'Finalizar e Entregar Prova'.");
+                  alert("Atenção: Prova em andamento!\n\nVocê está realizando um simulado. Para navegar pelo site, você deve primeiro concluir e enviar a sua prova utilizando o botão 'Finalizar e Entregar Prova'.");
                   return;
                 }
                 setStudyExamTheme(undefined);
@@ -3236,7 +3234,7 @@ export default function StudentDashboard({
                       </div>
                     </div>
                     <span className="text-[10px] bg-red-500/20 text-red-300 border border-red-500/40 px-3 py-1 rounded-full font-mono font-extrabold uppercase tracking-widest animate-pulse">
-                      🚨 NOTIFICAÇÕES
+                      Notificações
                     </span>
                   </div>
 
@@ -3255,7 +3253,7 @@ export default function StudentDashboard({
                           <div className="flex items-start justify-between gap-2">
                             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-mono font-black bg-amber-500/20 border border-amber-500/40 text-amber-300 uppercase tracking-wider animate-pulse">
                               <Megaphone className="w-3 h-3 text-amber-400" />
-                              📢 {ann.category === 'urgente' ? '🚨 Aviso Urgente' : ann.category === 'prova' ? '📝 Prova / Conteúdo' : ann.category === 'evento' ? '🎉 Evento Escolar' : 'Aviso do Professor'}
+                              {ann.category === 'urgente' ? 'Aviso Urgente' : ann.category === 'prova' ? 'Prova / Conteúdo' : ann.category === 'evento' ? 'Evento Escolar' : 'Aviso do Professor'}
                             </span>
                             <span className="text-[10px] text-amber-300/90 font-mono font-bold bg-neutral-950/80 px-2 py-0.5 rounded border border-amber-900/40">
                               {ann.class_name ? formatTargetDisplayName(ann.class_name, virtualClasses) : 'Geral'}
@@ -3320,7 +3318,7 @@ export default function StudentDashboard({
                           <div className="flex items-start justify-between gap-2">
                             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-mono font-black bg-red-500/20 border border-red-500/40 text-red-300 uppercase tracking-wider animate-pulse">
                               <AlertCircle className="w-3 h-3 text-red-400" />
-                              🚨 Novo Simulado Disponível
+                              Novo Simulado Disponível
                             </span>
                             <span className="text-[10px] text-red-300/80 font-mono font-bold bg-neutral-950/80 px-2 py-0.5 rounded border border-red-900/40">
                               {mock.subject || 'Biologia'}
@@ -3396,7 +3394,7 @@ export default function StudentDashboard({
                           <div className="flex items-start justify-between gap-2">
                             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-mono font-black bg-rose-500/20 border border-rose-500/40 text-rose-300 uppercase tracking-wider animate-pulse">
                               <Calendar className="w-3 h-3 text-rose-400" />
-                              📝 Prova Presencial Marcada
+                              Prova Presencial Marcada
                             </span>
                             <span className="text-[10px] text-rose-300/80 font-mono font-bold bg-neutral-950/80 px-2 py-0.5 rounded border border-rose-900/40">
                               {ex.materia || 'Biologia'}
@@ -3448,7 +3446,7 @@ export default function StudentDashboard({
                         <div className="flex items-start justify-between gap-2">
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-mono font-black bg-red-500/20 border border-red-500/30 text-red-300 uppercase tracking-wider">
                             <Bell className="w-3 h-3 text-red-400" />
-                            📢 Comunicado Geral
+                            Comunicado Geral
                           </span>
                           <span className="text-[9px] text-neutral-500 font-mono">
                             {new Date(n.created_at).toLocaleDateString('pt-BR')}
@@ -3752,509 +3750,586 @@ export default function StudentDashboard({
       </div>
 
       {isSettingsOpen && (
-        <div className="fixed inset-0 bg-neutral-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="bg-neutral-900 border border-neutral-800 rounded-3xl w-full max-w-md p-6 overflow-hidden relative shadow-2xl"
-          >
-            <div className="flex items-center justify-between mb-6 border-b border-neutral-800 pb-4">
-              <div className="flex items-center gap-2.5">
-                <Settings className="w-5 h-5 text-emerald-400" />
+        <div className="fixed inset-0 z-50 bg-[#0B0F0E] text-[#F1F5F3] flex flex-col overflow-y-auto">
+          {/* Top Bar Navigation */}
+          <header className="sticky top-0 z-30 bg-[#111715] border-b border-[#27322D] px-4 sm:px-8 py-4">
+            <div className="max-w-7xl mx-auto flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[#171E1B] border border-[#27322D] flex items-center justify-center text-[#55E6B5]">
+                  <Settings className="w-5 h-5 text-[#55E6B5]" />
+                </div>
                 <div>
-                  <h3 className="text-sm font-extrabold text-neutral-100 font-display">Ajustes do Aluno</h3>
-                  <p className="text-[10px] text-neutral-500 font-mono">Gerenciar seus dados e preferências</p>
+                  <h2 className="text-base sm:text-lg font-bold text-[#F1F5F3] leading-none">Ajustes da Conta</h2>
+                  <p className="text-xs text-[#A5B0AA] mt-1">Gerencie seus dados acadêmicos, preferências e credenciais</p>
                 </div>
               </div>
+
               <button 
                 type="button"
                 onClick={() => setIsSettingsOpen(false)}
-                className="text-neutral-450 hover:text-neutral-200 text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-neutral-950/40 border border-neutral-850 hover:border-neutral-800 transition-colors cursor-pointer"
+                className="px-4 py-2 bg-[#171E1B] hover:bg-[#1D2723] text-[#F1F5F3] text-xs font-semibold rounded-xl border border-[#27322D] transition-colors cursor-pointer flex items-center gap-2"
               >
-                Voltar
+                <ArrowLeft className="w-4 h-4 text-[#A5B0AA]" />
+                <span>Voltar ao Portal</span>
               </button>
             </div>
+          </header>
 
-            {/* Tab Switcher inside Settings */}
-            <div className="flex border-b border-neutral-850 mb-5 pb-0.5 gap-4">
-              <button
-                type="button"
-                onClick={() => setActiveSettingsTab('profile')}
-                className={`pb-2 text-xs font-bold transition-all relative ${
-                  activeSettingsTab === 'profile'
-                    ? 'text-emerald-400 border-b-2 border-emerald-500'
-                    : 'text-neutral-500 hover:text-neutral-300'
-                }`}
-              >
-                Meu Perfil
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveSettingsTab('notifications')}
-                className={`pb-2 text-xs font-bold transition-all relative flex items-center gap-1.5 ${
-                  activeSettingsTab === 'notifications'
-                    ? 'text-emerald-400 border-b-2 border-emerald-500'
-                    : 'text-neutral-500 hover:text-neutral-300'
-                }`}
-              >
-                <span>Notificações</span>
-                {profile?.notification_gmail && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveSettingsTab('vincular_pais');
-                  loadParentLinks();
-                }}
-                className={`pb-2 text-xs font-bold transition-all relative flex items-center gap-1.5 ${
-                  activeSettingsTab === 'vincular_pais'
-                    ? 'text-amber-400 border-b-2 border-amber-500'
-                    : 'text-neutral-500 hover:text-neutral-300'
-                }`}
-              >
-                <Users className="w-3.5 h-3.5 text-amber-400" />
-                <span>Vínculo com Pais</span>
-                {studentParentLinks.length > 0 && (
-                  <span className="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded-full font-mono font-bold">
-                    {studentParentLinks.length}/5
-                  </span>
-                )}
-              </button>
-            </div>
-
-            {activeSettingsTab === 'profile' && (
-              <div className="animate-fadeIn">
-                {settingsStatus && (
-                  <div className={`mb-4 p-3.5 rounded-xl text-xs border flex items-center justify-between gap-2.5 animate-fadeIn ${
-                    settingsStatus.type === 'success' 
-                      ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-400 font-medium' 
-                      : settingsStatus.type === 'info'
-                      ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-300 font-medium shadow-sm shadow-cyan-950/30'
-                      : 'bg-red-500/10 border-red-500/25 text-red-400'
-                  }`}>
-                    <div className="flex items-center gap-2">
-                      {settingsStatus.type === 'success' ? (
-                        <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
-                      ) : settingsStatus.type === 'info' ? (
-                        <Info className="w-4 h-4 text-cyan-400 shrink-0" />
-                      ) : (
-                        <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
-                      )}
-                      <span>{settingsStatus.msg}</span>
+          {/* Main Horizontal Content */}
+          <div className="max-w-7xl mx-auto w-full px-4 sm:px-8 py-8 flex-1">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+              {/* Left Column: Profile Card & Tabs Navigation */}
+              <div className="lg:col-span-4 space-y-6">
+                {/* Profile Overview Card */}
+                <div className="p-6 rounded-xl bg-[#111715] border border-[#27322D] space-y-4">
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 rounded-xl bg-[#171E1B] border border-[#55E6B5]/30 flex items-center justify-center font-bold text-lg text-[#55E6B5] uppercase shrink-0">
+                      {(profile ? profile.nome_completo : email).substring(0, 2).toUpperCase()}
                     </div>
-                    {settingsStatus.type === 'error' && (
-                      <button
-                        type="button"
-                        onClick={(e) => handleUpdateSettings(e as any)}
-                        disabled={savingSettings}
-                        className="px-2.5 py-1 bg-red-500/20 hover:bg-red-500/30 text-red-300 font-bold rounded-lg text-[10px] transition cursor-pointer flex items-center gap-1 shrink-0"
-                      >
-                        <RotateCcw className="w-3 h-3" />
-                        <span>Tentar Novamente</span>
-                      </button>
-                    )}
-                  </div>
-                )}
-
-                <form onSubmit={handleUpdateSettings} className="space-y-4">
-                  <div>
-                    <label className="block text-[10px] text-neutral-450 uppercase font-mono tracking-widest mb-1.5 font-bold">Nome Completo</label>
-                    <input
-                      type="text"
-                      required
-                      value={setName}
-                      onChange={(e) => setSetName(e.target.value)}
-                      className="w-full bg-neutral-950 border border-neutral-850 rounded-xl px-3.5 py-2 text-xs text-neutral-200 placeholder-neutral-600 focus:outline-none focus:border-emerald-500/30 font-medium"
-                      placeholder="Seu nome"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] text-neutral-450 uppercase font-mono tracking-widest mb-1.5 font-bold">Escola / Instituição de Ensino</label>
-                    <input
-                      type="text"
-                      value={setEscola}
-                      onChange={(e) => setSetEscola(e.target.value)}
-                      className="w-full bg-neutral-950 border border-neutral-850 rounded-xl px-3.5 py-2 text-xs text-neutral-200 placeholder-neutral-600 focus:outline-none focus:border-emerald-500/30 font-medium"
-                      placeholder="Nome da sua Escola (Opcional)"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] text-neutral-450 uppercase font-mono tracking-widest mb-1.5 font-bold">Endereço de E-mail</label>
-                    <input
-                      type="email"
-                      required
-                      value={setMail}
-                      onChange={(e) => setSetMail(e.target.value)}
-                      className="w-full bg-neutral-950 border border-neutral-850 rounded-xl px-3.5 py-2 text-xs text-neutral-200 placeholder-neutral-600 focus:outline-none focus:border-emerald-500/30 font-medium"
-                      placeholder="Seu e-mail"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] text-neutral-450 uppercase font-mono tracking-widest mb-1.5 font-bold">Nova Senha (Opcional - deixe em branco para não alterar)</label>
-                    <div className="relative">
-                      <input
-                        type={showPwd ? "text" : "password"}
-                        value={setPassword}
-                        onChange={(e) => setSetPassword(e.target.value)}
-                        className="w-full bg-neutral-950 border border-neutral-850 rounded-xl pl-3.5 pr-10 py-2 text-xs text-neutral-100 placeholder-neutral-600 focus:outline-none focus:border-emerald-500/30 font-mono"
-                        placeholder="Deixe em branco para manter a senha atual"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPwd(!showPwd)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-emerald-400 transition-colors"
-                      >
-                        {showPwd ? (
-                          <EyeOff className="w-3.5 h-3.5" />
-                        ) : (
-                          <Eye className="w-3.5 h-3.5" />
-                        )}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-[10px] text-neutral-450 uppercase font-mono tracking-widest mb-1.5 font-bold">Número de Chamada</label>
-                      <input
-                        type="number"
-                        min="1"
-                        max="100"
-                        required
-                        value={setChamada}
-                        onChange={(e) => setSetChamada(Number(e.target.value))}
-                        className="w-full bg-neutral-950 border border-neutral-850 rounded-xl px-3.5 py-2 text-xs text-neutral-200 focus:outline-none focus:border-emerald-500/30 font-mono font-bold"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] text-neutral-550 uppercase font-mono tracking-widest mb-1.5 font-bold">Turma (Inalterável)</label>
-                      <div className="w-full bg-neutral-950/60 border border-neutral-900 text-neutral-500 rounded-xl px-3.5 py-2 text-xs font-bold font-mono">
-                        {profile ? profile.turma : ''}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] text-neutral-450 uppercase font-mono tracking-widest mb-1.5 font-bold">Tema do Portal</label>
-                    <div className="grid grid-cols-2 gap-2 mt-1">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setThemePreference('escuro');
-                          setSettingsStatus({ type: 'info', msg: '🌙 Tema Escuro selecionado (padrão do portal).' });
-                          setTimeout(() => setSettingsStatus(prev => prev?.type === 'info' ? null : prev), 3500);
-                        }}
-                        className={`px-3 py-2 text-[10px] font-bold font-mono uppercase tracking-wider rounded-xl border transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                          themePreference === 'escuro'
-                            ? 'bg-neutral-950 border-emerald-500/30 text-emerald-400 shadow-sm shadow-emerald-950'
-                            : 'bg-transparent border-neutral-850 text-neutral-550 hover:text-neutral-400'
-                        }`}
-                      >
-                        <Moon className="w-3.5 h-3.5" />
-                        <span>Escuro (Padrão)</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSettingsStatus({
-                            type: 'info',
-                            msg: '☀️ O tema claro está em desenvolvimento e será liberado em breve! Por enquanto, utilize o tema escuro padrão.'
-                          });
-                          setTimeout(() => setSettingsStatus(prev => prev?.type === 'info' ? null : prev), 5000);
-                        }}
-                        title="Funcionalidade em desenvolvimento — o tema claro estará disponível em breve!"
-                        className="px-3 py-2 text-[10px] font-bold font-mono uppercase tracking-wider rounded-xl border transition-all flex items-center justify-center gap-1.5 bg-neutral-950/40 border-neutral-850/70 text-neutral-400 hover:text-amber-300 hover:border-amber-500/30 cursor-pointer group"
-                      >
-                        <Sun className="w-3.5 h-3.5 text-neutral-500 group-hover:text-amber-400 transition-colors" />
-                        <span>Claro</span>
-                        <span className="text-[8px] bg-amber-500/15 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded uppercase tracking-normal font-sans font-bold">Em breve</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="pt-3">
-                    <button
-                      type="submit"
-                      onClick={() => handleUpdateSettings()}
-                      disabled={savingSettings}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-neutral-950 font-bold rounded-xl transition-all text-xs shadow-[0_0_15px_rgba(30, 185, 150,0.1)] cursor-pointer"
-                    >
-                      {savingSettings ? 'Gravando dados...' : 'Salvar Preferências'}
-                    </button>
-                  </div>
-                </form>
-              </div>
-            )}
-
-            {activeSettingsTab === 'notifications' && (
-              <div className="space-y-4 animate-fadeIn text-left">
-                <div className="p-4 rounded-2xl bg-neutral-950/40 border border-neutral-850 relative overflow-hidden">
-                  <div className="absolute top-0 right-0 w-20 h-20 bg-emerald-500/5 rounded-full blur-xl pointer-events-none" />
-                  <div className="flex gap-3 items-start">
-                    <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl shrink-0 mt-0.5">
-                      <Mail className="w-5 h-5" />
-                    </div>
-                    <div>
+                    <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <h4 className="text-xs font-bold text-neutral-200">Alertas por E-mail</h4>
-                        {profile?.notification_gmail ? (
-                          <span className="px-1.5 py-0.5 text-[8px] font-extrabold font-mono rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 uppercase tracking-wider">
-                            Ativo
-                          </span>
-                        ) : (
-                          <span className="px-1.5 py-0.5 text-[8px] font-extrabold font-mono rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-400 uppercase tracking-wider">
-                            Pendente
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-neutral-400 mt-1 leading-relaxed">
-                        Receba avisos de novas provas, trabalhos, recados do mural e simulados diretamente na sua caixa de entrada, enviados por <span className="text-emerald-400 font-mono text-[10px]">wsmathenas@gmail.com</span>.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {profile?.notification_gmail && !isEditingGmail ? (
-                  <div className="space-y-3.5 pt-1">
-                    <div className="bg-neutral-950/60 border border-neutral-850 p-4 rounded-xl flex flex-col items-center justify-center text-center space-y-1.5">
-                      <p className="text-[10px] uppercase font-bold font-mono tracking-wider text-neutral-500">Gmail Cadastrado</p>
-                      <p className="text-emerald-400 text-sm font-bold font-mono bg-emerald-950/20 px-3 py-1.5 rounded-xl border border-emerald-500/10 select-all">
-                        {profile.notification_gmail}
-                      </p>
-                    </div>
-
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={handleDeleteGmail}
-                        disabled={savingGmail}
-                        className="flex-1 py-2.5 bg-red-950/20 hover:bg-red-950/30 text-red-400 border border-red-900/15 hover:border-red-900/35 font-bold rounded-xl text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        <span>Excluir E-mail</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsEditingGmail(true);
-                          setNotificationGmailInput(profile.notification_gmail || '');
-                          setGmailStatus(null);
-                        }}
-                        disabled={savingGmail}
-                        className="flex-1 py-2.5 bg-neutral-950 hover:bg-neutral-900 text-neutral-300 font-bold rounded-xl text-xs border border-neutral-850 transition-all cursor-pointer flex items-center justify-center gap-1.5"
-                      >
-                        <Edit3 className="w-3.5 h-3.5 text-emerald-450" />
-                        <span>Alterar E-mail</span>
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <form onSubmit={handleSaveGmail} className="space-y-3 text-left">
-                    <div>
-                      <label className="block text-[10px] text-neutral-450 uppercase font-mono tracking-widest mb-1.5 font-bold">
-                        {profile?.notification_gmail ? 'Novo Endereço do Gmail' : 'Endereço do Gmail para Receber Avisos'}
-                      </label>
-                      <input
-                        type="email"
-                        required
-                        placeholder="seu-email@gmail.com"
-                        value={notificationGmailInput}
-                        onChange={(e) => setNotificationGmailInput(e.target.value)}
-                        className="w-full bg-neutral-950 border border-neutral-850 rounded-xl px-3.5 py-2 text-xs text-neutral-200 placeholder-neutral-600 focus:outline-none focus:border-emerald-500/30 font-medium"
-                      />
-                    </div>
-
-                    <div className="flex gap-2 pt-1">
-                      {isEditingGmail && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsEditingGmail(false);
-                            setNotificationGmailInput(profile?.notification_gmail || '');
-                            setGmailStatus(null);
-                          }}
-                          className="flex-1 py-2.5 bg-neutral-950 hover:bg-neutral-900 text-neutral-400 font-bold rounded-xl text-xs border border-neutral-850 transition-all cursor-pointer"
-                        >
-                          Cancelar
-                        </button>
-                      )}
-                      <button
-                        type="submit"
-                        disabled={savingGmail}
-                        className="flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-400 disabled:bg-neutral-800 disabled:text-neutral-500 text-neutral-950 font-bold rounded-xl text-xs transition-all active:scale-98 flex items-center justify-center gap-1.5 cursor-pointer shadow-[0_0_12px_rgba(30, 185, 150,0.1)]"
-                      >
-                        {savingGmail ? (
-                          <span>Salvando...</span>
-                        ) : (
-                          <>
-                            <Mail className="w-3.5 h-3.5" />
-                            <span>{profile?.notification_gmail ? 'Salvar Novo' : 'Ativar E-mail'}</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </form>
-                )}
-
-                {gmailStatus && (
-                  <p className={`text-[10px] text-center font-semibold mt-2.5 ${gmailStatus.type === 'success' ? 'text-emerald-400 bg-emerald-500/5 py-2 px-3 border border-emerald-500/10 rounded-xl' : 'text-rose-400 bg-rose-500/5 py-2 px-3 border border-rose-500/10 rounded-xl'}`}>
-                    {gmailStatus.msg}
-                  </p>
-                )}
-              </div>
-            )}
-
-            {activeSettingsTab === 'vincular_pais' && (
-              <div className="space-y-4 animate-fadeIn text-left">
-                <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/25 relative overflow-hidden">
-                  <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/10 rounded-full blur-xl pointer-events-none" />
-                  <div className="flex items-start gap-3">
-                    <div className="p-2.5 bg-amber-500/15 border border-amber-500/30 text-amber-400 rounded-xl shrink-0 mt-0.5">
-                      <Users className="w-5 h-5" />
-                    </div>
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between">
-                        <h4 className="text-xs font-bold text-amber-200 uppercase tracking-wider font-mono">
-                          Vínculo com Pais & Responsáveis
-                        </h4>
-                        <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                          {studentParentLinks.length} de 5 utilizados
+                        <span className="text-[10px] bg-[#55E6B5]/15 text-[#55E6B5] border border-[#55E6B5]/30 px-2 py-0.5 rounded font-semibold uppercase">
+                          Aluno
                         </span>
+                        {profile?.numero_chamada && (
+                          <span className="text-[10px] bg-[#171E1B] text-[#A5B0AA] border border-[#27322D] px-2 py-0.5 rounded font-semibold">
+                            Nº {profile.numero_chamada}
+                          </span>
+                        )}
                       </div>
-                      <p className="text-[11.5px] text-neutral-300 leading-relaxed">
-                        Gere um código de 4 dígitos (letras maiúsculas e números) para passar aos seus pais. Eles poderão acompanhar seu progresso, notas nos simulados e suas conversas com a IA Athenas.
-                      </p>
+                      <h3 className="text-base font-bold text-[#F1F5F3] mt-1.5 truncate" title={profile?.nome_completo || email}>
+                        {profile?.nome_completo || email}
+                      </h3>
+                      <p className="text-xs text-[#A5B0AA] truncate" title={email}>{email}</p>
+                    </div>
+                  </div>
+
+                  <div className="pt-3 border-t border-[#27322D] space-y-2 text-xs">
+                    <div className="flex items-center justify-between text-[#A5B0AA]">
+                      <span>Turma:</span>
+                      <span className="font-semibold text-[#F1F5F3]">{profile?.turma || 'Não vinculada'}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-[#A5B0AA]">
+                      <span>Escola:</span>
+                      <span className="font-semibold text-[#F1F5F3] truncate max-w-[200px]">{profile?.escola || 'Não informada'}</span>
                     </div>
                   </div>
                 </div>
 
-                {parentLinkError && (
-                  <div className="p-3 bg-red-500/10 border border-red-500/25 rounded-xl text-xs text-red-400 flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4 shrink-0" />
-                    <span>{parentLinkError}</span>
-                  </div>
-                )}
+                {/* Tab Switcher */}
+                <div className="p-2 rounded-xl bg-[#111715] border border-[#27322D] flex flex-row lg:flex-col gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setActiveSettingsTab('profile')}
+                    className={`flex-1 flex items-center gap-2.5 px-4 py-3 rounded-lg text-xs font-semibold transition-colors cursor-pointer text-left ${
+                      activeSettingsTab === 'profile'
+                        ? 'bg-[#55E6B5] text-[#07110D]'
+                        : 'text-[#A5B0AA] hover:bg-[#171E1B] hover:text-[#F1F5F3]'
+                    }`}
+                  >
+                    <User className="w-4 h-4" />
+                    <span>Meu Perfil</span>
+                  </button>
 
-                {/* Box do Código de 4 Dígitos */}
-                <div className="p-4 rounded-2xl bg-neutral-950/70 border border-neutral-850 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider font-mono">
-                      Código de Vínculo Atual
-                    </span>
-                    <button
-                      type="button"
-                      onClick={handleGenerateCode}
-                      disabled={generatingParentCode || studentParentLinks.length >= 5}
-                      className="px-3 py-1.5 bg-neutral-900 hover:bg-neutral-850 text-amber-300 hover:text-amber-200 border border-amber-500/30 rounded-xl text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center gap-1.5"
-                    >
-                      <Key className="w-3.5 h-3.5" />
-                      <span>{generatingParentCode ? 'Gerando...' : (pendingParentCode ? 'Gerar Novo Código' : 'Gerar Código de 4 Dígitos')}</span>
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveSettingsTab('notifications')}
+                    className={`flex-1 flex items-center justify-between px-4 py-3 rounded-lg text-xs font-semibold transition-colors cursor-pointer text-left ${
+                      activeSettingsTab === 'notifications'
+                        ? 'bg-[#55E6B5] text-[#07110D]'
+                        : 'text-[#A5B0AA] hover:bg-[#171E1B] hover:text-[#F1F5F3]'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <Mail className="w-4 h-4" />
+                      <span>Notificações</span>
+                    </div>
+                    {profile?.notification_gmail && (
+                      <span className={`w-2 h-2 rounded-full ${activeSettingsTab === 'notifications' ? 'bg-[#07110D]' : 'bg-[#55E6B5]'}`} />
+                    )}
+                  </button>
 
-                  {pendingParentCode ? (
-                    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3.5 rounded-xl bg-neutral-900/90 border border-amber-500/40">
-                      <div className="flex items-center gap-3">
-                        <div className="px-4 py-2 bg-neutral-950 border border-amber-500/40 rounded-xl text-center">
-                          <span className="text-2xl font-black font-mono tracking-widest text-amber-400 selection:bg-amber-500 selection:text-neutral-950">
-                            {pendingParentCode}
-                          </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveSettingsTab('vincular_pais');
+                      loadParentLinks();
+                    }}
+                    className={`flex-1 flex items-center justify-between px-4 py-3 rounded-lg text-xs font-semibold transition-colors cursor-pointer text-left ${
+                      activeSettingsTab === 'vincular_pais'
+                        ? 'bg-[#55E6B5] text-[#07110D]'
+                        : 'text-[#A5B0AA] hover:bg-[#171E1B] hover:text-[#F1F5F3]'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <Users className="w-4 h-4" />
+                      <span>Vínculo com Pais</span>
+                    </div>
+                    {studentParentLinks.length > 0 && (
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                        activeSettingsTab === 'vincular_pais' ? 'bg-[#07110D]/20 text-[#07110D]' : 'bg-[#171E1B] text-[#55E6B5] border border-[#27322D]'
+                      }`}>
+                        {studentParentLinks.length}/5
+                      </span>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Right Column: Wide Content Card */}
+              <div className="lg:col-span-8">
+                <div className="p-6 sm:p-8 rounded-xl bg-[#111715] border border-[#27322D] space-y-6">
+                  {activeSettingsTab === 'profile' && (
+                    <div className="space-y-6 animate-fadeIn">
+                      <div className="border-b border-[#27322D] pb-4">
+                        <h3 className="text-base font-bold text-[#F1F5F3]">Dados Cadastrais e Preferências</h3>
+                        <p className="text-xs text-[#A5B0AA] mt-1">Mantenha seus dados atualizados para acesso às salas de aula e simulados.</p>
+                      </div>
+
+                      {settingsStatus && (
+                        <div className={`p-4 rounded-xl text-xs border flex items-center justify-between gap-3 animate-fadeIn ${
+                          settingsStatus.type === 'success' 
+                            ? 'bg-[#111F1A] border-[#1E3A2F] text-[#55E6B5] font-medium' 
+                            : settingsStatus.type === 'info'
+                            ? 'bg-[#171E1B] border-[#27322D] text-[#55E6B5] font-medium'
+                            : 'bg-[#201416] border-[#3B2024] text-[#FF8585]'
+                        }`}>
+                          <div className="flex items-center gap-2.5">
+                            {settingsStatus.type === 'success' ? (
+                              <CheckCircle className="w-4 h-4 text-[#55E6B5] shrink-0" />
+                            ) : settingsStatus.type === 'info' ? (
+                              <Info className="w-4 h-4 text-[#55E6B5] shrink-0" />
+                            ) : (
+                              <AlertCircle className="w-4 h-4 text-[#FF8585] shrink-0" />
+                            )}
+                            <span>{settingsStatus.msg}</span>
+                          </div>
+                          {settingsStatus.type === 'error' && (
+                            <button
+                              type="button"
+                              onClick={(e) => handleUpdateSettings(e as any)}
+                              disabled={savingSettings}
+                              className="px-3 py-1 bg-[#3B2024] hover:bg-[#50282E] text-[#FF8585] font-bold rounded-lg text-xs transition cursor-pointer flex items-center gap-1.5 shrink-0"
+                            >
+                              <RotateCcw className="w-3.5 h-3.5" />
+                              <span>Tentar Novamente</span>
+                            </button>
+                          )}
                         </div>
-                        <div>
-                          <p className="text-xs font-bold text-neutral-100">Código pronto para envio</p>
-                          <p className="text-[11px] text-neutral-400">Passe estes 4 dígitos para o seu responsável</p>
+                      )}
+
+                      <form onSubmit={handleUpdateSettings} className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                          <div>
+                            <label className="block text-[11px] text-[#A5B0AA] uppercase font-semibold tracking-wider mb-2">Nome Completo</label>
+                            <input
+                              type="text"
+                              required
+                              value={setName}
+                              onChange={(e) => setSetName(e.target.value)}
+                              className="w-full bg-[#171E1B] border border-[#27322D] rounded-xl px-4 py-2.5 text-xs text-[#F1F5F3] placeholder-[#77827C] focus:outline-none focus:border-[#55E6B5] font-medium"
+                              placeholder="Seu nome"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] text-[#A5B0AA] uppercase font-semibold tracking-wider mb-2">Escola / Instituição de Ensino</label>
+                            <input
+                              type="text"
+                              value={setEscola}
+                              onChange={(e) => setSetEscola(e.target.value)}
+                              className="w-full bg-[#171E1B] border border-[#27322D] rounded-xl px-4 py-2.5 text-xs text-[#F1F5F3] placeholder-[#77827C] focus:outline-none focus:border-[#55E6B5] font-medium"
+                              placeholder="Nome da sua Escola"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] text-[#A5B0AA] uppercase font-semibold tracking-wider mb-2">Endereço de E-mail</label>
+                            <input
+                              type="email"
+                              required
+                              value={setMail}
+                              onChange={(e) => setSetMail(e.target.value)}
+                              className="w-full bg-[#171E1B] border border-[#27322D] rounded-xl px-4 py-2.5 text-xs text-[#F1F5F3] placeholder-[#77827C] focus:outline-none focus:border-[#55E6B5] font-medium"
+                              placeholder="Seu e-mail"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] text-[#A5B0AA] uppercase font-semibold tracking-wider mb-2">Nova Senha (Opcional)</label>
+                            <div className="relative">
+                              <input
+                                type={showPwd ? "text" : "password"}
+                                value={setPassword}
+                                onChange={(e) => setSetPassword(e.target.value)}
+                                className="w-full bg-[#171E1B] border border-[#27322D] rounded-xl pl-4 pr-10 py-2.5 text-xs text-[#F1F5F3] placeholder-[#77827C] focus:outline-none focus:border-[#55E6B5]"
+                                placeholder="Deixe em branco para manter"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowPwd(!showPwd)}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#77827C] hover:text-[#55E6B5] transition-colors cursor-pointer"
+                              >
+                                {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                              </button>
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] text-[#A5B0AA] uppercase font-semibold tracking-wider mb-2">Número de Chamada</label>
+                            <input
+                              type="number"
+                              min="1"
+                              max="100"
+                              required
+                              value={setChamada}
+                              onChange={(e) => setSetChamada(Number(e.target.value))}
+                              className="w-full bg-[#171E1B] border border-[#27322D] rounded-xl px-4 py-2.5 text-xs text-[#F1F5F3] focus:outline-none focus:border-[#55E6B5] font-bold"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] text-[#77827C] uppercase font-semibold tracking-wider mb-2">Turma Oficial (Inalterável)</label>
+                            <div className="w-full bg-[#171E1B]/50 border border-[#27322D] text-[#77827C] rounded-xl px-4 py-2.5 text-xs font-semibold">
+                              {profile ? profile.turma : 'Sem turma'}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Theme Section */}
+                        <div className="pt-2 border-t border-[#27322D]">
+                          <label className="block text-[11px] text-[#A5B0AA] uppercase font-semibold tracking-wider mb-2.5">Tema da Plataforma</label>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setThemePreference('escuro');
+                                setSettingsStatus({ type: 'info', msg: 'Tema escuro selecionado (padrão do portal).' });
+                                setTimeout(() => setSettingsStatus(prev => prev?.type === 'info' ? null : prev), 3500);
+                              }}
+                              className={`p-3.5 text-xs font-semibold rounded-xl border transition-all flex items-center justify-between cursor-pointer ${
+                                themePreference === 'escuro'
+                                  ? 'bg-[#171E1B] border-[#55E6B5] text-[#55E6B5]'
+                                  : 'bg-transparent border-[#27322D] text-[#77827C] hover:text-[#F1F5F3]'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2.5">
+                                <Moon className="w-4 h-4" />
+                                <span>Escuro (Ativo)</span>
+                              </div>
+                              <span className="w-2 h-2 rounded-full bg-[#55E6B5]" />
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSettingsStatus({
+                                  type: 'info',
+                                  msg: 'O tema claro está em desenvolvimento e será liberado em breve! Por enquanto, utilize o tema escuro padrão.'
+                                });
+                                setTimeout(() => setSettingsStatus(prev => prev?.type === 'info' ? null : prev), 5000);
+                              }}
+                              className="p-3.5 text-xs font-semibold rounded-xl border transition-all flex items-center justify-between bg-[#171E1B]/40 border-[#27322D] text-[#77827C] hover:text-[#F1F5F3] cursor-pointer"
+                            >
+                              <div className="flex items-center gap-2.5">
+                                <Sun className="w-4 h-4" />
+                                <span>Claro</span>
+                              </div>
+                              <span className="text-[10px] bg-[#201C14] text-[#FFD175] border border-[#3B3220] px-2 py-0.5 rounded uppercase">Em breve</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="pt-4 flex items-center justify-end">
+                          <button
+                            type="submit"
+                            disabled={savingSettings}
+                            className="px-6 py-3 bg-[#55E6B5] hover:bg-[#7AF0C8] disabled:opacity-50 text-[#07110D] font-bold rounded-xl transition-all text-xs cursor-pointer flex items-center gap-2"
+                          >
+                            {savingSettings ? (
+                              <span>Gravando dados...</span>
+                            ) : (
+                              <>
+                                <Check className="w-4 h-4" />
+                                <span>Salvar Preferências</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  )}
+
+                  {activeSettingsTab === 'notifications' && (
+                    <div className="space-y-6 animate-fadeIn">
+                      <div className="border-b border-[#27322D] pb-4">
+                        <h3 className="text-base font-bold text-[#F1F5F3]">Alertas por E-mail</h3>
+                        <p className="text-xs text-[#A5B0AA] mt-1">Configure o e-mail que receberá notificações de provas, simulados e avisos urgentes.</p>
+                      </div>
+
+                      <div className="p-5 rounded-xl bg-[#171E1B] border border-[#27322D] flex items-start gap-4">
+                        <div className="p-3 bg-[#111715] border border-[#27322D] text-[#55E6B5] rounded-xl shrink-0">
+                          <Mail className="w-5 h-5" />
+                        </div>
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-xs font-bold text-[#F1F5F3]">Notificações do WSM Athenas</h4>
+                            {profile?.notification_gmail ? (
+                              <span className="px-2 py-0.5 text-[9px] font-bold rounded-full bg-[#111F1A] border border-[#1E3A2F] text-[#55E6B5] uppercase">
+                                Ativo
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 text-[9px] font-bold rounded-full bg-[#201C14] border border-[#3B3220] text-[#FFD175] uppercase">
+                                Pendente
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-[#A5B0AA] leading-relaxed">
+                            Receba avisos de novas provas, simulados liberados e comunicados diretamente na sua caixa de entrada, enviados por <span className="text-[#55E6B5]">wsmathenas@gmail.com</span>.
+                          </p>
                         </div>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          try {
-                            await navigator.clipboard.writeText(pendingParentCode);
-                            setCopiedCodeSuccess(true);
-                            setTimeout(() => setCopiedCodeSuccess(false), 2500);
-                          } catch {}
-                        }}
-                        className="w-full sm:w-auto px-3.5 py-2 bg-amber-500 hover:bg-amber-400 text-neutral-950 text-xs font-extrabold rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-md shadow-amber-500/10 cursor-pointer"
-                      >
-                        {copiedCodeSuccess ? (
-                          <>
-                            <Check className="w-3.5 h-3.5" />
-                            <span>Copiado!</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-3.5 h-3.5" />
-                            <span>Copiar Código</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="text-center py-4 px-3 rounded-xl border border-dashed border-neutral-800 text-neutral-500 text-xs">
-                      {studentParentLinks.length >= 5 ? (
-                        <p className="text-amber-400 font-semibold">Você já atingiu o limite máximo de 5 responsáveis vinculados.</p>
+                      {profile?.notification_gmail && !isEditingGmail ? (
+                        <div className="space-y-4 pt-2">
+                          <div className="bg-[#171E1B] border border-[#27322D] p-5 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-4">
+                            <div>
+                              <p className="text-[10px] uppercase font-bold tracking-wider text-[#77827C]">E-mail Cadastrado</p>
+                              <p className="text-[#55E6B5] text-sm font-bold mt-0.5 select-all">
+                                {profile.notification_gmail}
+                              </p>
+                            </div>
+
+                            <div className="flex items-center gap-2.5 w-full sm:w-auto">
+                              <button
+                                type="button"
+                                onClick={handleDeleteGmail}
+                                disabled={savingGmail}
+                                className="flex-1 sm:flex-initial px-4 py-2 bg-[#201416] hover:bg-[#3B2024] text-[#FF8585] border border-[#3B2024] font-semibold rounded-xl text-xs transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                <span>Remover</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setIsEditingGmail(true);
+                                  setNotificationGmailInput(profile.notification_gmail || '');
+                                  setGmailStatus(null);
+                                }}
+                                disabled={savingGmail}
+                                className="flex-1 sm:flex-initial px-4 py-2 bg-[#171E1B] hover:bg-[#1D2723] text-[#F1F5F3] font-semibold rounded-xl text-xs border border-[#27322D] transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                              >
+                                <Edit3 className="w-3.5 h-3.5 text-[#55E6B5]" />
+                                <span>Alterar</span>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
                       ) : (
-                        <p>Nenhum código gerado no momento. Clique em <strong className="text-neutral-300">"Gerar Código"</strong> para criar um código de 4 dígitos para seus pais.</p>
+                        <form onSubmit={handleSaveGmail} className="space-y-4 pt-2">
+                          <div>
+                            <label className="block text-[11px] text-[#A5B0AA] uppercase font-semibold tracking-wider mb-2">
+                              {profile?.notification_gmail ? 'Novo Endereço de E-mail' : 'Endereço para Receber Avisos'}
+                            </label>
+                            <input
+                              type="email"
+                              required
+                              placeholder="seu-email@gmail.com"
+                              value={notificationGmailInput}
+                              onChange={(e) => setNotificationGmailInput(e.target.value)}
+                              className="w-full bg-[#171E1B] border border-[#27322D] rounded-xl px-4 py-2.5 text-xs text-[#F1F5F3] placeholder-[#77827C] focus:outline-none focus:border-[#55E6B5] font-medium"
+                            />
+                          </div>
+
+                          <div className="flex gap-3 justify-end pt-2">
+                            {isEditingGmail && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setIsEditingGmail(false);
+                                  setNotificationGmailInput(profile?.notification_gmail || '');
+                                  setGmailStatus(null);
+                                }}
+                                className="px-4 py-2.5 bg-[#171E1B] hover:bg-[#1D2723] text-[#A5B0AA] font-semibold rounded-xl text-xs border border-[#27322D] transition-colors cursor-pointer"
+                              >
+                                Cancelar
+                              </button>
+                            )}
+                            <button
+                              type="submit"
+                              disabled={savingGmail}
+                              className="px-6 py-2.5 bg-[#55E6B5] hover:bg-[#7AF0C8] disabled:opacity-50 text-[#07110D] font-bold rounded-xl text-xs transition-colors flex items-center gap-2 cursor-pointer"
+                            >
+                              {savingGmail ? (
+                                <span>Salvando...</span>
+                              ) : (
+                                <>
+                                  <Mail className="w-4 h-4" />
+                                  <span>{profile?.notification_gmail ? 'Salvar Novo' : 'Ativar Notificações'}</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        </form>
+                      )}
+
+                      {gmailStatus && (
+                        <div className={`p-3.5 rounded-xl text-xs border flex items-center gap-2.5 ${
+                          gmailStatus.type === 'success' 
+                            ? 'bg-[#111F1A] border-[#1E3A2F] text-[#55E6B5]' 
+                            : 'bg-[#201416] border-[#3B2024] text-[#FF8585]'
+                        }`}>
+                          <Info className="w-4 h-4 shrink-0" />
+                          <span>{gmailStatus.msg}</span>
+                        </div>
                       )}
                     </div>
                   )}
-                </div>
 
-                {/* Lista de Responsáveis Vinculados */}
-                <div className="space-y-2.5">
-                  <h4 className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider font-mono">
-                    Responsáveis Conectados ({studentParentLinks.length}/5)
-                  </h4>
+                  {activeSettingsTab === 'vincular_pais' && (
+                    <div className="space-y-6 animate-fadeIn">
+                      <div className="border-b border-[#27322D] pb-4 flex items-center justify-between">
+                        <div>
+                          <h3 className="text-base font-bold text-[#F1F5F3]">Vínculo com Pais e Responsáveis</h3>
+                          <p className="text-xs text-[#A5B0AA] mt-1">Permita que seus responsáveis acompanhem seu boletim, frequência e simulados.</p>
+                        </div>
+                        <span className="text-xs font-bold px-3 py-1 rounded-full bg-[#171E1B] text-[#55E6B5] border border-[#27322D]">
+                          {studentParentLinks.length} de 5 utilizados
+                        </span>
+                      </div>
 
-                  {loadingParentLinks ? (
-                    <div className="p-4 text-center text-xs text-neutral-500 font-mono animate-pulse">
-                      Carregando vínculos...
-                    </div>
-                  ) : studentParentLinks.length === 0 ? (
-                    <div className="p-4 rounded-xl bg-neutral-950/40 border border-neutral-850 text-center text-xs text-neutral-500">
-                      Nenhum responsável vinculado ainda à sua conta.
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {studentParentLinks.map((link: any) => (
-                        <div
-                          key={link.id}
-                          className="p-3 rounded-xl bg-neutral-950/60 border border-neutral-850 flex items-center justify-between gap-3 text-xs"
-                        >
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
-                              <ShieldCheck className="w-4 h-4" />
-                            </div>
-                            <div className="truncate">
-                              <p className="font-semibold text-neutral-200 truncate">{link.parent_email}</p>
-                              <p className="text-[10px] text-neutral-500 font-mono">
-                                Conectado em {link.linked_at ? new Date(link.linked_at).toLocaleDateString('pt-BR') : 'Data recente'}
-                              </p>
-                            </div>
+                      {parentLinkError && (
+                        <div className="p-3.5 bg-[#201416] border border-[#3B2024] rounded-xl text-xs text-[#FF8585] flex items-center gap-2.5">
+                          <AlertCircle className="w-4 h-4 shrink-0" />
+                          <span>{parentLinkError}</span>
+                        </div>
+                      )}
+
+                      {/* Code Generation Card */}
+                      <div className="p-6 rounded-xl bg-[#171E1B] border border-[#27322D] space-y-4">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                          <div>
+                            <h4 className="text-xs font-bold text-[#F1F5F3] uppercase tracking-wider">
+                              Gerar Código de Acesso para os Pais
+                            </h4>
+                            <p className="text-xs text-[#A5B0AA] mt-0.5">
+                              Passe este código de 4 dígitos para que seus pais insiram no portal deles.
+                            </p>
                           </div>
 
                           <button
                             type="button"
-                            onClick={() => handleRemoveParentLink(link.id)}
-                            className="p-1.5 text-neutral-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer shrink-0"
-                            title="Desvincular responsável"
+                            onClick={handleGenerateCode}
+                            disabled={generatingParentCode || studentParentLinks.length >= 5}
+                            className="px-4 py-2 bg-[#55E6B5] hover:bg-[#7AF0C8] disabled:opacity-40 text-[#07110D] font-bold rounded-xl text-xs transition-colors cursor-pointer flex items-center gap-2 shrink-0"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Key className="w-4 h-4" />
+                            <span>{generatingParentCode ? 'Gerando...' : (pendingParentCode ? 'Gerar Novo Código' : 'Gerar Código')}</span>
                           </button>
                         </div>
-                      ))}
+
+                        {pendingParentCode ? (
+                          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-xl bg-[#111715] border border-[#55E6B5]/30">
+                            <div className="flex items-center gap-4">
+                              <div className="px-5 py-2.5 bg-[#171E1B] border border-[#55E6B5]/40 rounded-xl text-center">
+                                <span className="text-3xl font-extrabold tracking-widest text-[#55E6B5]">
+                                  {pendingParentCode}
+                                </span>
+                              </div>
+                              <div>
+                                <p className="text-xs font-bold text-[#F1F5F3]">Código pronto para uso</p>
+                                <p className="text-xs text-[#A5B0AA]">Informe este código ao seu responsável</p>
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                try {
+                                  await navigator.clipboard.writeText(pendingParentCode);
+                                  setCopiedCodeSuccess(true);
+                                  setTimeout(() => setCopiedCodeSuccess(false), 2500);
+                                } catch {}
+                              }}
+                              className="w-full sm:w-auto px-4 py-2 bg-[#171E1B] hover:bg-[#1D2723] text-[#55E6B5] border border-[#55E6B5]/30 text-xs font-bold rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                            >
+                              {copiedCodeSuccess ? (
+                                <>
+                                  <Check className="w-4 h-4 text-[#55E6B5]" />
+                                  <span>Copiado!</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-4 h-4" />
+                                  <span>Copiar Código</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="text-center py-5 px-4 rounded-xl border border-dashed border-[#27322D] text-[#77827C] text-xs">
+                            {studentParentLinks.length >= 5 ? (
+                              <p className="text-[#FFD175]">Você já atingiu o limite máximo de 5 responsáveis vinculados.</p>
+                            ) : (
+                              <p>Nenhum código ativo gerado. Clique no botão acima para gerar um novo código.</p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* List of Connected Parents in Horizontal Grid */}
+                      <div className="space-y-3">
+                        <h4 className="text-xs font-bold text-[#A5B0AA] uppercase tracking-wider">
+                          Responsáveis Conectados ({studentParentLinks.length}/5)
+                        </h4>
+
+                        {loadingParentLinks ? (
+                          <div className="p-6 text-center text-xs text-[#77827C] animate-pulse">
+                            Carregando vínculos...
+                          </div>
+                        ) : studentParentLinks.length === 0 ? (
+                          <div className="p-6 rounded-xl bg-[#171E1B] border border-[#27322D] text-center text-xs text-[#77827C]">
+                            Nenhum responsável vinculado ainda à sua conta.
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {studentParentLinks.map((link: any) => (
+                              <div
+                                key={link.id}
+                                className="p-4 rounded-xl bg-[#171E1B] border border-[#27322D] flex items-center justify-between gap-3 text-xs"
+                              >
+                                <div className="flex items-center gap-3 min-w-0">
+                                  <div className="w-9 h-9 rounded-lg bg-[#111715] border border-[#27322D] text-[#55E6B5] flex items-center justify-center shrink-0">
+                                    <ShieldCheck className="w-4 h-4" />
+                                  </div>
+                                  <div className="truncate">
+                                    <p className="font-semibold text-[#F1F5F3] truncate">{link.parent_email}</p>
+                                    <p className="text-[11px] text-[#77827C]">
+                                      Conectado em {link.linked_at ? new Date(link.linked_at).toLocaleDateString('pt-BR') : 'Data recente'}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveParentLink(link.id)}
+                                  className="p-2 text-[#77827C] hover:text-[#FF8585] hover:bg-[#201416] rounded-lg transition-colors cursor-pointer shrink-0"
+                                  title="Desvincular responsável"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
               </div>
-            )}
-          </motion.div>
+            </div>
+          </div>
         </div>
       )}
       {/* Unsaved Notebook Changes Confirmation Modal */}
@@ -4331,7 +4406,7 @@ export default function StudentDashboard({
                 <span>BOAS-VINDAS AO ATHENAS</span>
               </div>
               <h2 className="text-2xl md:text-3xl font-extrabold text-neutral-100 font-display tracking-tight">
-                Olá, {profile?.nome_completo || 'Estudante'}! 🎉
+                Olá, {profile?.nome_completo || 'Estudante'}!
               </h2>
               <p className="text-neutral-300 text-sm md:text-base max-w-2xl mx-auto leading-relaxed">
                 Sua conta foi criada com sucesso! Para começar a usar a plataforma e ter acesso às suas matérias, simulados virtuais, provas e avisos pedagógicos, você precisa <strong>pegar o código de acesso da sala com o seu professor</strong>.

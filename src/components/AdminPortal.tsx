@@ -804,7 +804,7 @@ Prof. Roberto Souza,roberto.bio@escola.com,teacher,9A, ,Biologia`;
 
   // Complete clean up database (excluir TODOS o dados - reset master)
   const handleMasterPurge = async () => {
-    const confirmation1 = prompt("⚠️ ALERTA EXTREMO! Você está prestes a apagar TODOS OS DADOS de todas as tabelas (perfis, exames, simulados, chats, submissões, notificações, e avisos). Os logins do Supabase continuarão existindo, mas vazios.\n\nPara prosseguir, digite 'RESETAR ATHENAS' abaixo:");
+    const confirmation1 = prompt("ALERTA EXTREMO! Você está prestes a apagar TODOS OS DADOS de todas as tabelas (perfis, exames, simulados, chats, submissões, notificações, e avisos). Os logins do Supabase continuarão existindo, mas vazios.\n\nPara prosseguir, digite 'RESETAR ATHENAS' abaixo:");
     if (confirmation1 !== 'RESETAR ATHENAS') {
       alert("Operação cancelada. Chave de reset inválida.");
       return;
@@ -831,7 +831,7 @@ Prof. Roberto Souza,roberto.bio@escola.com,teacher,9A, ,Biologia`;
         metadata: { date: new Date().toISOString() }
       });
 
-      alert("💥 Reset Completo Realizado com Sucesso! Todas as tabelas foram inteiramente limpas.");
+      alert("Reset Completo Realizado com Sucesso! Todas as tabelas foram inteiramente limpas.");
       fetchEverything();
     } catch (err: any) {
       showToast('error', `Erro no purge: ${err.message}`);
@@ -842,7 +842,7 @@ Prof. Roberto Souza,roberto.bio@escola.com,teacher,9A, ,Biologia`;
 
   // Excluir apenas os perfis de usuários (teachers e students)
   const handlePurgeUsersOnly = async () => {
-    const confirmation = prompt("⚠️ Confirme a remoção de todos os Perfis Acadêmicos (wsm_user_profiles), desvinculando todos os estudantes e professores.\n\nPara confirmar, digite 'APAGAR PERFIS':");
+    const confirmation = prompt("Confirme a remoção de todos os Perfis Acadêmicos (wsm_user_profiles), desvinculando todos os estudantes e professores.\n\nPara confirmar, digite 'APAGAR PERFIS':");
     if (confirmation !== 'APAGAR PERFIS') return;
 
     setLoading(true);
@@ -868,7 +868,7 @@ Prof. Roberto Souza,roberto.bio@escola.com,teacher,9A, ,Biologia`;
 
   // Limpar apenas dados escolares (provas, simulados, submissões, notas, chats, anúncios), preservando os usuários
   const handlePurgeSchoolDataOnly = async () => {
-    const confirmation = prompt("⚠️ Confirme a limpeza de todo o conteúdo escolar (provas físicas agendadas, simulados digitais, respostas de alunos, conversas da AI, e notificações), mantendo a tabela de usuários limpa de interações.\n\nPara confirmar, digite 'LIMPAR CONTEUDO':");
+    const confirmation = prompt("Confirme a limpeza de todo o conteúdo escolar (provas físicas agendadas, simulados digitais, respostas de alunos, conversas da AI, e notificações), mantendo a tabela de usuários limpa de interações.\n\nPara confirmar, digite 'LIMPAR CONTEUDO':");
     if (confirmation !== 'LIMPAR CONTEUDO') return;
 
     setLoading(true);
@@ -972,14 +972,9 @@ Prof. Roberto Souza,roberto.bio@escola.com,teacher,9A, ,Biologia`;
   });
 
   return (
-    <div className="min-h-screen bg-[#030504] text-neutral-100 flex flex-col font-sans relative">
-      
-      {/* Background elegant accents */}
-      <div className="absolute top-0 left-1/4 w-80 h-80 bg-red-500/5 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-10 right-1/4 w-96 h-96 bg-emerald-500/5 rounded-full blur-[140px] pointer-events-none" />
-
+    <div className="min-h-screen bg-[#0B0F0E] text-[#F1F5F3] flex flex-col font-sans relative">
       {/* Admin Subheader Panel */}
-      <header className="border-b border-neutral-900 bg-neutral-950/80 backdrop-blur-md px-6 py-4 sticky top-0 z-40 flex flex-col md:flex-row items-center justify-between gap-4">
+      <header className="border-b border-[#27322D] bg-[#111715] px-6 py-4 sticky top-0 z-40 flex flex-col md:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-red-500/10 border border-red-500/30 rounded-xl">
             <ShieldAlert className="w-6 h-6 text-red-500 animate-pulse" />

@@ -831,59 +831,45 @@ export default function LoginModal({ role, onBack, onLoginSuccess }: LoginModalP
   };
 
   return (
-    <div className="relative min-h-screen w-full flex flex-col justify-start sm:justify-center items-center p-4 sm:p-6 md:p-8 uiverse-dark-grid text-white py-4 sm:py-6 md:py-8">
-      {/* Background decor */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(2,195,154,0.08),transparent_70%)] pointer-events-none" />
-      <div 
-        className="absolute inset-0 opacity-[0.02] pointer-events-none bg-[linear-gradient(to_right,#808080_1px,transparent_1px),linear-gradient(to_bottom,#808080_1px,transparent_1px)]" 
-        style={{ backgroundSize: '30px 30px' }}
-      />
-
+    <div className="relative min-h-screen w-full flex flex-col justify-start sm:justify-center items-center p-4 sm:p-6 md:p-8 bg-[#0B0F0E] text-[#F1F5F3] py-4 sm:py-6 md:py-8 font-sans">
       <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 15 }}
+        initial={{ opacity: 0, scale: 0.98, y: 10 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: -15 }}
-        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-        className="w-full max-w-5xl relative z-10 rounded-3xl bg-neutral-950/60 border border-neutral-800/80 backdrop-blur-2xl shadow-3xl overflow-visible my-auto"
+        exit={{ opacity: 0, scale: 0.98, y: -10 }}
+        transition={{ duration: 0.25 }}
+        className="w-full max-w-5xl relative z-10 rounded-xl bg-[#111715] border border-[#27322D] overflow-visible my-auto"
       >
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-0 md:min-h-[540px]">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-0 md:min-h-[520px]">
           {/* Lado do Formulário */}
           <div className="col-span-1 md:col-span-6 p-6 sm:p-8 flex flex-col justify-between relative">
             <div>
-              {/* Glow corner decorations */}
-              <div className="absolute -top-10 -right-10 w-40 h-40 bg-[#02c39a]/10 rounded-full blur-3xl pointer-events-none" />
-              <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-teal-600/5 rounded-full blur-3xl pointer-events-none" />
-
               {/* Back navigation button */}
               <button
                 id="btn-login-voltar"
                 onClick={showForgot ? () => { setShowForgot(false); setForgotStep(1); setResetError(''); setForgotGmail(''); } : onBack}
-                className="group flex items-center gap-2 text-xs font-medium text-neutral-400 hover:text-[#02c39a] transition-colors mb-6 cursor-pointer"
+                className="group flex items-center gap-2 text-xs font-medium text-[#77827C] hover:text-[#55E6B5] transition-colors mb-6 cursor-pointer"
               >
                 <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-0.5" />
                 <span>{showForgot ? 'Voltar para o Login' : 'Voltar ao Portal'}</span>
               </button>
 
               <div className="mb-6">
-                <div className="flex justify-center mb-4">
-                  <motion.img
-                    initial={{ scale: 0.9, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    transition={{ delay: 0.1, duration: 0.5 }}
+                <div className="flex justify-start mb-3">
+                  <img
                     src="https://res.cloudinary.com/dqx8p8orf/image/upload/f_auto/q_auto/gallery_image_20260927_114822-sem-mexer-em-mais-nada-nesse-boneco-mantenha-a-con-removebg-preview_3_ewaz6x.png"
                     alt="Mascote WSM Athenas"
                     referrerPolicy="no-referrer"
-                    className="w-20 h-20 object-contain select-none drop-shadow-[0_0_15px_rgba(2,195,154,0.25)]"
+                    className="w-12 h-12 object-contain select-none"
                   />
                 </div>
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#02c39a]/10 border border-[#02c39a]/20 text-[#02c39a] rounded-full text-xs font-mono font-medium mb-3">
-                  <Sparkles className="w-3.5 h-3.5 animate-pulse" />
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-[#171E1B] border border-[#27322D] text-[#55E6B5] rounded text-xs font-medium uppercase tracking-wide mb-3">
+                  <ShieldCheck className="w-3.5 h-3.5 text-[#55E6B5]" />
                   <span>{isParent ? 'Área dos Pais & Responsáveis' : `Portal do ${isStudent ? 'Aluno' : 'Professor'}`}</span>
                 </div>
-                <h2 className="text-2xl font-extrabold text-neutral-100 font-display tracking-tight">
-                  {showForgot ? (forgotStep === 1 ? 'Esqueceu a senha?' : 'Redefinir Senha') : activeTab === 'signin' ? 'Acesse sua área' : 'Crie sua conta'}
+                <h2 className="text-2xl font-bold text-[#F1F5F3] tracking-tight">
+                  {showForgot ? (forgotStep === 1 ? 'Recuperação de Senha' : 'Redefinir Senha') : activeTab === 'signin' ? 'Acesse sua área' : 'Crie sua conta'}
                 </h2>
-                <p className="text-neutral-500 text-xs mt-1.5 leading-relaxed">
+                <p className="text-[#A5B0AA] text-xs mt-1.5 leading-relaxed">
                   {showForgot 
                     ? (forgotStep === 1 
                         ? 'Informe o e-mail cadastrado do aluno e o e-mail Gmail onde enviaremos o código de segurança de 6 dígitos.'
@@ -979,8 +965,8 @@ export default function LoginModal({ role, onBack, onLoginSuccess }: LoginModalP
                             <span>O e-mail para receber o código deve terminar obrigatoriamente com <strong>@gmail.com</strong></span>
                           </p>
                         )}
-                        <p className="text-[11px] text-neutral-500 mt-1">
-                          💡 O código de 6 dígitos será enviado diretamente para este endereço @gmail.com.
+                        <p className="text-[11px] text-[#A5B0AA] mt-1">
+                          O código de 6 dígitos será enviado diretamente para este endereço @gmail.com.
                         </p>
                       </div>
 
@@ -993,17 +979,17 @@ export default function LoginModal({ role, onBack, onLoginSuccess }: LoginModalP
                             setResetError('');
                             setForgotGmail('');
                           }}
-                          className="py-3 bg-neutral-900 hover:bg-neutral-850 text-neutral-300 font-bold rounded-xl text-xs transition-all cursor-pointer"
+                          className="py-2.5 bg-[#171E1B] hover:bg-[#1D2723] text-[#A5B0AA] hover:text-[#F1F5F3] font-medium border border-[#27322D] rounded-lg text-xs transition-colors cursor-pointer"
                         >
                           Cancelar
                         </button>
                         <button
                           type="submit"
                           disabled={forgotLoading || !forgotEmail.trim() || !forgotGmail.trim()}
-                          className="py-3 bg-[#02c39a] hover:bg-[#02b18c] disabled:opacity-40 disabled:cursor-not-allowed text-neutral-950 font-extrabold rounded-xl text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-lg shadow-[#02c39a]/15"
+                          className="py-2.5 bg-[#55E6B5] hover:bg-[#7AF0C8] disabled:opacity-40 disabled:cursor-not-allowed text-[#07110D] font-semibold rounded-lg text-xs transition-colors cursor-pointer flex items-center justify-center gap-1.5"
                         >
                           {forgotLoading ? (
-                            <div className="w-4 h-4 border-2 border-neutral-950 border-t-transparent rounded-full animate-spin" />
+                            <div className="w-4 h-4 border-2 border-[#07110D] border-t-transparent rounded-full animate-spin" />
                           ) : (
                             <>
                               <Send className="w-3.5 h-3.5" />
@@ -1016,7 +1002,7 @@ export default function LoginModal({ role, onBack, onLoginSuccess }: LoginModalP
                   ) : (
                     <form onSubmit={handleConfirmResetPassword} noValidate className="space-y-4">
                       <div>
-                        <label className="block text-xs font-semibold text-neutral-400 tracking-wider uppercase mb-1.5">
+                        <label className="block text-xs font-semibold text-[#A5B0AA] tracking-wider uppercase mb-1.5">
                           Código de 6 Dígitos (Recebido por E-mail)
                         </label>
                         <input
@@ -1025,12 +1011,12 @@ export default function LoginModal({ role, onBack, onLoginSuccess }: LoginModalP
                           placeholder="000000"
                           value={resetTokenInput}
                           onChange={(e) => setResetTokenInput(e.target.value.replace(/\D/g, ''))}
-                          className="w-full px-4 py-3 bg-neutral-900/60 border border-neutral-800 focus:border-[#02c39a]/50 rounded-xl text-lg font-mono tracking-widest text-center text-neutral-100 outline-none font-bold placeholder-neutral-700"
+                          className="w-full px-4 py-2.5 bg-[#171E1B] border border-[#27322D] focus:border-[#55E6B5] rounded-lg text-base tracking-widest text-center text-[#F1F5F3] outline-none font-bold placeholder-[#77827C]"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-xs font-semibold text-neutral-400 tracking-wider uppercase mb-1.5">
+                        <label className="block text-xs font-semibold text-[#A5B0AA] tracking-wider uppercase mb-1.5">
                           Nova Senha (mínimo 6 caracteres)
                         </label>
                         <input
@@ -1038,12 +1024,12 @@ export default function LoginModal({ role, onBack, onLoginSuccess }: LoginModalP
                           placeholder="Digite a nova senha"
                           value={resetNewPassword}
                           onChange={(e) => setResetNewPassword(e.target.value)}
-                          className="w-full px-4 py-3 bg-neutral-900/60 border border-neutral-800 focus:border-[#02c39a]/50 rounded-xl text-sm text-neutral-100 outline-none"
+                          className="w-full px-4 py-2.5 bg-[#171E1B] border border-[#27322D] focus:border-[#55E6B5] rounded-lg text-sm text-[#F1F5F3] outline-none placeholder-[#77827C]"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-xs font-semibold text-neutral-400 tracking-wider uppercase mb-1.5">
+                        <label className="block text-xs font-semibold text-[#A5B0AA] tracking-wider uppercase mb-1.5">
                           Confirmar Nova Senha
                         </label>
                         <input
@@ -1051,7 +1037,7 @@ export default function LoginModal({ role, onBack, onLoginSuccess }: LoginModalP
                           placeholder="Repita a nova senha"
                           value={resetConfirmPassword}
                           onChange={(e) => setResetConfirmPassword(e.target.value)}
-                          className="w-full px-4 py-3 bg-neutral-900/60 border border-neutral-800 focus:border-[#02c39a]/50 rounded-xl text-sm text-neutral-100 outline-none"
+                          className="w-full px-4 py-2.5 bg-[#171E1B] border border-[#27322D] focus:border-[#55E6B5] rounded-lg text-sm text-[#F1F5F3] outline-none placeholder-[#77827C]"
                         />
                       </div>
 
@@ -1062,17 +1048,17 @@ export default function LoginModal({ role, onBack, onLoginSuccess }: LoginModalP
                             setForgotStep(1);
                             setResetError('');
                           }}
-                          className="py-3 bg-neutral-900 hover:bg-neutral-850 text-neutral-300 font-bold rounded-xl text-xs transition-all cursor-pointer"
+                          className="py-2.5 bg-[#171E1B] hover:bg-[#1D2723] text-[#A5B0AA] hover:text-[#F1F5F3] font-medium border border-[#27322D] rounded-lg text-xs transition-colors cursor-pointer"
                         >
                           Voltar
                         </button>
                         <button
                           type="submit"
                           disabled={forgotLoading || resetTokenInput.length !== 6 || resetNewPassword.length < 6 || resetNewPassword !== resetConfirmPassword}
-                          className="py-3 bg-[#02c39a] hover:bg-[#02b18c] disabled:opacity-40 disabled:cursor-not-allowed text-neutral-950 font-extrabold rounded-xl text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-lg shadow-[#02c39a]/15"
+                          className="py-2.5 bg-[#55E6B5] hover:bg-[#7AF0C8] disabled:opacity-40 disabled:cursor-not-allowed text-[#07110D] font-semibold rounded-lg text-xs transition-colors cursor-pointer flex items-center justify-center gap-1.5"
                         >
                           {forgotLoading ? (
-                            <div className="w-4 h-4 border-2 border-neutral-950 border-t-transparent rounded-full animate-spin" />
+                            <div className="w-4 h-4 border-2 border-[#07110D] border-t-transparent rounded-full animate-spin" />
                           ) : (
                             <>
                               <CheckCircle className="w-3.5 h-3.5" />
@@ -1087,7 +1073,7 @@ export default function LoginModal({ role, onBack, onLoginSuccess }: LoginModalP
                           type="button"
                           disabled={forgotLoading}
                           onClick={handleRequestResetToken}
-                          className="text-xs text-neutral-400 hover:text-[#02c39a] transition-colors underline cursor-pointer disabled:opacity-50"
+                          className="text-xs text-[#77827C] hover:text-[#55E6B5] transition-colors underline cursor-pointer disabled:opacity-50"
                         >
                           Não recebeu o código? Reenviar por e-mail
                         </button>
@@ -1098,16 +1084,16 @@ export default function LoginModal({ role, onBack, onLoginSuccess }: LoginModalP
               ) : (
                 <>
                   {/* Dynamic Dual-Tab Selector switcher */}
-                  <div className="grid grid-cols-2 p-1 bg-neutral-900/60 border border-neutral-800 rounded-xl mb-6">
+                  <div className="grid grid-cols-2 p-1 bg-[#171E1B] border border-[#27322D] rounded-lg mb-6">
                     <button
                       id="tab-login-signin"
                       type="button"
                       disabled={isLoading}
                       onClick={() => setActiveTab('signin')}
-                      className={`py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed ${
+                      className={`py-2 text-xs font-semibold rounded-md transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed ${
                         activeTab === 'signin' 
-                          ? 'bg-[#02c39a] text-neutral-950 shadow-md' 
-                          : 'text-neutral-400 hover:text-neutral-200'
+                          ? 'bg-[#55E6B5] text-[#07110D]' 
+                          : 'text-[#77827C] hover:text-[#F1F5F3]'
                       }`}
                     >
                       <LogIn className="w-3.5 h-3.5" />
@@ -1118,10 +1104,10 @@ export default function LoginModal({ role, onBack, onLoginSuccess }: LoginModalP
                       type="button"
                       disabled={isLoading}
                       onClick={() => setActiveTab('signup')}
-                      className={`py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed ${
+                      className={`py-2 text-xs font-semibold rounded-md transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed ${
                         activeTab === 'signup' 
-                          ? 'bg-[#02c39a] text-neutral-950 shadow-md' 
-                          : 'text-neutral-400 hover:text-neutral-200'
+                          ? 'bg-[#55E6B5] text-[#07110D]' 
+                          : 'text-[#77827C] hover:text-[#F1F5F3]'
                       }`}
                     >
                       <UserPlus className="w-3.5 h-3.5" />
@@ -1737,12 +1723,12 @@ export default function LoginModal({ role, onBack, onLoginSuccess }: LoginModalP
                       id="btn-login-submit"
                       type="submit"
                       disabled={!isFormValid || isLoading}
-                      className="w-full mt-6 py-3.5 bg-[#02c39a] hover:bg-[#02b18c] disabled:opacity-50 disabled:cursor-not-allowed text-neutral-950 font-extrabold rounded-xl transition-all shadow-lg hover:shadow-[#02c39a]/20 flex items-center justify-center gap-2 text-sm cursor-pointer"
+                      className="w-full mt-6 py-3 bg-[#55E6B5] hover:bg-[#7AF0C8] disabled:opacity-50 disabled:cursor-not-allowed text-[#07110D] font-semibold rounded-lg transition-colors flex items-center justify-center gap-2 text-sm cursor-pointer"
                     >
                       {isLoading ? (
                         <>
-                          <div className="w-4 h-4 border-2 border-neutral-950 border-t-transparent rounded-full animate-spin shrink-0" />
-                          <span>{activeTab === 'signin' ? 'Verificando credenciais e acessando...' : 'Criando perfil e registrando...'}</span>
+                          <div className="w-4 h-4 border-2 border-[#07110D] border-t-transparent rounded-full animate-spin shrink-0" />
+                          <span>{activeTab === 'signin' ? 'Acessando plataforma...' : 'Criando conta...'}</span>
                         </>
                       ) : (
                         <>
@@ -1757,23 +1743,23 @@ export default function LoginModal({ role, onBack, onLoginSuccess }: LoginModalP
             </div>
           </div>
 
-          {/* Lado da Imagem com cantos arredondados */}
+          {/* Lado da Imagem Editorial */}
           <div className="hidden md:block md:col-span-6 p-4">
-            <div className="relative w-full h-full min-h-[460px] rounded-2xl overflow-hidden shadow-2xl border border-neutral-800/40">
+            <div className="relative w-full h-full min-h-[460px] rounded-lg overflow-hidden border border-[#27322D] bg-[#171E1B]">
               <img
                 src="https://i.ibb.co/dsNgMZMN/2.jpg"
                 alt="Arte Athenas"
                 referrerPolicy="no-referrer"
                 className="absolute inset-0 w-full h-full object-cover select-none"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-neutral-950/80 via-neutral-950/20 to-transparent pointer-events-none" />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#0B0F0E] via-[#0B0F0E]/40 to-transparent pointer-events-none" />
               <div className="absolute bottom-6 left-6 right-6 text-left z-10">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-neutral-950/60 border border-white/10 text-[#02c39a] rounded-full text-[10px] font-mono font-medium mb-2.5 backdrop-blur-md">
-                  <Sparkles className="w-3 h-3 text-[#02c39a]" />
-                  Ambiente de Aprendizagem Inteligente
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-[#111715] border border-[#27322D] text-[#55E6B5] rounded text-[11px] font-medium mb-2">
+                  <ShieldCheck className="w-3.5 h-3.5 text-[#55E6B5]" />
+                  Ambiente de Aprendizagem
                 </span>
-                <h3 className="text-xl font-bold text-white tracking-tight font-display">Athenas Plataforma</h3>
-                <p className="text-neutral-300 text-xs mt-1 leading-relaxed">Conectando saberes, expandindo possibilidades e construindo o futuro da educação de forma ativa.</p>
+                <h3 className="text-xl font-bold text-[#F1F5F3] tracking-tight">Athenas Plataforma</h3>
+                <p className="text-[#A5B0AA] text-xs mt-1 leading-relaxed">Conectando saberes, expandindo possibilidades e acompanhando a evolução dos estudos.</p>
               </div>
             </div>
           </div>

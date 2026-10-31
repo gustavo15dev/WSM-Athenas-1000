@@ -165,7 +165,7 @@ export function startRealtimeNotificationListener(
             const isRecent = (now - createdTime) < (24 * 60 * 60 * 1000);
 
             if (matchesClass && isRecent) {
-              sendBrowserNotification(`📢 Novo Aviso: ${ann.title || 'Aviso da Escola'}`, {
+              sendBrowserNotification(`Novo Aviso: ${ann.title || 'Aviso da Escola'}`, {
                 body: ann.message ? ann.message.substring(0, 120) + '...' : 'Acesse o portal para conferir a publicação na íntegra.',
                 tag: `ann-${ann.id}`
               });
@@ -207,7 +207,7 @@ export function startRealtimeNotificationListener(
             const isRecent = (Date.now() - createdTime) < (48 * 60 * 60 * 1000);
 
             if (isRecent) {
-              sendBrowserNotification(`📝 Novo Simulado Disponível: ${exam.title}`, {
+              sendBrowserNotification(`Novo Simulado Disponível: ${exam.title}`, {
                 body: `Matéria: ${exam.subject || 'Geral'}. Acesse para responder agora!`,
                 tag: `exam-${exam.id}`
               });
@@ -243,7 +243,7 @@ export function startRealtimeNotificationListener(
         if (ann && ann.id && !notifiedSet.has(ann.id)) {
           const targetClass = ann.class_name || ann.target_class;
           if (matchesStudentTarget(targetClass, cleanEmail, userClass, virtualClasses)) {
-            sendBrowserNotification(`📢 Novo Aviso Publicado: ${ann.title || 'Aviso da Escola'}`, {
+            sendBrowserNotification(`Novo Aviso Publicado: ${ann.title || 'Aviso da Escola'}`, {
               body: ann.message || 'Há uma nova notificação importante para sua turma.',
               tag: `ann-${ann.id}`
             });
@@ -261,7 +261,7 @@ export function startRealtimeNotificationListener(
           const exam = payload.new;
           if (exam && exam.id && !notifiedSet.has(`sim-${exam.id}`)) {
             if (matchesStudentTarget(exam.class_name, cleanEmail, userClass, virtualClasses)) {
-              sendBrowserNotification(`🚨 Novo Simulado Liberado: ${exam.title}`, {
+              sendBrowserNotification(`Novo Simulado Liberado: ${exam.title}`, {
                 body: `Professor(a) ${exam.teacher_name || 'Docente'} acabou de publicar uma avaliação.`,
                 tag: `exam-${exam.id}`
               });

@@ -1311,7 +1311,7 @@ export default function TeacherSimulados({
         setEditingExamId(resData[0].id);
       }
 
-      setSuccessMsg('💾 Rascunho do simulado salvo com sucesso! Você pode continuar a preenchê-lo a qualquer momento na aba "Rascunhos Salvos".');
+      setSuccessMsg('Rascunho do simulado salvo com sucesso! Você pode continuar a preenchê-lo a qualquer momento na aba "Rascunhos Salvos".');
       await loadData();
     } catch (err: any) {
       console.error(err);
@@ -1451,7 +1451,7 @@ export default function TeacherSimulados({
         }
       }
 
-      setSuccessMsg(editingExamId ? "✅ Simulado atualizado com sucesso!" : "🎉 Simulado virtual criado, publicado e sincronizado com os estudantes com sucesso!");
+      setSuccessMsg(editingExamId ? "Simulado atualizado com sucesso!" : "Simulado virtual criado, publicado e sincronizado com os estudantes com sucesso!");
       
       // Reset simulator forms
       setEditingExamId(null);
@@ -1966,7 +1966,7 @@ export default function TeacherSimulados({
                             ? 'bg-red-500/10 text-red-400 border border-red-500/20' 
                             : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
                         }`}>
-                          {isExamControlled ? '🔒 Controlado' : '🟢 Normal'}
+                          {isExamControlled ? 'Controlado' : 'Normal'}
                         </span>
                       </div>
 
@@ -2131,7 +2131,7 @@ export default function TeacherSimulados({
                             ? 'bg-red-500/10 text-red-400 border border-red-500/20' 
                             : 'bg-neutral-800 text-neutral-400 border border-neutral-700'
                         }`}>
-                          {isExamControlled ? '🔒 Controlado' : '🟢 Normal'}
+                          {isExamControlled ? 'Controlado' : 'Normal'}
                         </span>
                       </div>
 
@@ -2439,7 +2439,7 @@ export default function TeacherSimulados({
                     <span>Conteúdo do Simulado & Instruções de Estudo (IA)</span>
                   </label>
                   <span className="text-[10px] text-emerald-400 font-semibold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 hidden sm:inline-block">
-                    💡 Alunos poderão estudar este conteúdo com o Tutor IA antes de responder
+                    Alunos poderão estudar este conteúdo com o Tutor IA antes de responder
                   </span>
                 </div>
                 <textarea
@@ -2470,7 +2470,7 @@ export default function TeacherSimulados({
                   >
                     <div>
                       <span className={`text-xs font-bold block ${examMode === 'normal' ? 'text-emerald-400' : 'text-neutral-300'}`}>
-                        🟢 Simulado Normal (Ritmo Livre)
+                        Simulado Normal (Ritmo Livre)
                       </span>
                       <span className="text-[11px] leading-relaxed text-neutral-500 mt-1 block">
                         Permite que o aluno responda no seu próprio ritmo, sem bloqueios de tela cheia ou monitoramento.
@@ -2489,7 +2489,7 @@ export default function TeacherSimulados({
                   >
                     <div>
                       <span className={`text-xs font-bold block ${examMode === 'controlled' ? 'text-emerald-400' : 'text-neutral-300'}`}>
-                        🔒 Simulado Controlado (Anticola)
+                        Simulado Controlado (Anticola)
                       </span>
                       <span className="text-[11px] leading-relaxed text-neutral-500 mt-1 block">
                         Tentativa única, obriga modo tela cheia e registra telemetria de trocas de aba durante a prova.
@@ -2694,7 +2694,7 @@ export default function TeacherSimulados({
                                 }`}
                               >
                                 <div className="flex items-center gap-2">
-                                  <span className="text-xs">{room.type === 'official' ? '🏛️' : '💬'}</span>
+                                  <span className="text-xs">{room.type === 'official' ? '' : ''}</span>
                                   <span className="text-xs font-semibold text-neutral-200">{room.name}</span>
                                   <span className="text-[10px] text-neutral-500 font-mono">({room.studentList.length} alunos)</span>
                                 </div>
@@ -3057,12 +3057,12 @@ export default function TeacherSimulados({
                               </span>
                               {q.isEnem && (
                                 <span className="px-2.5 py-1 bg-amber-500/10 text-amber-400 border border-amber-500/20 text-xs font-bold rounded-lg">
-                                  ⚡ ENEM {q.enemYear || ''}
+                                  ENEM {q.enemYear || ''}
                                 </span>
                               )}
                               {editingQuestionId === q.id && (
                                 <span className="px-2.5 py-1 bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-bold rounded-lg animate-pulse font-mono">
-                                  ✏️ Em edição no formulário
+                                  Em edição no formulário
                                 </span>
                               )}
                             </div>
@@ -3164,7 +3164,7 @@ export default function TeacherSimulados({
                                   <span>{String.fromCharCode(65 + oIdx)}) {opt}</span>
                                   {q.correctOption === oIdx && (
                                     <span className="text-[10px] font-mono uppercase text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded-md">
-                                      ✓ Correta
+                                      Correta
                                     </span>
                                   )}
                                 </div>
@@ -3176,12 +3176,12 @@ export default function TeacherSimulados({
                           {q.type === 'written' && (
                             <div className="space-y-2">
                               <div className="p-3 rounded-xl bg-neutral-900/30 border border-dashed border-neutral-800 text-xs text-neutral-500 font-mono italic">
-                                ✍️ Espaço para o estudante redigir a resposta dissertativa em texto livre.
+                                Espaço para o estudante redigir a resposta dissertativa em texto livre.
                               </div>
                               {q.correctionType === 'ai' ? (
                                 <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-300 font-sans space-y-1">
                                   <div className="font-extrabold flex items-center gap-1.5 font-mono">
-                                    <span>🤖 Correção Automática por IA Ativada (Athenas AI)</span>
+                                    <span>Correção Automática por IA Ativada (Athenas AI)</span>
                                   </div>
                                   <p className="text-[11px] text-neutral-300">
                                     <strong className="text-emerald-400 font-mono">Gabarito para IA:</strong> "{q.expectedAnswer}"
@@ -3189,7 +3189,7 @@ export default function TeacherSimulados({
                                 </div>
                               ) : (
                                 <div className="text-[10px] text-neutral-500 font-mono">
-                                  📝 Modo de correção: Manual pela Professora
+                                  Modo de correção: Manual pela Professora
                                 </div>
                               )}
                             </div>
@@ -3405,7 +3405,7 @@ export default function TeacherSimulados({
                           ))}
                         </div>
                         <span className="text-[10px] text-neutral-500 block">
-                          💡 Marque a opção de rádio da alternativa que deve ser considerada o Gabarito Correto.
+                          Marque a opção de rádio da alternativa que deve ser considerada o Gabarito Correto.
                         </span>
                       </div>
                     ) : (
@@ -3424,7 +3424,7 @@ export default function TeacherSimulados({
                                 : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-neutral-200'
                             }`}
                           >
-                            <div className="p-1.5 rounded-lg bg-neutral-900 shrink-0 text-sm">📝</div>
+                            <div className="p-1.5 rounded-lg bg-neutral-900 shrink-0 text-sm"><Edit3 className="w-4 h-4 text-neutral-300" /></div>
                             <div>
                               <div className="text-xs font-extrabold text-neutral-200">1. Correção Manual</div>
                               <div className="text-[10px] text-neutral-400 font-normal mt-0.5">A professora corrige individualmente a resposta de cada aluno no painel.</div>
@@ -3440,7 +3440,7 @@ export default function TeacherSimulados({
                                 : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-neutral-200'
                             }`}
                           >
-                            <div className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 shrink-0 text-sm">🤖</div>
+                            <div className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 shrink-0 text-sm"><Sparkles className="w-4 h-4 text-emerald-400" /></div>
                             <div>
                               <div className="text-xs font-extrabold text-neutral-200 flex items-center gap-1.5">
                                 <span>2. Correção Automática por IA</span>
@@ -3454,7 +3454,7 @@ export default function TeacherSimulados({
                         {qCorrectionType === 'ai' && (
                           <div className="mt-3 p-3.5 bg-neutral-950 border border-emerald-500/30 rounded-xl space-y-2 animate-fadeIn">
                             <label className="block text-[10px] font-bold uppercase tracking-wider text-emerald-400 font-mono">
-                              🎯 Gabarito / Resposta Esperada para a IA utilizar como base *
+                              Gabarito / Resposta Esperada para a IA utilizar como base *
                             </label>
                             <textarea
                               rows={3}
@@ -3464,7 +3464,7 @@ export default function TeacherSimulados({
                               className="w-full px-3.5 py-2.5 bg-neutral-900 border border-neutral-800 focus:border-emerald-500/50 rounded-xl text-xs text-neutral-200 outline-none placeholder-neutral-600 resize-none font-sans"
                             />
                             <span className="text-[10px] text-neutral-400 block leading-tight">
-                              💡 A IA comparará este gabarito com a pergunta e a resposta do aluno para atribuir: <strong>Correto (100% dos pontos)</strong>, <strong>Meio Certo (50%)</strong> ou <strong>Errado (0%)</strong>. Você poderá editar a nota da IA se desejar.
+                              A IA comparará este gabarito com a pergunta e a resposta do aluno para atribuir: <strong>Correto (100% dos pontos)</strong>, <strong>Meio Certo (50%)</strong> ou <strong>Errado (0%)</strong>. Você poderá editar a nota da IA se desejar.
                             </span>
                           </div>
                         )}
@@ -3598,10 +3598,10 @@ export default function TeacherSimulados({
                   </p>
                   <div className="flex gap-1.5 pt-1">
                     <span className={`px-2 py-0.5 text-[9px] font-mono rounded ${isControlled ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'}`}>
-                      {isControlled ? '🔒 Controlado (Anticola)' : '🟢 Normal (Livre)'}
+                      {isControlled ? 'Controlado (Anticola)' : 'Normal (Livre)'}
                     </span>
-                    {shuffleQuestions && <span className="px-2 py-0.5 text-[9px] font-mono rounded bg-purple-500/10 text-purple-400 border border-purple-500/20">🔀 Questões</span>}
-                    {shuffleOptions && <span className="px-2 py-0.5 text-[9px] font-mono rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">🔀 Opções</span>}
+                    {shuffleQuestions && <span className="px-2 py-0.5 text-[9px] font-mono rounded bg-purple-500/10 text-purple-400 border border-purple-500/20">Questões aleatórias</span>}
+                    {shuffleOptions && <span className="px-2 py-0.5 text-[9px] font-mono rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">Opções aleatórias</span>}
                   </div>
                 </div>
               </div>
@@ -3673,7 +3673,7 @@ export default function TeacherSimulados({
                     className="flex-1 sm:flex-initial px-8 py-3.5 bg-emerald-500 hover:bg-emerald-400 text-neutral-950 font-black text-xs rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xl shadow-emerald-500/20 disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     <CheckCircle className="w-4 h-4" />
-                    <span>{isSaving ? "Salvando..." : editingExamId ? "Salvar e Publicar Alterações" : "🚀 Confirmar e Publicar Simulado Agora"}</span>
+                    <span>{isSaving ? "Salvando..." : editingExamId ? "Salvar e Publicar Alterações" : "Confirmar e Publicar Simulado Agora"}</span>
                   </button>
                 </div>
               </div>
@@ -3693,7 +3693,7 @@ export default function TeacherSimulados({
                   </span>
                 </div>
                 <span className="text-[10px] text-neutral-500 block mt-0.5">
-                  💡 Clique no ícone de lápis para carregar qualquer simulado no assistente de criação.
+                  Clique no ícone de lápis para carregar qualquer simulado no assistente de criação.
                 </span>
               </div>
 
@@ -3762,11 +3762,11 @@ export default function TeacherSimulados({
                         <div className="flex items-center gap-1.5 flex-wrap">
                           {isDraft ? (
                             <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30 shrink-0">
-                              📝 Rascunho
+                              Rascunho
                             </span>
                           ) : (
                             <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shrink-0">
-                              🚀 Publicado
+                              Publicado
                             </span>
                           )}
                           <button
@@ -4295,7 +4295,7 @@ export default function TeacherSimulados({
                         return (
                           <div className="py-4 text-center text-neutral-500 flex flex-col items-center justify-center gap-2">
                             <span className="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-1 rounded-full font-mono font-bold">
-                              Segurança Preservada ✅
+                              Segurança Preservada
                             </span>
                             <p className="text-[11px] text-neutral-400 font-medium">
                               Nenhum aluno deste simulado apresentou saídas de tela ou comportamentos suspeitos registrados.
@@ -4541,7 +4541,7 @@ export default function TeacherSimulados({
 
                                       return (
                                         <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-550/10">
-                                          Entregue ✅ ({new Date(submission.submitted_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })})
+                                          Entregue ({new Date(submission.submitted_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })})
                                         </span>
                                       );
                                     })() : (
@@ -4777,7 +4777,7 @@ export default function TeacherSimulados({
               </span>
               {selectedEnemQuestions.length > 0 && (
                 <span className="text-xs text-amber-400 font-extrabold animate-pulse">
-                  🌟 {selectedEnemQuestions.length} questão(ões) selecionada(s)
+                  {selectedEnemQuestions.length} questão(ões) selecionada(s)
                 </span>
               )}
             </div>
@@ -4930,7 +4930,7 @@ export default function TeacherSimulados({
                               >
                                 <img src={imgUrl} alt="Imagem da questão do ENEM" className="max-h-44 object-contain rounded group-hover:scale-105 transition-transform duration-300" referrerPolicy="no-referrer" />
                                 <div className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                  <span className="text-[10px] font-bold text-white bg-black/60 px-1.5 py-0.5 rounded">🔍</span>
+                                  <span className="text-[10px] font-bold text-white bg-black/60 px-1.5 py-0.5 rounded">Ampliar</span>
                                 </div>
                               </div>
                             ))}
@@ -5039,7 +5039,7 @@ export default function TeacherSimulados({
             {/* Exam Details preview */}
             <div className="p-8 rounded-3xl bg-neutral-950/50 border border-neutral-900 backdrop-blur-md space-y-4">
               <span className="px-2.5 py-1 bg-amber-500/10 text-amber-400 border border-amber-500/20 font-bold font-mono text-[9px] rounded uppercase tracking-widest">
-                Modo de Simulação Ativo 👁️
+                Modo de Simulação Ativo
               </span>
               <h1 className="text-xl md:text-2xl font-black text-neutral-100 tracking-tight">{displayTitle}</h1>
               <p className="text-xs text-neutral-450 leading-relaxed max-w-2xl whitespace-pre-wrap font-sans">
@@ -5078,7 +5078,7 @@ export default function TeacherSimulados({
                         </span>
                         {q.isEnem && (
                           <span className="px-2.5 py-1 bg-amber-500/10 text-amber-400 border border-amber-500/20 font-extrabold font-mono text-[10px] rounded flex items-center gap-1 animate-pulse">
-                            ⚡ ENEM {q.enemYear || ""}
+                            ENEM {q.enemYear || ""}
                           </span>
                         )}
                         <span className="px-2.5 py-1 bg-neutral-900 text-emerald-400 border border-neutral-850 font-bold font-mono text-[10px] rounded ml-auto">
@@ -5101,7 +5101,7 @@ export default function TeacherSimulados({
                             >
                               <img src={img} alt={`Imagem ${imgIdx+1}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" referrerPolicy="no-referrer" />
                               <div className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                <span className="text-[10px] font-bold text-white bg-black/60 px-1.5 py-0.5 rounded">🔍</span>
+                                <span className="text-[10px] font-bold text-white bg-black/60 px-1.5 py-0.5 rounded">Ampliar</span>
                               </div>
                             </div>
                           ))}
@@ -5114,7 +5114,7 @@ export default function TeacherSimulados({
                         >
                           <img src={qImgUrl} alt="Ilustração da pergunta" className="max-h-64 object-contain group-hover:scale-[1.02] transition-transform duration-300" referrerPolicy="no-referrer" />
                           <div className="absolute inset-0 bg-black/35 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-2xl">
-                            <span className="text-xs font-bold text-white bg-black/60 px-2 py-1 rounded-lg">Ampliar 🔍</span>
+                            <span className="text-xs font-bold text-white bg-black/60 px-2 py-1 rounded-lg">Ampliar</span>
                           </div>
                         </div>
                       ) : null}
@@ -5206,7 +5206,7 @@ export default function TeacherSimulados({
                 <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
                 <span>{successMsg}</span>
               </div>
-              <span className="text-[10px] text-emerald-400 font-mono font-normal">Salvo no sistema ✔️</span>
+              <span className="text-[10px] text-emerald-400 font-mono font-normal">Salvo no sistema</span>
             </div>
           )}
 
@@ -5270,11 +5270,11 @@ export default function TeacherSimulados({
                               </span>
                             ) : isCorrect ? (
                               <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-550/15 font-bold text-[10px] rounded-md">
-                                Acertou ✔️ (+{qPts.toFixed(1)} pt)
+                                Acertou (+{qPts.toFixed(1)} pt)
                               </span>
                             ) : (
                               <span className="px-2 py-0.5 bg-red-500/10 text-red-400 border border-red-550/15 font-bold text-[10px] rounded-md">
-                                Errou ❌ (+0.0)
+                                Errou (+0.0)
                               </span>
                             )
                           ) : (
@@ -5308,7 +5308,7 @@ export default function TeacherSimulados({
                               >
                                 <img src={img} alt={`Imagem ${imgIdx+1}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" referrerPolicy="no-referrer" />
                                 <div className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                  <span className="text-[10px] font-bold text-white bg-black/60 px-1.5 py-0.5 rounded">🔍</span>
+                                  <span className="text-[10px] font-bold text-white bg-black/60 px-1.5 py-0.5 rounded">Ampliar</span>
                                 </div>
                               </div>
                             ))}
@@ -5321,7 +5321,7 @@ export default function TeacherSimulados({
                           >
                             <img src={q.imageUrl} alt="Imagem da questão" className="max-h-48 w-auto object-contain group-hover:scale-[1.02] transition-transform duration-300" referrerPolicy="no-referrer" />
                             <div className="absolute inset-0 bg-black/35 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-xl">
-                              <span className="text-xs font-bold text-white bg-black/60 px-2 py-1 rounded-lg">Ampliar 🔍</span>
+                              <span className="text-xs font-bold text-white bg-black/60 px-2 py-1 rounded-lg">Ampliar</span>
                             </div>
                           </div>
                         ) : null}
@@ -5371,15 +5371,15 @@ export default function TeacherSimulados({
                             <div className="p-3.5 bg-neutral-950 border border-emerald-500/20 rounded-xl space-y-2">
                               <div className="flex items-center justify-between flex-wrap gap-2">
                                 <span className="text-[10px] font-bold text-emerald-400 font-mono uppercase tracking-wider block">
-                                  📝 Avaliar Resposta Dissertativa (Valendo {qPts} pt{qPts !== 1 ? 's' : ''}):
+                                  Avaliar Resposta Dissertativa (Valendo {qPts} pt{qPts !== 1 ? 's' : ''}):
                                 </span>
                                 {manualGrade?.gradedBy === 'ai' ? (
                                   <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 rounded text-[9px] font-mono font-bold">
-                                    🤖 Corrigido pela IA (Você pode editar abaixo)
+                                    Corrigido pela IA (Você pode editar abaixo)
                                   </span>
                                 ) : q.correctionType === 'ai' ? (
                                   <span className="px-2 py-0.5 bg-neutral-900 text-neutral-400 border border-neutral-800 rounded text-[9px] font-mono">
-                                    🤖 Configurado para IA
+                                    Configurado para IA
                                   </span>
                                 ) : null}
                               </div>
@@ -5393,7 +5393,7 @@ export default function TeacherSimulados({
                                       : 'bg-neutral-900 hover:bg-emerald-950/40 text-emerald-400 border border-emerald-500/30'
                                   }`}
                                 >
-                                  <span>Correto ✔️</span>
+                                  <span>Correto</span>
                                   <span className="text-[10px] font-mono opacity-80">(+{qPts} pt)</span>
                                 </button>
 
@@ -5406,7 +5406,7 @@ export default function TeacherSimulados({
                                       : 'bg-neutral-900 hover:bg-amber-950/40 text-amber-400 border border-amber-500/30'
                                   }`}
                                 >
-                                  <span>Meio Certo 🌓</span>
+                                  <span>Meio Certo</span>
                                   <span className="text-[10px] font-mono opacity-80">(+{(qPts / 2).toFixed(1)} pt)</span>
                                 </button>
 
@@ -5419,7 +5419,7 @@ export default function TeacherSimulados({
                                       : 'bg-neutral-900 hover:bg-rose-950/40 text-rose-400 border border-rose-500/30'
                                   }`}
                                 >
-                                  <span>Errado ❌</span>
+                                  <span>Errado</span>
                                   <span className="text-[10px] font-mono opacity-80">(+0 pt)</span>
                                 </button>
                               </div>
@@ -5429,10 +5429,10 @@ export default function TeacherSimulados({
                                 <div className="p-3.5 bg-emerald-500/10 border border-emerald-500/30 rounded-xl space-y-1.5">
                                   <div className="flex items-center justify-between">
                                     <span className="text-[10px] font-bold text-emerald-400 uppercase font-mono flex items-center gap-1.5">
-                                      <span>💬 Feedback enviado ao aluno:</span>
+                                      <span> Feedback enviado ao aluno:</span>
                                     </span>
                                     <span className="text-[9px] text-emerald-300 font-mono font-bold bg-emerald-500/20 px-2 py-0.5 rounded-md border border-emerald-500/30">
-                                      Salvo no sistema ✔️
+                                      Salvo no sistema
                                     </span>
                                   </div>
                                   <p className="text-xs text-neutral-100 font-sans italic whitespace-pre-wrap leading-relaxed bg-neutral-950/60 p-2.5 rounded-lg border border-neutral-850">
@@ -5552,7 +5552,7 @@ export default function TeacherSimulados({
                             </span>
                           ) : (
                             <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[9px] font-mono font-bold rounded-full">
-                              ✓ 100% Digitado Manualmente
+                              100% Digitado Manualmente
                             </span>
                           )}
                         </div>

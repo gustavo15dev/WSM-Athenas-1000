@@ -1014,7 +1014,7 @@ export default function StudentSimulados({
       }
       e.preventDefault();
       e.stopPropagation();
-      showToast("🔒 Seleção e cópia de texto bloqueadas durante a prova.");
+      showToast("Seleção e cópia de texto bloqueadas durante a prova.");
     };
 
     const handleCut = (e: ClipboardEvent) => {
@@ -1024,7 +1024,7 @@ export default function StudentSimulados({
       }
       e.preventDefault();
       e.stopPropagation();
-      showToast("🔒 Recorte de texto bloqueado durante a prova.");
+      showToast("Recorte de texto bloqueado durante a prova.");
     };
 
     const handlePaste = (e: ClipboardEvent) => {
@@ -1066,7 +1066,7 @@ export default function StudentSimulados({
 
         e.preventDefault();
         e.stopPropagation();
-        showToast(`🔒 Colagem de texto (${pastedData.length} carac.) bloqueada e registrada no relatório.`);
+        showToast(`Colagem de texto (${pastedData.length} carac.) bloqueada e registrada no relatório.`);
       }
     };
 
@@ -1103,7 +1103,7 @@ export default function StudentSimulados({
       }
       e.preventDefault();
       e.stopPropagation();
-      showToast("🔒 Menu de contexto desativado na prova.");
+      showToast("Menu de contexto desativado na prova.");
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -1116,7 +1116,7 @@ export default function StudentSimulados({
       if (e.key === 'F12' || e.keyCode === 123) {
         e.preventDefault();
         e.stopPropagation();
-        showToast("🔒 Inspecionar elemento bloqueado na prova.");
+        showToast("Inspecionar elemento bloqueado na prova.");
         return;
       }
 
@@ -1124,7 +1124,7 @@ export default function StudentSimulados({
       if (e.key === 'PrintScreen' || key === 'printscreen' || e.keyCode === 44) {
         e.preventDefault();
         e.stopPropagation();
-        showToast("🔒 Captura de tela bloqueada durante o simulado.");
+        showToast("Captura de tela bloqueada durante o simulado.");
         return;
       }
 
@@ -1132,7 +1132,7 @@ export default function StudentSimulados({
       if (isCtrlOrCmd && key === 'a' && !isInInput) {
         e.preventDefault();
         e.stopPropagation();
-        showToast("🔒 Seleção de texto bloqueada durante o simulado.");
+        showToast("Seleção de texto bloqueada durante o simulado.");
         return;
       }
 
@@ -1140,7 +1140,7 @@ export default function StudentSimulados({
       if (isCtrlOrCmd && key === 'c' && !isInInput) {
         e.preventDefault();
         e.stopPropagation();
-        showToast("🔒 Cópia de texto bloqueada durante o simulado.");
+        showToast("Cópia de texto bloqueada durante o simulado.");
         return;
       }
 
@@ -1148,7 +1148,7 @@ export default function StudentSimulados({
       if (isCtrlOrCmd && (key === 'p' || key === 'u' || key === 's')) {
         e.preventDefault();
         e.stopPropagation();
-        showToast(`🔒 Atalho Ctrl+${key.toUpperCase()} bloqueado durante o simulado.`);
+        showToast(`Atalho Ctrl+${key.toUpperCase()} bloqueado durante o simulado.`);
         return;
       }
 
@@ -1156,7 +1156,7 @@ export default function StudentSimulados({
       if (isCtrlOrCmd && e.shiftKey && (key === 'i' || key === 'j' || key === 'c')) {
         e.preventDefault();
         e.stopPropagation();
-        showToast("🔒 Ferramentas de desenvolvedor bloqueadas.");
+        showToast("Ferramentas de desenvolvedor bloqueadas.");
         return;
       }
     };
@@ -1639,7 +1639,7 @@ export default function StudentSimulados({
 
       setActiveExam(null);
       setCurrentSubmissionId(null);
-      alert(`⚠️ SIMULADO ENCERRADO POR VIOLAÇÃO DE REGRA!\n\nFoi detectada a saída da tela da prova ou troca de aba.\n\nPara garantir a integridade dos testes, suas respostas marcadas até o momento foram enviadas para o seu professor.`);
+      alert(`SIMULADO ENCERRADO POR VIOLAÇÃO DE REGRA!\n\nFoi detectada a saída da tela da prova ou troca de aba.\n\nPara garantir a integridade dos testes, suas respostas marcadas até o momento foram enviadas para o seu professor.`);
       loadStudentSimulados();
 
     } catch (err: any) {
@@ -1859,7 +1859,7 @@ export default function StudentSimulados({
 
       let successMsgText = '';
       if (hasWritten && multipleCount === 0) {
-        successMsgText = `Simulado "${activeExam.title}" finalizado com sucesso! 📝 Questões discursivas enviadas para correção da professora.`;
+        successMsgText = `Simulado "${activeExam.title}" finalizado com sucesso! Questões discursivas enviadas para correção da professora.`;
       } else if (hasWritten && multipleCount > 0) {
         successMsgText = `Simulado "${activeExam.title}" finalizado com sucesso! Nota objetiva parcial: ${finalGrade.toFixed(1)} / ${totalExamPoints.toFixed(1)} pt(s). ⏳ Questões discursivas aguardando correção da professora.`;
       } else {
@@ -2031,7 +2031,7 @@ export default function StudentSimulados({
                               <div className="flex flex-wrap items-center justify-between gap-2">
                                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-mono font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 uppercase tracking-wider animate-pulse">
                                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-                                  ⚡ SIMULADO DISPONÍVEL
+                                  SIMULADO DISPONÍVEL
                                 </span>
 
                                 <div className="flex items-center gap-1.5">
@@ -2044,7 +2044,7 @@ export default function StudentSimulados({
                                           ? 'bg-red-500/10 text-red-400 border-red-500/20' 
                                           : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
                                       }`}>
-                                        {isCont ? '🔒 Controlado' : '🟢 Ritmo Livre'}
+                                        {isCont ? 'Controlado' : 'Ritmo Livre'}
                                       </span>
                                     );
                                   })()}
@@ -2061,7 +2061,7 @@ export default function StudentSimulados({
 
                               {isResuming && (
                                 <p className="text-[10px] text-amber-300 font-mono font-extrabold flex items-center gap-1 bg-amber-500/20 border border-amber-500/30 w-fit px-2.5 py-1 rounded-lg animate-pulse">
-                                  ★ Tentativa em Andamento (Clique para Retomar)
+                                  Tentativa em Andamento (Clique para Retomar)
                                 </p>
                               )}
 
@@ -2094,7 +2094,7 @@ export default function StudentSimulados({
                               ) : (
                                 <>
                                   <span className={`text-[10px] font-extrabold px-2.5 py-1 rounded-lg border ${isResuming ? 'text-amber-300 bg-amber-500/15 border-amber-500/30' : 'text-emerald-300 bg-emerald-500/15 border-emerald-500/30'}`}>
-                                    {isResuming ? 'Em Andamento' : '🚨 Ação Requerida'}
+                                    {isResuming ? 'Em Andamento' : 'Ação Requerida'}
                                   </span>
                                   <div className="flex items-center gap-2">
                                     {onStudyForExam && (
@@ -2339,7 +2339,7 @@ export default function StudentSimulados({
             const target = e.target as HTMLElement;
             if (target?.tagName !== 'TEXTAREA' && target?.tagName !== 'INPUT') {
               e.preventDefault();
-              setBlockedActionToast("🔒 Seleção e cópia de texto bloqueadas durante a prova.");
+              setBlockedActionToast("Seleção e cópia de texto bloqueadas durante a prova.");
               setTimeout(() => setBlockedActionToast(null), 2500);
             }
           }}
@@ -2347,7 +2347,7 @@ export default function StudentSimulados({
             const target = e.target as HTMLElement;
             if (target?.tagName !== 'TEXTAREA' && target?.tagName !== 'INPUT') {
               e.preventDefault();
-              setBlockedActionToast("🔒 Menu de contexto desativado na prova.");
+              setBlockedActionToast("Menu de contexto desativado na prova.");
               setTimeout(() => setBlockedActionToast(null), 2500);
             }
           }}
@@ -2494,7 +2494,7 @@ export default function StudentSimulados({
                     }`}>
                       <ShieldAlert className={`w-4 h-4 ${switches > 0 ? 'text-red-400' : 'text-emerald-400'}`} />
                       <span>
-                        {switches === 0 ? '🛡️ Anticola: 0/3 infrações' : `🚨 Tentativas de cola: ${switches}/3`}
+                        {switches === 0 ? 'Anticola: 0/3 infrações' : `Tentativas de cola: ${switches}/3`}
                       </span>
                     </div>
                   );
@@ -2580,7 +2580,7 @@ export default function StudentSimulados({
                           </span>
                           {currentQ.isEnem && (
                             <span className="px-2.5 py-1 bg-amber-500/10 text-amber-400 border border-amber-500/20 font-extrabold font-mono text-[10px] rounded-xl flex items-center gap-1 animate-pulse">
-                              ⚡ ENEM {currentQ.enemYear || ""}
+                              ENEM {currentQ.enemYear || ""}
                             </span>
                           )}
                         </div>
@@ -2617,7 +2617,7 @@ export default function StudentSimulados({
                             >
                               <img src={img} alt={`Imagem ${imgIdx+1}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" referrerPolicy="no-referrer" />
                               <div className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                <span className="text-[10px] font-bold text-white bg-black/60 px-1.5 py-0.5 rounded">🔍</span>
+                                <span className="text-[10px] font-bold text-white bg-black/60 px-1.5 py-0.5 rounded">Ampliar</span>
                               </div>
                             </div>
                           ))}
@@ -2630,7 +2630,7 @@ export default function StudentSimulados({
                         >
                           <img src={currentQ.imageUrl} alt="Ilustração da pergunta" className="max-h-64 object-contain group-hover:scale-[1.02] transition-transform duration-300" referrerPolicy="no-referrer" />
                           <div className="absolute inset-0 bg-black/35 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-2xl">
-                            <span className="text-xs font-bold text-white bg-black/60 px-2 py-1 rounded-lg">Ampliar 🔍</span>
+                            <span className="text-xs font-bold text-white bg-black/60 px-2 py-1 rounded-lg">Ampliar</span>
                           </div>
                         </div>
                       ) : null}
@@ -2926,11 +2926,11 @@ export default function StudentSimulados({
                 </span>
                 {reviewSubmission.telemetry.pasted_texts && reviewSubmission.telemetry.pasted_texts.length > 0 ? (
                   <span className="px-2.5 py-0.5 bg-red-500/15 text-red-300 border border-red-500/30 text-[10px] font-mono font-bold rounded-full">
-                    🚨 {reviewSubmission.telemetry.pasted_texts.length} colagem(ns) registrada(s)
+                    {reviewSubmission.telemetry.pasted_texts.length} colagem(ns) registrada(s)
                   </span>
                 ) : (
                   <span className="px-2.5 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-mono font-bold rounded-full">
-                    🛡️ Respostas 100% Digitadas Manualmente
+                    Respostas 100% Digitadas Manualmente
                   </span>
                 )}
               </div>
@@ -2972,7 +2972,7 @@ export default function StudentSimulados({
                       </span>
                       {q.isEnem && (
                         <span className="px-2.5 py-0.5 bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[10px] font-extrabold rounded-lg">
-                          ⚡ ENEM {q.enemYear || ""}
+                          ENEM {q.enemYear || ""}
                         </span>
                       )}
                     </div>
@@ -2983,11 +2983,11 @@ export default function StudentSimulados({
                         </span>
                       ) : isCorrect ? (
                         <span className="px-2.5 py-0.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-bold rounded-lg flex items-center gap-1">
-                          Correto ✔️ (+{qPts.toFixed(1)} pt)
+                          Correto (+{qPts.toFixed(1)} pt)
                         </span>
                       ) : (
                         <span className="px-2.5 py-0.5 bg-rose-500/10 border border-rose-500/20 text-red-400 text-[10px] font-bold rounded-lg flex items-center gap-1">
-                          Incorreto ❌ (+0.0 pt)
+                          Incorreto (+0.0 pt)
                         </span>
                       )
                     ) : !hasStudentAnswer ? (
@@ -3024,7 +3024,7 @@ export default function StudentSimulados({
                         >
                           <img src={img} alt={`Imagem ${imgIdx+1}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" referrerPolicy="no-referrer" />
                           <div className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <span className="text-[10px] font-bold text-white bg-black/60 px-1.5 py-0.5 rounded">🔍</span>
+                            <span className="text-[10px] font-bold text-white bg-black/60 px-1.5 py-0.5 rounded">Ampliar</span>
                           </div>
                         </div>
                       ))}
@@ -3037,7 +3037,7 @@ export default function StudentSimulados({
                     >
                       <img src={q.imageUrl} alt="Questão ilustração" className="max-h-44 object-contain group-hover:scale-[1.02] transition-transform duration-300" referrerPolicy="no-referrer" />
                       <div className="absolute inset-0 bg-black/35 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-xl">
-                        <span className="text-xs font-bold text-white bg-black/60 px-2 py-1 rounded-lg">Ampliar 🔍</span>
+                        <span className="text-xs font-bold text-white bg-black/60 px-2 py-1 rounded-lg">Ampliar</span>
                       </div>
                     </div>
                   ) : null}
@@ -3085,9 +3085,9 @@ export default function StudentSimulados({
                           <div className="flex items-center justify-between">
                             <span className="text-[10px] font-bold text-emerald-400 font-mono uppercase tracking-wider flex items-center gap-1">
                               {manualGrade.gradedBy === 'ai' ? (
-                                <span>🤖 Correção Automática por IA (Athenas AI):</span>
+                                <span>Correção Automática por IA (Athenas AI):</span>
                               ) : (
-                                <span>📝 Avaliação da Professora:</span>
+                                <span>Avaliação da Professora:</span>
                               )}
                             </span>
                             <span className="text-xs font-extrabold text-emerald-300 font-mono">
@@ -3096,7 +3096,7 @@ export default function StudentSimulados({
                           </div>
                           {manualGrade.comment && (
                             <p className="text-xs text-neutral-300 italic bg-neutral-950 p-2.5 rounded-xl border border-neutral-850">
-                              💬 "{manualGrade.comment}"
+                              "{manualGrade.comment}"
                             </p>
                           )}
                         </div>
@@ -3104,13 +3104,13 @@ export default function StudentSimulados({
                         <div className="p-3.5 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center justify-between gap-2">
                           <span className="text-xs text-emerald-300 font-bold flex items-center gap-1.5 font-mono">
                             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping shrink-0" />
-                            <span>🤖 Processando Correção por IA...</span>
+                            <span>Processando Correção por IA...</span>
                           </span>
                           <span className="text-[10px] text-neutral-400 font-mono">Em breve atualizado</span>
                         </div>
                       ) : (
                         <div className="p-3 bg-neutral-950 border border-neutral-900 rounded-xl text-[11px] text-neutral-500 font-mono italic">
-                          📝 Questão aguardando avaliação manual da professora no painel.
+                          Questão aguardando avaliação manual da professora no painel.
                         </div>
                       )}
                     </div>

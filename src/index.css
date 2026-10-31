@@ -1,14 +1,28 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Mr+De+Haviland&family=Monsieur+La+Doulaise&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 @import url('https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github-dark.min.css');
-@import url('./font-face.css');
 @import "tailwindcss";
+
+:root {
+  --bg: #0B0F0E;
+  --surface: #111715;
+  --surface-raised: #171E1B;
+  --surface-hover: #1D2723;
+  --text: #F1F5F3;
+  --text-secondary: #A5B0AA;
+  --muted: #77827C;
+  --border: #27322D;
+  --accent: #55E6B5;
+  --accent-hover: #7AF0C8;
+  --accent-fg: #07110D;
+}
 
 html {
   margin: 0;
   padding: 0;
   width: 100%;
   overflow-x: hidden;
-  background-color: #040605;
+  background-color: #0B0F0E;
+  color: #F1F5F3;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
@@ -17,7 +31,8 @@ body {
   padding: 0;
   width: 100%;
   min-height: 100%;
-  background-color: #040605;
+  background-color: #0B0F0E;
+  color: #F1F5F3;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   overflow: visible;
 }
@@ -25,7 +40,8 @@ body {
 #root {
   width: 100%;
   min-height: 100%;
-  background-color: #040605;
+  background-color: #0B0F0E;
+  color: #F1F5F3;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   overflow: visible;
 }
@@ -37,63 +53,46 @@ body {
 @theme {
   --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-display: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   
-  /* Verde Água Palette (from mascot image) */
-  --color-emerald-50: #edfbf7;
-  --color-emerald-100: #d4f8ef;
-  --color-emerald-200: #aaf0df;
-  --color-emerald-300: #71e5cc;
-  --color-emerald-350: #52dcbe;
-  --color-emerald-400: #33d3b0;
-  --color-emerald-405: #30cfac;
-  --color-emerald-450: #26caa5;
-  --color-emerald-455: #24c7a2;
-  --color-emerald-500: #1eb996;
-  --color-emerald-550: #19a888;
-  --color-emerald-600: #13997b;
-  --color-emerald-700: #107b64;
-  --color-emerald-800: #0f6150;
-  --color-emerald-900: #0c4f42;
-  --color-emerald-950: #042b24;
+  /* Dark Editorial Minimalist UI Palette */
+  --color-brand-bg: #0B0F0E;
+  --color-brand-surface: #111715;
+  --color-brand-raised: #171E1B;
+  --color-brand-hover: #1D2723;
+  --color-brand-text: #F1F5F3;
+  --color-brand-secondary: #A5B0AA;
+  --color-brand-muted: #77827C;
+  --color-brand-border: #27322D;
+  --color-brand-accent: #55E6B5;
+  --color-brand-accent-hover: #7AF0C8;
+  --color-brand-accent-fg: #07110D;
 
-  --color-green-50: #edfbf7;
-  --color-green-100: #d4f8ef;
-  --color-green-200: #aaf0df;
-  --color-green-300: #71e5cc;
-  --color-green-400: #33d3b0;
-  --color-green-500: #1eb996;
-  --color-green-600: #13997b;
-  --color-green-700: #107b64;
-  --color-green-800: #0f6150;
-  --color-green-900: #0c4f42;
-  --color-green-950: #042b24;
-
-  /* Additional smooth animation classes and custom glows */
-  --animate-glow: glow 8s ease-in-out infinite alternate;
+  /* Aqua-Green mapped to existing emerald/green utilities */
+  --color-emerald-300: #7AF0C8;
+  --color-emerald-400: #55E6B5;
+  --color-emerald-500: #55E6B5;
+  --color-emerald-600: #38b88f;
+  --color-emerald-700: #298c6d;
+  --color-emerald-800: #1d614b;
+  --color-emerald-900: #171E1B;
+  --color-emerald-950: #111715;
 }
 
-@keyframes glow {
-  0% {
-    text-shadow: 0 0 10px rgba(30, 185, 150, 0.2), 0 0 20px rgba(30, 185, 150, 0.1);
-  }
-  100% {
-    text-shadow: 0 0 20px rgba(30, 185, 150, 0.4), 0 0 30px rgba(30, 185, 150, 0.2);
-  }
-}
-
-/* Custom scrollbar to match sleek theme */
+/* Custom scrollbar to match dark editorial theme */
 ::-webkit-scrollbar {
   width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #090d0a;
+  background: #0B0F0E;
 }
 ::-webkit-scrollbar-thumb {
-  background: #13997b;
-  border-radius: 9999px;
+  background: #27322D;
+  border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #1eb996;
+  background: #55E6B5;
 }
 
 /* Custom styling for markdown elements inside the chat bot */
@@ -386,15 +385,11 @@ mjx-assistive-mml mjx-container {
 }
 
 @layer utilities {
-  /* From Uiverse.io by kennyotsu-monochromia (Versão Dark) */
+  /* Solid Dark Editorial Minimalist Page Surface */
   .uiverse-dark-grid {
     width: 100%;
     min-height: 100vh;
-    --color: #2A2A2A; /* Cor das linhas da grade */
-    background-color: #121212; /* Cor do fundo escuro */
-    background-image: linear-gradient(0deg, transparent 24%, var(--color) 25%, var(--color) 26%, transparent 27%,transparent 74%, var(--color) 75%, var(--color) 76%, transparent 77%,transparent),
-        linear-gradient(90deg, transparent 24%, var(--color) 25%, var(--color) 26%, transparent 27%,transparent 74%, var(--color) 75%, var(--color) 76%, transparent 77%,transparent);
-    background-size: 55px 55px;
+    background-color: #0B0F0E;
   }
 
   .custom-scrollbar::-webkit-scrollbar {

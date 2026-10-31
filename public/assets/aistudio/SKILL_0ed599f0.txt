@@ -1,0 +1,78 @@
+---
+name: minimalist-ui
+description: |
+  Redesign and build refined, minimal editorial/product websites with an exclusively Inter typographic system, dark surfaces, and restrained aqua-green accents. Use when designing or implementing dark website interfaces, redesigning a site in this visual direction, or applying this design system to HTML, React, Vue, or Tailwind.
+metadata:
+  example_prompt: "Redesign this website as a restrained dark editorial product interface. Use Inter for every text style, near-black layered surfaces, and aqua-green accents only for emphasis and interaction."
+---
+
+# Dark Editorial Minimalist UI
+
+## 1. Design intent
+Create polished, legible websites with a dark, quiet editorial character. Use generous spacing, clear information hierarchy, crisp surfaces, and restrained aqua-green accents. Adapt layout to the site's content and purpose rather than forcing every page into the same template.
+
+## 2. Non-negotiable visual rules
+- Use **Inter exclusively** for all typography: headings, body copy, labels, buttons, metadata, code-like UI, and fallback stacks. Do not introduce serif, mono, or alternate display fonts. Prefer a locally available Inter font or load the appropriate Inter family/weights; include `Inter, sans-serif` as the fallback.
+- Use a dark base palette. Do not use white or warm off-white page backgrounds, light cards, or bright full-section backgrounds.
+- Use aqua-green as a selective accent, not as a dominant fill. Reserve it for key actions, active states, focus indicators, links, small markers, and occasional data highlights.
+- Avoid gradients, neon glow, glassmorphism, decorative blur, heavy shadows, and ornamental effects. Use solid colors and subtle borders for depth.
+- Avoid generic placeholder content, lorem ipsum, and stock SaaS copy. Use concrete, contextual language.
+- Do not use emojis. Use a consistent icon set or simple, purposeful SVG icons.
+- Avoid generic AI copywriting clichés such as “Elevate”, “Seamless”, “Unleash”, “Next-Gen”, “Game-changer”, or “Delve”.
+
+## 3. Typography
+Use Inter weights to build hierarchy instead of mixing typefaces:
+- Display/headings: Inter 600–700, tight line-height (about 1.05–1.2) and modest negative tracking where appropriate.
+- Body: Inter 400–450, line-height about 1.5–1.7 for comfortable reading.
+- UI labels and metadata: Inter 500–600; keep small text readable and avoid excessive uppercase tracking.
+- Use fluid sizing (`clamp()`) for prominent headings when appropriate. Keep long-form content at a readable measure.
+- Define a shared font stack such as `font-family: Inter, sans-serif`; do not use another family in nested components or code samples.
+
+## 4. Color system
+Use these as starting tokens and adjust only when the product's existing brand requires it:
+- Page background: `#0B0F0E`.
+- Primary surface: `#111715`.
+- Raised surface: `#171E1B`.
+- Hover/selected surface: `#1D2723`.
+- Primary text: `#F1F5F3`.
+- Secondary text: `#A5B0AA`.
+- Muted text: `#77827C`.
+- Border/divider: `#27322D` or a subtle equivalent with sufficient contrast.
+- Aqua-green accent: `#55E6B5`.
+- Accent hover: `#7AF0C8`.
+- Accent text on a filled action: use a dark foreground such as `#07110D` to maintain contrast.
+- Semantic status colors may be used sparingly when needed, but keep them subdued and ensure they remain legible on dark surfaces.
+
+Define these as CSS custom properties (for example, `--bg`, `--surface`, `--surface-raised`, `--text`, `--muted`, `--border`, `--accent`). Verify text and control contrast; do not make secondary text so dim that it becomes difficult to read.
+
+## 5. Layout and components
+- Establish a clear page grid, consistent alignment, and generous but purposeful spacing. Whitespace should clarify the content, not leave important areas empty.
+- Use asymmetric grids or bento layouts only when they improve the information architecture. Cards should use dark surfaces, thin low-contrast borders, and restrained corner radii (typically 8–14px).
+- Primary buttons may use the aqua-green accent fill with dark text. Secondary buttons should use a dark surface or transparent fill with a visible border. Keep shadows off; use border and surface changes for hover feedback.
+- Use aqua-green for selected navigation items, keyboard focus rings, key links, and concise status emphasis. Avoid coloring every icon, heading, or card edge with the accent.
+- Use badges sparingly with dark tinted fills and readable text; do not default every badge to a pill.
+- Keep accordions and lists visually light: separate rows with subtle borders and clear interactive affordances.
+- For software mockups, use a dark window surface and restrained controls rather than white macOS-style chrome.
+- Keep forms, navigation, and responsive states accessible. Show visible keyboard focus and do not communicate state through color alone.
+
+## 6. Icons and imagery
+- Use one consistent, reasonably substantial icon style (for example, Phosphor regular/bold or Radix) and standardize sizes and stroke weight.
+- Prefer purposeful product imagery, diagrams, or real contextual photography. Avoid generic decorative imagery and oversaturated stock photos.
+- If imagery is unavailable, use a composed dark surface or simple geometric illustration; do not add gradients or glowing aqua blobs to fill space.
+- Provide meaningful alt text for informative images and empty alt text for purely decorative images.
+
+## 7. Motion and interaction
+- Keep motion subtle, short, and functional. Use transitions around 150–250ms for color, border, opacity, or transform.
+- Use `IntersectionObserver` for optional reveal effects; keep them restrained and ensure content remains available when reduced motion is requested.
+- Animate only `transform` and `opacity` for larger motion effects. Avoid layout-shifting animation and excessive staggered entrance sequences.
+- Respect `prefers-reduced-motion`. Preserve clear hover, active, disabled, and focus-visible states without relying on animation.
+
+## 8. Implementation protocol
+When redesigning or implementing a page:
+1. Inspect the existing content, brand, and functionality; preserve useful information architecture and working interactions.
+2. Establish the dark design tokens and the single Inter font stack before styling individual components.
+3. Set layout, hierarchy, and responsive behavior before adding decorative detail.
+4. Apply aqua-green selectively to meaningful actions and states; check readability and contrast on every surface.
+5. Keep borders, radii, spacing, and icon treatment consistent across the page.
+6. Check desktop and mobile layouts, keyboard focus, reduced-motion behavior, and text legibility.
+7. Deliver complete, implementation-ready code that follows this visual system without requiring manual styling fixes.

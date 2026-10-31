@@ -403,7 +403,7 @@ const ChatMessageItem = React.memo(({
                     const ext = parts.length > 1 ? parts[parts.length - 1].toUpperCase() : 'DOC';
                     return (
                       <div key={fIdx} className="px-3 py-1.5 bg-black/30 border border-emerald-500/20 rounded-xl text-[11px] font-mono text-emerald-200 flex items-center gap-2">
-                        <span>📎 {file.name}</span>
+                        <span>{file.name}</span>
                         <span className="text-[9px] opacity-70">({formatFileSize(file.size)})</span>
                       </div>
                     );
@@ -1782,7 +1782,7 @@ export default function WsmChat({
         { label: "Sugestões de Atividades", text: "Me dê ideias de projetos e atividades práticas inovadoras para os alunos desenvolverem em equipe." }
       ]
     : [
-        { label: "🌿 Fórmula da Fotossíntese", text: "Qual a equação química e biológica da fotossíntese com reagentes, produtos e catalisadores em notação científica limpa?" },
+        { label: "Fórmula da Fotossíntese", text: "Qual a equação química e biológica da fotossíntese com reagentes, produtos e catalisadores em notação científica limpa?" },
         { label: "Princípios de Software", text: "Explique de forma visual o princípio Open/Closed (OCP) do SOLID com exemplos práticos." },
         { label: "Dicas de Estudo", text: "Estou me preparando para a prova de Engenharia de Software. Como posso organizar meus estudos de forma eficiente?" },
         { label: "Microsserviços", text: "Qual a diferença real e vantagens entre uma arquitetura Monolítica e uma em Microsserviços?" }

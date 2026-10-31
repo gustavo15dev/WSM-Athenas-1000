@@ -189,7 +189,7 @@ export default function StudentAnnouncements({
         const isLiked = virtualLikes[annId];
         return {
           id: annId,
-          title: `👋 Boas-vindas ao Portal Athenas!`,
+          title: `Boas-vindas ao Portal Athenas!`,
           content: `Olá, ${studentName}! Seja muito bem-vindo(a) ao portal de estudos Athenas. Sou seu(sua) professor(a) ${teacher.nome_completo || 'Docente'} da disciplina de ${teacher.materia || 'Biologia'}.\n\nEste é o nosso Mural de Avisos em tempo real. Sempre que eu publicar datas de provas físicas, trabalhos práticos ou recados acadêmicos importantes, eles aparecerão aqui para você curtir e confirmar presença! Se prepare para aprender muito neste ano letivo!`,
           category: 'Geral',
           teacher_email: teacher.email,
@@ -402,7 +402,7 @@ export default function StudentAnnouncements({
                             className="w-full max-h-72 object-contain bg-neutral-950 group-hover:scale-[1.02] transition-transform duration-300" 
                           />
                           <div className="absolute inset-0 bg-black/35 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <span className="text-xs font-bold text-white bg-black/70 px-2.5 py-1 rounded-lg">Clique para ampliar 🔍</span>
+                            <span className="text-xs font-bold text-white bg-black/70 px-2.5 py-1 rounded-lg">Clique para ampliar</span>
                           </div>
                         </div>
                       )}

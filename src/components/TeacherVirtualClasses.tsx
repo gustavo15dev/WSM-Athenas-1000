@@ -470,7 +470,7 @@ export default function TeacherVirtualClasses({
         if (st.id) {
           await supabase.from('wsm_notifications').insert({
             user_id: st.id,
-            title: `📢 Novo Aviso: ${annTitle.trim()} (Turma ${targetClassName})`,
+            title: `Novo Aviso: ${annTitle.trim()} (Turma ${targetClassName})`,
             message: annMessage.trim(),
             is_read: false
           });
@@ -479,7 +479,7 @@ export default function TeacherVirtualClasses({
 
       setAnnSuccess(`Aviso publicado com sucesso para a turma ${targetClassName}!`);
       
-      sendBrowserNotification(`📢 Novo Aviso Publicado: ${annTitle.trim()}`, {
+      sendBrowserNotification(`Novo Aviso Publicado: ${annTitle.trim()}`, {
         body: `Publicação disparada para a turma ${targetClassName}.`,
         tag: `pub-ann-vc-${Date.now()}`
       });
@@ -895,7 +895,7 @@ export default function TeacherVirtualClasses({
         questionsThisWeek: 0,
         mostAskedTopic: "Nenhum tema",
         questionsQuality: "Sem dados",
-        safetySignals: "🔴 Nenhuma atividade no sistema.",
+        safetySignals: "Nenhuma atividade no sistema.",
         safetyStatus: "red",
         submissionsDetails: [],
         sessionsDetails: [],
@@ -1268,14 +1268,14 @@ export default function TeacherVirtualClasses({
         ? sessions[0].title.replace("Estudo: ", "").replace("Dúvida: ", "")
         : "Nenhum";
 
-    let safetySignals = "🟢 Tudo saudável. Excelente engajamento.";
+    let safetySignals = "Tudo saudável. Excelente engajamento.";
     let safetyStatus = "green" as "green" | "yellow" | "red";
     if (totalExams > 0 && avgExamScore < 60) {
       safetySignals =
-        "🟡 Atenção: Desempenho médio abaixo de 60% nos simulados.";
+        "Atenção: Desempenho médio abaixo de 60% nos simulados.";
       safetyStatus = "yellow";
     } else if (realQuestions < 1 && totalExams < 1) {
-      safetySignals = "🔴 Sem engajamento recente na plataforma.";
+      safetySignals = "Sem engajamento recente na plataforma.";
       safetyStatus = "red";
     }
 
@@ -1305,8 +1305,8 @@ export default function TeacherVirtualClasses({
       mostAskedTopic,
       questionsQuality:
         realQuestions > 6
-          ? "🟢 Perguntas contextualizadas"
-          : "🟡 Pouco aprofundamento",
+          ? "Perguntas contextualizadas"
+          : "Pouco aprofundamento",
       safetySignals,
       safetyStatus,
       submissionsDetails: submissions,
@@ -2048,8 +2048,8 @@ export default function TeacherVirtualClasses({
                         >
                           {analyticsData.progressWeekToWeek[3].tempo >=
                           analyticsData.progressWeekToWeek[2].tempo
-                            ? "📈 Melhorando (Estudos em alta)"
-                            : "📉 Desacelerando (Menos atividades)"}
+                            ? "Melhorando (Estudos em alta)"
+                            : "Desacelerando (Menos atividades)"}
                         </span>
                       </div>
 
@@ -2507,7 +2507,7 @@ export default function TeacherVirtualClasses({
                               return (
                                 <>
                                   <span className="text-[9px] text-emerald-450 font-semibold font-mono">
-                                    ✓ Hipótese comprovada!
+                                    Hipótese comprovada!
                                   </span>
                                   <span className="text-[9px] bg-emerald-500/10 text-emerald-450 border border-emerald-500/20 px-2 py-0.5 rounded-full font-bold font-mono">
                                     +{diff.toFixed(1)} pontos com IA
@@ -2918,7 +2918,7 @@ export default function TeacherVirtualClasses({
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-neutral-900 pb-4">
                       <div>
                         <h4 className="text-xs font-extrabold uppercase font-mono tracking-wider text-neutral-200">
-                          📈 Métricas de Estudo e Distribuição
+                          Métricas de Estudo e Distribuição
                         </h4>
                         <p className="text-[11px] text-neutral-500">
                           Selecione o filtro temporal do gráfico para analisar
@@ -3128,7 +3128,7 @@ export default function TeacherVirtualClasses({
                     <div className="p-6 rounded-2xl bg-neutral-900/20 border border-neutral-900 space-y-4">
                       <h4 className="text-xs font-extrabold uppercase font-mono tracking-wider text-neutral-200 flex items-center gap-2">
                         <BrainCircuit className="w-4 h-4 text-emerald-400" />
-                        💬 Atividade de Diálogos na IA
+                        Atividade de Diálogos na IA
                       </h4>
 
                       <div className="space-y-3 font-mono text-xs text-neutral-350">
@@ -3163,7 +3163,7 @@ export default function TeacherVirtualClasses({
                     <div className="p-6 rounded-2xl bg-neutral-900/20 border border-neutral-900 space-y-4">
                       <h4 className="text-xs font-extrabold uppercase font-mono tracking-wider text-neutral-200 flex items-center gap-2">
                         <Activity className="w-4 h-4 text-emerald-400" />
-                        📚 Padrões de Estudos
+                        Padrões de Estudos
                       </h4>
 
                       <div className="space-y-3 font-mono text-xs text-neutral-350">

@@ -255,11 +255,11 @@ export const InteractiveQuizModal: React.FC<InteractiveQuizModalProps> = ({
       const correctOpt = q.options?.find(o => o.letter === q.correctOption);
 
       return `**Questão ${idx + 1}:** ${q.question}
-- **Minha resposta:** ${chosen}) ${chosenOpt ? chosenOpt.text : ''} ${isRight ? '✅ (Correta)' : '❌ (Incorreta)'}
+- **Minha resposta:** ${chosen}) ${chosenOpt ? chosenOpt.text : ''} ${isRight ? '(Correta)' : '(Incorreta)'}
 ${!isRight ? `- **Gabarito oficial:** ${q.correctOption}) ${correctOpt ? correctOpt.text : ''}\n` : ''}- **Dica/Explicação:** ${q.explanation}`;
     }).join('\n\n');
 
-    const reportMessage = `📋 **Quiz Concluído: ${quiz.title || 'Quiz com IA Athenas'}**
+    const reportMessage = `**Quiz Concluído: ${quiz.title || 'Quiz com IA Athenas'}**
 • **Pontuação:** ${correctCount} de ${totalQuestions} acertos (${scorePercentage}%)
 • **Nota Final:** ${finalScore} / 10
 
@@ -571,7 +571,7 @@ Athenas, analise o meu desempenho neste quiz! Me diga onde me saí bem, quais co
                                 ? 'bg-emerald-500/20 text-emerald-300'
                                 : 'bg-red-500/20 text-red-300'
                             }`}>
-                              {isRight ? 'Acertou ✓' : 'Errou ✕'}
+                              {isRight ? 'Acertou' : 'Errou'}
                             </span>
                           </div>
                           <div className="text-xs text-slate-400 flex flex-wrap gap-x-4 gap-y-1">

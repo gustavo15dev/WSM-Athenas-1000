@@ -216,7 +216,7 @@ export default function ParentDashboard({ email, onLogout }: ParentDashboardProp
       if (!res.success) {
         setLinkError(res.error || 'Código inválido ou expirado.');
       } else {
-        setLinkSuccess(`🎉 Vínculo realizado com sucesso com ${res.studentName || 'seu filho(a)'}!`);
+        setLinkSuccess(`Vínculo realizado com sucesso com ${res.studentName || 'seu filho(a)'}!`);
         setLinkCodeInput('');
         await loadStudents();
         setActiveTab('metricas');
@@ -400,7 +400,7 @@ export default function ParentDashboard({ email, onLogout }: ParentDashboardProp
 
           const conv = convMap.get(otherEmail)!;
           conv.messages.push(msg);
-          conv.lastMessage = msg.content || (msg.attachment_name ? `📎 ${msg.attachment_name}` : 'Mensagem');
+          conv.lastMessage = msg.content || (msg.attachment_name ? `Anexo: ${msg.attachment_name}` : 'Mensagem');
           conv.lastMessageTime = msg.created_at;
           if (otherName && otherName !== otherEmail) {
             conv.contactName = otherName;
@@ -548,26 +548,26 @@ export default function ParentDashboard({ email, onLogout }: ParentDashboardProp
   // =========================================================================
   if (linkedStudents.length === 0) {
     return (
-      <div className="min-h-screen bg-[#070908] text-white font-sans flex flex-col justify-between p-4 sm:p-6 md:p-8 relative selection:bg-[#02c39a] selection:text-neutral-950">
+      <div className="min-h-screen bg-[#0B0F0E] text-[#F1F5F3] font-sans flex flex-col justify-between p-4 sm:p-6 md:p-8 relative selection:bg-[#55E6B5]/25 selection:text-[#55E6B5]">
         {/* Header */}
-        <header className="w-full max-w-4xl mx-auto flex items-center justify-between py-3 px-5 border border-neutral-850 bg-neutral-900/60 backdrop-blur-xl rounded-2xl shadow-xl z-10">
+        <header className="w-full max-w-4xl mx-auto flex items-center justify-between py-3.5 px-5 border border-[#27322D] bg-[#111715] rounded-xl z-10">
           <div className="flex items-center gap-3">
             <img
               src={isBlinking ? LOGO_CLOSED : LOGO_OPEN}
               alt="Mascote WSM Athenas"
-              className="w-9 h-9 object-contain drop-shadow-[0_0_12px_rgba(2,195,154,0.3)]"
+              className="w-9 h-9 object-contain select-none"
             />
             <div>
-              <span className="text-sm font-extrabold text-neutral-100 flex items-center gap-1.5 font-display">
-                <span className="text-[#02c39a]">WSM</span> Athenas · Área dos Pais
+              <span className="text-sm font-bold text-[#F1F5F3] flex items-center gap-1.5">
+                <span className="text-[#55E6B5]">WSM</span> Athenas · Área dos Pais
               </span>
-              <span className="text-[10px] text-neutral-400 block font-mono">Conectado como {email}</span>
+              <span className="text-xs text-[#77827C] block">Conectado como {email}</span>
             </div>
           </div>
 
           <button
             onClick={onLogout}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-neutral-850 hover:bg-neutral-800 text-neutral-400 hover:text-white rounded-xl text-xs font-semibold transition-colors cursor-pointer border border-neutral-800"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#171E1B] hover:bg-[#1D2723] text-[#A5B0AA] hover:text-[#F1F5F3] rounded-lg text-xs font-medium transition-colors cursor-pointer border border-[#27322D]"
           >
             <LogOut className="w-3.5 h-3.5" />
             <span>Sair</span>
@@ -575,24 +575,18 @@ export default function ParentDashboard({ email, onLogout }: ParentDashboardProp
         </header>
 
         {/* Center Card with 4-digit input */}
-        <div className="max-w-2xl mx-auto w-full my-auto py-8 space-y-6 z-10">
-          <motion.div
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="p-6 sm:p-8 rounded-3xl bg-neutral-900/90 border-2 border-[#02c39a]/40 backdrop-blur-2xl shadow-2xl space-y-6 relative overflow-hidden"
-          >
-            <div className="absolute top-0 right-0 w-44 h-44 bg-[#02c39a]/10 rounded-full blur-3xl pointer-events-none" />
-
-            <div className="text-center space-y-2">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#02c39a]/10 border border-[#02c39a]/30 text-[#02c39a] text-xs font-bold font-mono">
-                <Sparkles className="w-3.5 h-3.5 text-[#02c39a]" />
-                PRIMEIRO PASSO: VINCULAR CONTA DO FILHO
+        <div className="max-w-xl mx-auto w-full my-auto py-8 space-y-6 z-10">
+          <div className="p-6 sm:p-8 rounded-xl bg-[#111715] border border-[#27322D] space-y-6 text-center">
+            <div className="space-y-2">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded bg-[#171E1B] border border-[#27322D] text-[#55E6B5] text-xs font-medium uppercase tracking-wide">
+                <Sparkles className="w-3.5 h-3.5 text-[#55E6B5]" />
+                Vinculação de Conta de Aluno
               </div>
-              <h2 className="text-2xl font-extrabold text-neutral-100 tracking-tight font-display">
+              <h2 className="text-2xl font-bold text-[#F1F5F3] tracking-tight">
                 Digite o Código de 4 Dígitos
               </h2>
-              <p className="text-xs text-neutral-400 max-w-md mx-auto leading-relaxed">
-                Para ter acesso às métricas verdadeiras, notas dos simulados e conversas do seu filho(a), solicite a ele(a) o código de 4 dígitos gerado na conta de aluno.
+              <p className="text-xs text-[#A5B0AA] max-w-md mx-auto leading-relaxed">
+                Para ter acesso às métricas, notas dos simulados e conversas de estudo do seu filho(a), solicite o código de 4 caracteres gerado na conta de aluno.
               </p>
             </div>
 
@@ -607,20 +601,20 @@ export default function ParentDashboard({ email, onLogout }: ParentDashboardProp
                     setLinkCodeInput(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''));
                     if (linkError) setLinkError(null);
                   }}
-                  className="w-full px-4 py-3 bg-neutral-950 border-2 border-[#02c39a]/50 focus:border-[#02c39a] rounded-2xl text-center text-3xl font-mono font-black tracking-widest outline-none text-[#02c39a] placeholder-neutral-700 shadow-inner"
+                  className="w-full px-4 py-3 bg-[#171E1B] border border-[#27322D] focus:border-[#55E6B5] rounded-lg text-center text-3xl font-bold tracking-widest outline-none text-[#55E6B5] placeholder-[#77827C]"
                 />
               </div>
 
               {linkError && (
-                <div className="p-3 bg-red-500/15 border border-red-500/30 rounded-xl text-xs text-red-300 flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
+                <div className="p-3 bg-[#171E1B] border border-rose-900/60 rounded-lg text-xs text-rose-300 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
                   <span>{linkError}</span>
                 </div>
               )}
 
               {linkSuccess && (
-                <div className="p-3 bg-emerald-500/15 border border-emerald-500/30 rounded-xl text-xs text-emerald-300 flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 shrink-0 text-emerald-400" />
+                <div className="p-3 bg-[#171E1B] border border-[#27322D] rounded-lg text-xs text-[#55E6B5] flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 shrink-0 text-[#55E6B5]" />
                   <span>{linkSuccess}</span>
                 </div>
               )}
@@ -628,7 +622,7 @@ export default function ParentDashboard({ email, onLogout }: ParentDashboardProp
               <button
                 type="submit"
                 disabled={linkingLoading || linkCodeInput.length !== 4}
-                className="w-full py-3.5 bg-[#02c39a] hover:bg-[#02b18c] disabled:opacity-40 disabled:cursor-not-allowed text-neutral-950 font-black rounded-xl text-xs uppercase tracking-wider transition-all shadow-lg shadow-[#02c39a]/20 flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full py-2.5 bg-[#55E6B5] hover:bg-[#7AF0C8] disabled:opacity-40 disabled:cursor-not-allowed text-[#07110D] font-semibold rounded-lg text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
               >
                 {linkingLoading ? 'Verificando Código...' : 'Vincular Conta do Filho'}
                 <ArrowRight className="w-4 h-4" />
@@ -636,24 +630,24 @@ export default function ParentDashboard({ email, onLogout }: ParentDashboardProp
             </form>
 
             {/* Instructions box */}
-            <div className="p-4 rounded-2xl bg-neutral-950/70 border border-neutral-800 space-y-2">
-              <span className="text-[11px] font-bold text-neutral-300 flex items-center gap-1.5 uppercase font-mono">
-                <HelpCircle className="w-3.5 h-3.5 text-[#02c39a]" />
-                Onde meu filho encontra esse código?
+            <div className="p-4 rounded-lg bg-[#171E1B] border border-[#27322D] space-y-2 text-left">
+              <span className="text-xs font-semibold text-[#F1F5F3] flex items-center gap-1.5">
+                <HelpCircle className="w-3.5 h-3.5 text-[#55E6B5]" />
+                Onde encontrar esse código?
               </span>
-              <ol className="text-xs text-neutral-400 space-y-1 list-decimal list-inside leading-relaxed">
-                <li>Seu filho entra na conta de aluno dele no Athenas.</li>
-                <li>Na barra superior ou em Perfil, clica em <strong>"Vincular Responsável"</strong>.</li>
-                <li>O sistema gera um código de 4 dígitos válido por 10 minutos.</li>
-                <li>Basta você digitar esse código no campo acima!</li>
+              <ol className="text-xs text-[#A5B0AA] space-y-1 list-decimal list-inside leading-relaxed">
+                <li>O aluno entra na conta dele no Athenas.</li>
+                <li>Na seção de Perfil, clica em <strong>"Vincular Responsável"</strong>.</li>
+                <li>O sistema gera um código de 4 caracteres.</li>
+                <li>Digite o código no campo acima para vincular.</li>
               </ol>
             </div>
-          </motion.div>
+          </div>
         </div>
 
         {/* Footer */}
-        <footer className="w-full max-w-4xl mx-auto py-3 text-center text-[11px] text-neutral-600 font-mono">
-          WSM Athenas · Plataforma de Educação Inteligente & Acompanhamento Familiar
+        <footer className="w-full max-w-4xl mx-auto py-3 text-center text-xs text-[#77827C]">
+          WSM Athenas · Plataforma de Educação & Acompanhamento Familiar
         </footer>
       </div>
     );
@@ -664,59 +658,59 @@ export default function ParentDashboard({ email, onLogout }: ParentDashboardProp
   // Clean Verde Água styling (#02c39a) + Dropdown Selector + Real Data + Real Chats
   // =========================================================================
   return (
-    <div className="min-h-screen bg-[#070908] text-white font-sans flex flex-col selection:bg-[#02c39a] selection:text-neutral-950">
+    <div className="min-h-screen bg-[#0B0F0E] text-[#F1F5F3] font-sans flex flex-col selection:bg-[#55E6B5]/25 selection:text-[#55E6B5]">
       {/* Top Navbar */}
-      <header className="sticky top-0 z-30 w-full border-b border-neutral-850/80 bg-neutral-950/85 backdrop-blur-xl">
+      <header className="sticky top-0 z-30 w-full border-b border-[#27322D] bg-[#111715]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
           {/* Logo & Portal title */}
           <div className="flex items-center gap-3 shrink-0">
             <img
               src={isBlinking ? LOGO_CLOSED : LOGO_OPEN}
               alt="Mascote WSM Athenas"
-              className="w-9 h-9 object-contain drop-shadow-[0_0_10px_rgba(2,195,154,0.3)]"
+              className="w-8 h-8 object-contain select-none"
             />
             <div>
-              <span className="text-sm font-extrabold text-neutral-100 flex items-center gap-1.5 font-display">
-                <span className="text-[#02c39a]">WSM</span> Athenas · Portal dos Pais
+              <span className="text-sm font-bold text-[#F1F5F3] flex items-center gap-1.5">
+                <span className="text-[#55E6B5]">WSM</span> Athenas · Portal dos Pais
               </span>
-              <span className="text-[10px] text-neutral-400 block font-mono">Responsável: {email}</span>
+              <span className="text-xs text-[#77827C] block">Responsável: {email}</span>
             </div>
           </div>
 
-          {/* Child Switcher (Interactive Dropdown Selector - Click to open list) */}
+          {/* Child Switcher (Interactive Dropdown Selector) */}
           <div className="relative" ref={dropdownRef}>
             <button
               type="button"
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              className="flex items-center gap-2.5 px-3 sm:px-4 py-2 rounded-xl bg-neutral-900/90 hover:bg-neutral-850 border border-[#02c39a]/35 text-neutral-100 text-xs font-semibold transition-all shadow-sm cursor-pointer group"
+              className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg bg-[#171E1B] hover:bg-[#1D2723] border border-[#27322D] hover:border-[#55E6B5]/40 text-[#F1F5F3] text-xs font-medium transition-colors cursor-pointer group"
             >
-              <div className="w-6 h-6 rounded-lg bg-[#02c39a]/15 text-[#02c39a] flex items-center justify-center font-bold text-xs shrink-0">
+              <div className="w-6 h-6 rounded bg-[#111715] text-[#55E6B5] flex items-center justify-center font-bold text-xs shrink-0 border border-[#27322D]">
                 {currentStudent?.name.charAt(0) || <GraduationCap className="w-3.5 h-3.5" />}
               </div>
               <div className="text-left max-w-[140px] sm:max-w-[200px]">
-                <span className="block text-xs font-bold text-neutral-100 group-hover:text-[#02c39a] transition-colors truncate">
+                <span className="block text-xs font-semibold text-[#F1F5F3] group-hover:text-[#55E6B5] transition-colors truncate">
                   {currentStudent?.name || 'Selecione o filho'}
                 </span>
-                <span className="block text-[10px] text-neutral-400 font-mono truncate">
+                <span className="block text-[11px] text-[#77827C] truncate">
                   {currentStudent?.turma} {currentStudent?.numero_chamada ? `· Nº ${currentStudent.numero_chamada}` : ''}
                 </span>
               </div>
-              <ChevronDown className={`w-4 h-4 text-neutral-400 group-hover:text-[#02c39a] transition-transform duration-200 shrink-0 ${isDropdownOpen ? 'rotate-180 text-[#02c39a]' : ''}`} />
+              <ChevronDown className={`w-3.5 h-3.5 text-[#77827C] group-hover:text-[#55E6B5] transition-transform duration-200 shrink-0 ${isDropdownOpen ? 'rotate-180 text-[#55E6B5]' : ''}`} />
             </button>
 
             {/* Dropdown Popover Menu */}
             <AnimatePresence>
               {isDropdownOpen && (
                 <motion.div
-                  initial={{ opacity: 0, y: 8, scale: 0.98 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 5, scale: 0.98 }}
+                  initial={{ opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 5 }}
                   transition={{ duration: 0.15 }}
-                  className="absolute right-0 sm:left-0 mt-2 w-72 rounded-2xl bg-neutral-900/95 border border-[#02c39a]/30 shadow-2xl backdrop-blur-xl z-50 p-2 space-y-1 overflow-hidden"
+                  className="absolute right-0 sm:left-0 mt-2 w-72 rounded-lg bg-[#111715] border border-[#27322D] z-50 p-2 space-y-1 overflow-hidden"
                 >
-                  <div className="px-3 py-2 text-[10px] font-mono uppercase tracking-wider text-neutral-400 border-b border-neutral-800 flex items-center justify-between">
+                  <div className="px-3 py-1.5 text-xs text-[#77827C] border-b border-[#27322D] flex items-center justify-between">
                     <span>Filhos Vinculados</span>
-                    <span className="text-[#02c39a] font-bold">{linkedStudents.length}</span>
+                    <span className="text-[#55E6B5] font-semibold">{linkedStudents.length}</span>
                   </div>
 
                   <div className="max-h-60 overflow-y-auto space-y-1 custom-scrollbar py-1">
@@ -730,41 +724,41 @@ export default function ParentDashboard({ email, onLogout }: ParentDashboardProp
                             setSelectedStudentIndex(idx);
                             setIsDropdownOpen(false);
                           }}
-                          className={`w-full flex items-center justify-between p-2.5 rounded-xl text-left text-xs transition-all cursor-pointer ${
+                          className={`w-full flex items-center justify-between p-2 rounded-lg text-left text-xs transition-colors cursor-pointer ${
                             isSelected
-                              ? 'bg-[#02c39a]/15 text-[#02c39a] font-bold border border-[#02c39a]/35'
-                              : 'hover:bg-neutral-800/70 text-neutral-200 border border-transparent'
+                              ? 'bg-[#1D2723] text-[#55E6B5] font-semibold border border-[#55E6B5]/40'
+                              : 'hover:bg-[#171E1B] text-[#F1F5F3] border border-transparent'
                           }`}
                         >
                           <div className="flex items-center gap-2.5 min-w-0">
-                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 ${
-                              isSelected ? 'bg-[#02c39a] text-neutral-950' : 'bg-neutral-800 text-neutral-300'
+                            <div className={`w-6 h-6 rounded flex items-center justify-center font-semibold text-xs shrink-0 ${
+                              isSelected ? 'bg-[#55E6B5] text-[#07110D]' : 'bg-[#171E1B] text-[#A5B0AA] border border-[#27322D]'
                             }`}>
                               {stud.name.charAt(0)}
                             </div>
                             <div className="min-w-0">
                               <p className="truncate text-xs font-semibold">{stud.name}</p>
-                              <p className="text-[10px] text-neutral-400 font-mono truncate">
+                              <p className="text-[11px] text-[#77827C] truncate">
                                 Turma: {stud.turma} {stud.numero_chamada ? `· Nº ${stud.numero_chamada}` : ''}
                               </p>
                             </div>
                           </div>
                           {isSelected && (
-                            <Check className="w-4 h-4 text-[#02c39a] shrink-0" />
+                            <Check className="w-4 h-4 text-[#55E6B5] shrink-0" />
                           )}
                         </button>
                       );
                     })}
                   </div>
 
-                  <div className="pt-1 border-t border-neutral-800">
+                  <div className="pt-1 border-t border-[#27322D]">
                     <button
                       type="button"
                       onClick={() => {
                         setActiveTab('vincular');
                         setIsDropdownOpen(false);
                       }}
-                      className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-[#02c39a] hover:bg-[#02c39a]/10 font-semibold transition-colors cursor-pointer"
+                      className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-[#55E6B5] hover:bg-[#171E1B] font-medium transition-colors cursor-pointer"
                     >
                       <Plus className="w-3.5 h-3.5" />
                       <span>Vincular outro filho(a)</span>
@@ -778,54 +772,54 @@ export default function ParentDashboard({ email, onLogout }: ParentDashboardProp
           {/* Logout */}
           <button
             onClick={onLogout}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-neutral-900 hover:bg-neutral-850 text-neutral-400 hover:text-white rounded-xl text-xs font-semibold transition-colors cursor-pointer border border-neutral-850 shrink-0"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#171E1B] hover:bg-[#1D2723] text-[#A5B0AA] hover:text-[#F1F5F3] rounded-lg text-xs font-medium transition-colors cursor-pointer border border-[#27322D] shrink-0"
           >
             <LogOut className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Sair</span>
           </button>
         </div>
 
-        {/* Tab Navigation Bar (Verde Água design) */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center gap-2 border-t border-neutral-900 overflow-x-auto">
+        {/* Tab Navigation Bar */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center gap-2 border-t border-[#27322D] overflow-x-auto">
           <button
             type="button"
             onClick={() => setActiveTab('metricas')}
-            className={`py-2.5 px-3.5 text-xs font-bold transition-all flex items-center gap-2 border-b-2 cursor-pointer shrink-0 ${
+            className={`py-2.5 px-3.5 text-xs font-medium transition-colors flex items-center gap-2 border-b-2 cursor-pointer shrink-0 ${
               activeTab === 'metricas'
-                ? 'border-[#02c39a] text-[#02c39a]'
-                : 'border-transparent text-neutral-400 hover:text-neutral-200'
+                ? 'border-[#55E6B5] text-[#55E6B5]'
+                : 'border-transparent text-[#77827C] hover:text-[#F1F5F3]'
             }`}
           >
-            <TrendingUp className="w-4 h-4 text-[#02c39a]" />
+            <TrendingUp className="w-4 h-4" />
             <span>Métricas & Progresso</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab('simulados')}
-            className={`py-2.5 px-3.5 text-xs font-bold transition-all flex items-center gap-2 border-b-2 cursor-pointer shrink-0 ${
+            className={`py-2.5 px-3.5 text-xs font-medium transition-colors flex items-center gap-2 border-b-2 cursor-pointer shrink-0 ${
               activeTab === 'simulados'
-                ? 'border-[#02c39a] text-[#02c39a]'
-                : 'border-transparent text-neutral-400 hover:text-neutral-200'
+                ? 'border-[#55E6B5] text-[#55E6B5]'
+                : 'border-transparent text-[#77827C] hover:text-[#F1F5F3]'
             }`}
           >
-            <ClipboardList className="w-4 h-4 text-[#02c39a]" />
+            <ClipboardList className="w-4 h-4" />
             <span>Notas & Simulados</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab('conversas_pessoas')}
-            className={`py-2.5 px-3.5 text-xs font-bold transition-all flex items-center gap-2 border-b-2 cursor-pointer shrink-0 ${
+            className={`py-2.5 px-3.5 text-xs font-medium transition-colors flex items-center gap-2 border-b-2 cursor-pointer shrink-0 ${
               activeTab === 'conversas_pessoas'
-                ? 'border-[#02c39a] text-[#02c39a]'
-                : 'border-transparent text-neutral-400 hover:text-neutral-200'
+                ? 'border-[#55E6B5] text-[#55E6B5]'
+                : 'border-transparent text-[#77827C] hover:text-[#F1F5F3]'
             }`}
           >
-            <MessageSquare className="w-4 h-4 text-[#02c39a]" />
+            <MessageSquare className="w-4 h-4" />
             <span>Conversas Escolares</span>
             {personConversations.length > 0 && (
-              <span className="px-1.5 py-0.2 rounded-full bg-[#02c39a]/20 text-[#02c39a] text-[10px] font-mono font-bold">
+              <span className="px-1.5 py-0.2 rounded bg-[#171E1B] text-[#55E6B5] text-[10px] font-semibold border border-[#27322D]">
                 {personConversations.length}
               </span>
             )}
@@ -834,26 +828,26 @@ export default function ParentDashboard({ email, onLogout }: ParentDashboardProp
           <button
             type="button"
             onClick={() => setActiveTab('chat_ia')}
-            className={`py-2.5 px-3.5 text-xs font-bold transition-all flex items-center gap-2 border-b-2 cursor-pointer shrink-0 ${
+            className={`py-2.5 px-3.5 text-xs font-medium transition-colors flex items-center gap-2 border-b-2 cursor-pointer shrink-0 ${
               activeTab === 'chat_ia'
-                ? 'border-[#02c39a] text-[#02c39a]'
-                : 'border-transparent text-neutral-400 hover:text-neutral-200'
+                ? 'border-[#55E6B5] text-[#55E6B5]'
+                : 'border-transparent text-[#77827C] hover:text-[#F1F5F3]'
             }`}
           >
-            <Bot className="w-4 h-4 text-teal-400" />
+            <Bot className="w-4 h-4 text-[#55E6B5]" />
             <span>Tutora Athenas AI</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab('vincular')}
-            className={`py-2.5 px-3.5 text-xs font-bold transition-all flex items-center gap-2 border-b-2 cursor-pointer shrink-0 ${
+            className={`py-2.5 px-3.5 text-xs font-medium transition-colors flex items-center gap-2 border-b-2 cursor-pointer shrink-0 ${
               activeTab === 'vincular'
-                ? 'border-[#02c39a] text-[#02c39a]'
-                : 'border-transparent text-neutral-400 hover:text-neutral-200'
+                ? 'border-[#55E6B5] text-[#55E6B5]'
+                : 'border-transparent text-[#77827C] hover:text-[#F1F5F3]'
             }`}
           >
-            <Key className="w-4 h-4 text-[#02c39a]" />
+            <Key className="w-4 h-4" />
             <span>Vincular Outro Filho</span>
           </button>
         </div>

@@ -59,7 +59,7 @@ export default function BrowserNotificationPrompt({
     const perm = await requestNotificationPermission();
     setPermission(perm);
     if (perm === 'granted') {
-      sendBrowserNotification('🔔 Notificações Ativadas com Sucesso!', {
+      sendBrowserNotification('Notificações Ativadas com Sucesso!', {
         body: 'Você receberá pop-ups do navegador para novos avisos, simulados e mensagens da escola em tempo real.',
         tag: 'welcome-notif'
       });
@@ -69,7 +69,7 @@ export default function BrowserNotificationPrompt({
   };
 
   const handleTestNotification = async () => {
-    const success = await sendBrowserNotification('🧪 Teste de Notificação Pop-up Athenas', {
+    const success = await sendBrowserNotification('Teste de Notificação Pop-up Athenas', {
       body: `Esta é uma notificação do navegador para ${userRole === 'student' ? 'alunos' : 'professores'}. O sistema está pronto para enviar avisos em tempo real!`,
       tag: `test-${Date.now()}`
     });
@@ -96,7 +96,7 @@ export default function BrowserNotificationPrompt({
           >
             <BellRing className="w-3 h-3 text-emerald-400 animate-pulse" />
             <span>Notificações Push Ativas</span>
-            {testSent && <span className="text-emerald-300 font-extrabold ml-1">✓ Enviado!</span>}
+            {testSent && <span className="text-emerald-300 font-extrabold ml-1">Enviado!</span>}
           </button>
         ) : permission === 'denied' ? (
           <div className="px-2.5 py-1 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-[10px] font-mono font-bold flex items-center gap-1">

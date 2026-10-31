@@ -632,7 +632,7 @@ export default function ClassChat({
 
             const pairObj = pairMap.get(pairKey)!;
             pairObj.messages.push(msg);
-            pairObj.lastMessage = msg.content || (msg.attachment_name ? `📎 Anexo: ${msg.attachment_name}` : 'Mensagem');
+            pairObj.lastMessage = msg.content || (msg.attachment_name ? `Anexo: ${msg.attachment_name}` : 'Mensagem');
             const d = new Date(msg.created_at);
             pairObj.lastMessageTime = isNaN(d.getTime()) ? 'Agora' : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
           }
@@ -1178,7 +1178,7 @@ export default function ClassChat({
             let lastMessageTimeStr = contact.lastMessageTime || '';
 
             if (lastMsg) {
-              lastMessageStr = lastMsg.content || (lastMsg.attachment_name ? `📎 ${lastMsg.attachment_name}` : 'Anexo');
+              lastMessageStr = lastMsg.content || (lastMsg.attachment_name ? `Anexo: ${lastMsg.attachment_name}` : 'Anexo');
               const d = new Date(lastMsg.created_at);
               lastMessageTimeStr = isNaN(d.getTime()) ? '' : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             }
