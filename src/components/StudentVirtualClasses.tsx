@@ -407,21 +407,12 @@ export default function StudentVirtualClasses({
                       </div>
                     </div>
                     <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                      {isActive && (
-                        <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full">
-                          <Star className="w-2.5 h-2.5 fill-current" />
-                          Turma Ativa
-                        </span>
-                      )}
                       {hasNotif && (
                         <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase bg-red-600 text-white border border-red-500 px-2.5 py-0.5 rounded-full shadow-[0_0_10px_rgba(239,68,68,0.5)] animate-pulse">
                           <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
                           Notificação
                         </span>
                       )}
-                      <span className="text-[9px] font-mono uppercase bg-neutral-950 border border-neutral-850 text-neutral-400 px-2 py-0.5 rounded">
-                        {isOfficial ? "Oficial" : "Virtual"}
-                      </span>
                     </div>
                   </div>
 
@@ -441,25 +432,11 @@ export default function StudentVirtualClasses({
                     <button
                       type="button"
                       onClick={() => handleOpenRoom(clsName)}
-                      className="flex-1 py-2 px-3 bg-neutral-800 hover:bg-neutral-750 text-neutral-200 text-xs font-bold rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                      className="w-full py-2 px-3 bg-neutral-800 hover:bg-neutral-750 text-neutral-200 text-xs font-bold rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-1.5"
                     >
                       <span>Abrir Sala</span>
                       <ChevronRight className="w-3.5 h-3.5" />
                     </button>
-                    {onSelectActiveTurma && !isActive && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onSelectActiveTurma(clsName);
-                        }}
-                        className="py-2 px-3 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-bold rounded-xl transition-colors cursor-pointer flex items-center gap-1"
-                        title="Definir esta turma como o contexto ativo para provas, caderno e métricas"
-                      >
-                        <Star className="w-3.5 h-3.5" />
-                        <span>Tornar Ativa</span>
-                      </button>
-                    )}
                   </div>
                 </div>
               );

@@ -75,6 +75,7 @@ import TabLoadingSkeleton from './TabLoadingSkeleton';
 import BrowserNotificationPrompt from './BrowserNotificationPrompt';
 import VirtualNotebook from './VirtualNotebook';
 import StudentProgress from './StudentProgress';
+import StudentAnnouncementBanner from './StudentAnnouncementBanner';
 import { startRealtimeNotificationListener } from '../utils/browserNotifications';
 import { supabase } from '../supabase';
 import { 
@@ -3194,6 +3195,9 @@ export default function StudentDashboard({
           /* Main Dashboard Content Layout (Início) */
           <div className="max-w-4xl mx-auto w-full space-y-10 animate-fadeIn pb-12">
             
+            {/* Banner Mostrador de Anúncios / Destaques Rotativo (Troca a cada 5 segundos) */}
+            <StudentAnnouncementBanner onNavigate={handleTabClick} />
+
             {/* CARDS VERMELHOS DE NOTIFICAÇÕES (Simulados, Provas e Avisos Pendentes) */}
             {(() => {
               // Pending simulados (assigned to student, not submitted yet, and deadline not passed)
@@ -3806,8 +3810,8 @@ export default function StudentDashboard({
 
                   <div className="pt-3 border-t border-[#27322D] space-y-2 text-xs">
                     <div className="flex items-center justify-between text-[#A5B0AA]">
-                      <span>Turma:</span>
-                      <span className="font-semibold text-[#F1F5F3]">{profile?.turma || 'Não vinculada'}</span>
+                      <span>Salas / Turmas:</span>
+                      <span className="font-semibold text-[#F1F5F3]">{allEnrolledClasses.length > 0 ? `${allEnrolledClasses.length} sala(s)` : (profile?.turma || 'Nenhuma')}</span>
                     </div>
                     <div className="flex items-center justify-between text-[#A5B0AA]">
                       <span>Escola:</span>
@@ -3989,9 +3993,9 @@ export default function StudentDashboard({
                           </div>
 
                           <div>
-                            <label className="block text-[11px] text-[#77827C] uppercase font-semibold tracking-wider mb-2">Turma Oficial (Inalterável)</label>
+                            <label className="block text-[11px] text-[#77827C] uppercase font-semibold tracking-wider mb-2">Sala / Turma</label>
                             <div className="w-full bg-[#171E1B]/50 border border-[#27322D] text-[#77827C] rounded-xl px-4 py-2.5 text-xs font-semibold">
-                              {profile ? profile.turma : 'Sem turma'}
+                              {profile?.turma || (allEnrolledClasses.length > 0 ? allEnrolledClasses.join(', ') : 'Nenhuma sala vinculada')}
                             </div>
                           </div>
                         </div>
