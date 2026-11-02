@@ -1940,20 +1940,30 @@ export default function StudentDashboard({
     setWelcomeJoinError(null);
     setWelcomeJoinSuccess(null);
 
-    try {
-      const { data: vClass, error: findError } = await supabase
-        .from('wsm_virtual_classes')
-        .select('*')
-        .eq('access_code', cleanCode)
-        .maybeSingle();
+    const cleanEmail = (email || '').toLowerCase().trim();
 
-      if (findError || !vClass) {
+    try {
+      // Fetch all virtual classes to perform resilient matching (handles numeric vs text access codes)
+      const { data: allVClasses, error: fetchErr } = await supabase
+        .from('wsm_virtual_classes')
+        .select('*');
+
+      if (fetchErr) {
+        console.warn('Error querying virtual classes:', fetchErr);
+      }
+
+      const vClass = (allVClasses || []).find((vc: any) => 
+        String(vc.access_code || '').trim() === cleanCode ||
+        areTurmasMatching(vc.name, cleanCode) ||
+        areTurmasMatching(vc.access_code, cleanCode)
+      );
+
+      if (!vClass) {
         setWelcomeJoinError('Código de sala não encontrado. Verifique os 4 dígitos com o seu professor e tente novamente.');
         setWelcomeJoinLoading(false);
         return;
       }
 
-      const cleanEmail = email.toLowerCase().trim();
       let currentEmails: string[] = [];
       if (Array.isArray(vClass.student_emails)) {
         currentEmails = vClass.student_emails;
@@ -1978,15 +1988,16 @@ export default function StudentDashboard({
             welcome_modal_dismissed: true
           })
           .eq('id', profile.id);
-      } else {
-        await safeUpsertUserProfile({
-          email: cleanEmail,
-          role: 'student',
-          turma: vClass.name,
-          welcome_modal_dismissed: true,
-          nome_completo: profile?.nome_completo || cleanEmail.split('@')[0]
-        });
       }
+      
+      await safeUpsertUserProfile({
+        email: cleanEmail,
+        role: 'student',
+        turma: vClass.name,
+        welcome_modal_dismissed: true,
+        nome_completo: profile?.nome_completo || cleanEmail.split('@')[0],
+        numero_chamada: activeChamada || 1
+      });
 
       // Local storage updates
       try {
@@ -4470,7 +4481,11 @@ export default function StudentDashboard({
       )}
 
       {/* Fullscreen No-Room Welcome Modal (Covers EVERYTHING on the site, in fullscreen) */}
-      {showNoRoomModal && allEnrolledClasses.length === 0 && (!profile?.turma || profile.turma.trim() === '') && (
+      {showNoRoomModal && 
+       !profile?.welcome_modal_dismissed && 
+       localStorage.getItem(`wsm_dismissed_welcome_modal_${(email || '').toLowerCase().trim()}`) !== 'true' && 
+       allEnrolledClasses.length === 0 && 
+       (!profile?.turma || profile.turma.trim() === '') && (
         <div 
           id="student-fullscreen-welcome-overlay"
           className="fixed inset-0 z-[99999] bg-neutral-950/95 backdrop-blur-2xl flex items-center justify-center p-4 md:p-8 overflow-y-auto animate-fadeIn"
@@ -4607,7 +4622,12 @@ export default function StudentDashboard({
                 </div>
                 <button
                   type="submit"
-                  disabled={welcomeJoinLoading || welcomeJoinCode.length !== 4}
+                  onClick={(e) => {
+                    if (welcomeJoinCode.trim().length === 4) {
+                      handleJoinClassFromWelcomeCard(e);
+                    }
+                  }}
+                  disabled={welcomeJoinLoading || welcomeJoinCode.trim().length !== 4}
                   className="w-full sm:w-auto px-6 py-3 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed text-neutral-950 font-extrabold rounded-xl text-xs transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 shrink-0"
                 >
                   {welcomeJoinLoading ? (
