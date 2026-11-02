@@ -45,6 +45,36 @@ const BRAZILIAN_STATES = [
   { sigla: 'TO', nome: 'Tocantins' }
 ];
 
+const STATIC_CITIES_FALLBACK: Record<string, string[]> = {
+  AC: ['Rio Branco', 'Cruzeiro do Sul', 'Sena Madureira', 'Tarauacá'],
+  AL: ['Maceió', 'Arapiraca', 'Rio Largo', 'Palmeira dos Índios', 'Penedo'],
+  AP: ['Macapá', 'Santana', 'Laranjal do Jari'],
+  AM: ['Manaus', 'Parintins', 'Itacoatiara', 'Manacapuru', 'Coari'],
+  BA: ['Salvador', 'Feira de Santana', 'Vitória da Conquista', 'Camaçari', 'Juazeiro', 'Lauro de Freitas', 'Itabuna', 'Ilhéus'],
+  CE: ['Fortaleza', 'Caucaia', 'Juazeiro do Norte', 'Maracanaú', 'Sobral', 'Crato'],
+  DF: ['Brasília', 'Taguatinga', 'Ceilândia', 'Águas Claras', 'Gama', 'Samambaia'],
+  ES: ['Vitória', 'Vila Velha', 'Serra', 'Cariacica', 'Cachoeiro de Itapemirim', 'Linhares'],
+  GO: ['Goiânia', 'Aparecida de Goiânia', 'Anápolis', 'Rio Verde', 'Luziânia', 'Águas Lindas de Goiás'],
+  MA: ['São Luís', 'Imperatriz', 'São José de Ribamar', 'Timon', 'Caxias'],
+  MT: ['Cuiabá', 'Várzea Grande', 'Rondonópolis', 'Sinop', 'Tangará da Serra'],
+  MS: ['Campo Grande', 'Dourados', 'Três Lagoas', 'Corumbá', 'Ponta Porã'],
+  MG: ['Belo Horizonte', 'Uberlândia', 'Contagem', 'Juiz de Fora', 'Betim', 'Montes Claros', 'Uberaba', 'Governador Valadares', 'Ipatinga', 'Sete Lagoas'],
+  PA: ['Belém', 'Ananindeua', 'Santarém', 'Marabá', 'Parauapebas', 'Castanhal'],
+  PB: ['João Pessoa', 'Campina Grande', 'Santa Rita', 'Patos', 'Bayeux'],
+  PR: ['Curitiba', 'Londrina', 'Maringá', 'Ponta Grossa', 'Cascavel', 'São José dos Pinhais', 'Foz do Iguaçu'],
+  PE: ['Recife', 'Jaboatão dos Guararapes', 'Olinda', 'Caruaru', 'Petrolina', 'Paulista'],
+  PI: ['Teresina', 'Parnaíba', 'Picos', 'Piripiri'],
+  RJ: ['Rio de Janeiro', 'São Gonçalo', 'Duque de Caxias', 'Nova Iguaçu', 'Niterói', 'Campos dos Goytacazes', 'Belford Roxo', 'Petrópolis', 'Volta Redonda'],
+  RN: ['Natal', 'Mossoró', 'Parnamirim', 'São Gonçalo do Amarante'],
+  RS: ['Porto Alegre', 'Caxias do Sul', 'Canoas', 'Pelotas', 'Santa Maria', 'Gravataí', 'Viamão', 'Novo Hamburgo'],
+  RO: ['Porto Velho', 'Ji-Paraná', 'Ariquemes', 'Vilhena', 'Cacoal'],
+  RR: ['Boa Vista', 'Rorainópolis'],
+  SC: ['Florianópolis', 'Joinville', 'Blumenau', 'São José', 'Chapecó', 'Criciúma', 'Itajaí', 'Jaraguá do Sul'],
+  SP: ['São Paulo', 'Guarulhos', 'Campinas', 'São Bernardo do Campo', 'Santo André', 'São José dos Campos', 'Osasco', 'Ribeirão Preto', 'Sorocaba', 'Mauá', 'Santos', 'Diadema', 'Jundiaí', 'Piracicaba', 'Bauru'],
+  SE: ['Aracaju', 'Nossa Senhora do Socorro', 'Lagarto', 'Itabaiana'],
+  TO: ['Palmas', 'Araguaína', 'Gurupi', 'Porto Nacional']
+};
+
 interface LoginModalProps {
   role: PortalRole;
   onBack: () => void;
@@ -127,7 +157,7 @@ export default function LoginModal({ role, onBack, onLoginSuccess }: LoginModalP
   const [isEscolaDropdownOpen, setIsEscolaDropdownOpen] = useState(false);
   const [schoolSelected, setSchoolSelected] = useState<any | null>(null);
 
-  // 1. Fetch Brazilian municipalities from official IBGE API when state changes
+  // 1. Fetch Brazilian municipalities with 3.5s AbortController timeout & static fallback
   useEffect(() => {
     if (!estado) {
       setCidadesList([]);
@@ -141,37 +171,60 @@ export default function LoginModal({ role, onBack, onLoginSuccess }: LoginModalP
 
     let isMounted = true;
     setLoadingCidades(true);
-    fetch(`https://servicodados.ibge.gov.br/api/v1/localidades/estados/${estado}/municipios?orderBy=nome`)
-      .then(res => res.json())
+
+    // Provide local static contingency list immediately so user is never blocked
+    const fallbacks = STATIC_CITIES_FALLBACK[estado] || [];
+    setCidadesList(fallbacks);
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+    }, 3500);
+
+    fetch(`https://servicodados.ibge.gov.br/api/v1/localidades/estados/${estado}/municipios?orderBy=nome`, {
+      signal: controller.signal
+    })
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
       .then((data: any[]) => {
         if (!isMounted) return;
-        if (Array.isArray(data)) {
+        if (Array.isArray(data) && data.length > 0) {
           const names = data.map((m: any) => m.nome).filter(Boolean);
           setCidadesList(names);
         }
       })
       .catch(err => {
-        console.warn('Erro ao carregar municípios do IBGE:', err);
+        if (err.name === 'AbortError') {
+          console.warn(`[IBGE API] Requisição expirou em 3.5s para UF ${estado}. Usando lista local de contingência.`);
+        } else {
+          console.warn(`[IBGE API] Erro/Instabilidade ao consultar municípios da UF ${estado}:`, err);
+        }
       })
       .finally(() => {
+        clearTimeout(timeoutId);
         if (isMounted) setLoadingCidades(false);
       });
 
     return () => {
       isMounted = false;
+      controller.abort();
+      clearTimeout(timeoutId);
     };
   }, [estado]);
 
   // 2. Fetch INEP school catalog when state, city or school query changes
   useEffect(() => {
-    if (!estado || !cidade) {
+    const activeCidade = cidade.trim() || cidadeSearch.trim();
+    if (!estado || !activeCidade) {
       setInepSchools([]);
       return;
     }
 
     const timer = setTimeout(() => {
       setLoadingInep(true);
-      fetch(`/api/inep/schools?uf=${encodeURIComponent(estado)}&cidade=${encodeURIComponent(cidade)}&q=${encodeURIComponent(escolaSearchQuery)}`)
+      fetch(`/api/inep/schools?uf=${encodeURIComponent(estado)}&cidade=${encodeURIComponent(activeCidade)}&q=${encodeURIComponent(escolaSearchQuery)}`)
         .then(res => res.json())
         .then(data => {
           if (data && Array.isArray(data.schools)) {
@@ -189,7 +242,7 @@ export default function LoginModal({ role, onBack, onLoginSuccess }: LoginModalP
     }, 280);
 
     return () => clearTimeout(timer);
-  }, [estado, cidade, escolaSearchQuery]);
+  }, [estado, cidade, cidadeSearch, escolaSearchQuery]);
 
   const handleSelectInepSchool = (sch: any) => {
     setSchoolSelected(sch);
@@ -226,6 +279,10 @@ export default function LoginModal({ role, onBack, onLoginSuccess }: LoginModalP
   const [materiaProfessor, setMateriaProfessor] = useState('');
   const [turmasProfessor, setTurmasProfessor] = useState<string[]>([]);
 
+  // Active City and School resolved values
+  const activeCidade = cidade.trim() || cidadeSearch.trim();
+  const activeEscola = schoolSelected?.nome || escola.trim() || escolaSearchQuery.trim();
+
   // Validation rules with strict email normalization & typo detection
   const normalizedEmail = email.trim().toLowerCase();
   const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail);
@@ -239,19 +296,20 @@ export default function LoginModal({ role, onBack, onLoginSuccess }: LoginModalP
   const isPasswordValid = password.length >= 6;
   const isConfirmValid = activeTab === 'signin' || (password === confirmPassword && confirmPassword.length >= 6);
   const isEscolaValid = isParent || activeTab === 'signin' || (
-    escola.trim().length > 0 && 
-    (!isStudent || (estado.trim().length > 0 && cidade.trim().length > 0))
+    activeEscola.length > 0 && 
+    (!isStudent || (estado.trim().length > 0 && activeCidade.length > 0))
   );
   const isStudentValid = !isStudent || isParent || activeTab === 'signin' || (
     nomeAluno.trim().length > 0 &&
     numeroChamada.trim().length > 0 &&
-    parseInt(numeroChamada) > 0
+    parseInt(numeroChamada, 10) > 0
   );
   const isTeacherValid = !isTeacher || isParent || activeTab === 'signin' || (
     nomeProfessor.trim().length > 0 &&
     materiaProfessor.trim().length > 0
   );
   const isFormValid = isEmailValid && isPasswordValid && isConfirmValid && isEscolaValid && isStudentValid && isTeacherValid;
+
 
   // Clear states on tab change
   useEffect(() => {
@@ -485,7 +543,7 @@ export default function LoginModal({ role, onBack, onLoginSuccess }: LoginModalP
         return;
       }
 
-      if (!isParent && !escola.trim()) {
+      if (!isParent && !activeEscola) {
         setError('Por favor, informe a sua Escola / Instituição de Ensino.');
         return;
       }
@@ -555,11 +613,11 @@ export default function LoginModal({ role, onBack, onLoginSuccess }: LoginModalP
 
         const fullEscolaData = isParent
           ? 'Responsável'
-          : (isStudent && estado && cidade
+          : (isStudent && estado && activeCidade
               ? (schoolSelected?.codigoInep && schoolSelected.codigoInep !== 'Não informado'
-                  ? `${schoolSelected.nome} (INEP: ${schoolSelected.codigoInep}) - ${cidade}/${estado}`
-                  : `${escola.trim()} - ${cidade}/${estado}`)
-              : escola.trim());
+                  ? `${schoolSelected.nome} (INEP: ${schoolSelected.codigoInep}) - ${activeCidade}/${estado}`
+                  : `${activeEscola} - ${activeCidade}/${estado}`)
+              : activeEscola);
 
         const { data, error: suError } = await supabase.auth.signUp({
           email: targetEmail,
@@ -1413,32 +1471,33 @@ export default function LoginModal({ role, onBack, onLoginSuccess }: LoginModalP
                                   Cidade onde estuda
                                 </span>
                                 {loadingCidades && (
-                                  <span className="text-[10px] text-emerald-400 font-mono animate-pulse">Carregando municípios...</span>
+                                  <span className="text-[10px] text-emerald-400 font-mono animate-pulse">Buscando municípios...</span>
                                 )}
                               </label>
                               <div className="relative">
                                 <input
                                   id="signup-cidade-input"
                                   type="text"
-                                  disabled={isLoading || loadingCidades}
-                                  placeholder={loadingCidades ? "Carregando municípios..." : "Digite o nome da sua cidade..."}
+                                  disabled={isLoading}
+                                  placeholder={loadingCidades ? "Digite a cidade (buscando IBGE...)" : "Digite o nome da sua cidade..."}
                                   value={cidadeSearch || cidade}
                                   onChange={(e) => {
-                                    setCidadeSearch(e.target.value);
-                                    setCidade('');
+                                    const val = e.target.value;
+                                    setCidadeSearch(val);
+                                    setCidade(val);
                                     setIsCidadeDropdownOpen(true);
                                     setTouchedCidade(true);
                                   }}
                                   onFocus={() => setIsCidadeDropdownOpen(true)}
                                   className={`w-full pl-10 pr-4 py-3 bg-neutral-900/80 border ${
-                                    touchedCidade && !cidade ? 'border-amber-500/60' : 'border-neutral-800 focus:border-[#02c39a]/50'
+                                    touchedCidade && !activeCidade ? 'border-amber-500/60' : 'border-neutral-800 focus:border-[#02c39a]/50'
                                   } focus:ring-1 focus:ring-[#02c39a]/35 rounded-xl text-sm text-neutral-100 placeholder-neutral-600 outline-none`}
                                 />
                                 <Search className="w-4 h-4 text-neutral-500 absolute left-3.5 top-3.5" />
                               </div>
 
-                              {/* Dropdown with filtered cities from IBGE */}
-                              {isCidadeDropdownOpen && cidadesList.length > 0 && (
+                              {/* Dropdown with filtered cities from IBGE or Contingency List */}
+                              {isCidadeDropdownOpen && (cidadesList.length > 0 || cidadeSearch.trim().length > 0) && (
                                 <div className="absolute z-30 left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-neutral-900 border border-neutral-700/80 rounded-xl shadow-2xl p-1 space-y-0.5 custom-scrollbar">
                                   {cidadesList
                                     .filter(c => !cidadeSearch || c.toLowerCase().includes(cidadeSearch.toLowerCase()))
@@ -1456,26 +1515,41 @@ export default function LoginModal({ role, onBack, onLoginSuccess }: LoginModalP
                                           setEscolaSearchQuery('');
                                         }}
                                         className={`w-full text-left px-3 py-2 text-xs rounded-lg transition-colors flex items-center justify-between cursor-pointer ${
-                                          cidade === c ? 'bg-emerald-500/20 text-emerald-300 font-bold' : 'text-neutral-200 hover:bg-neutral-800'
+                                          activeCidade === c ? 'bg-emerald-500/20 text-emerald-300 font-bold' : 'text-neutral-200 hover:bg-neutral-800'
                                         }`}
                                       >
                                         <span>{c}</span>
-                                        {cidade === c && <Check className="w-3.5 h-3.5 text-emerald-400" />}
+                                        {activeCidade === c && <Check className="w-3.5 h-3.5 text-emerald-400" />}
                                       </button>
                                     ))}
+                                  {cidadeSearch.trim().length > 0 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const trimmed = cidadeSearch.trim();
+                                        setCidade(trimmed);
+                                        setCidadeSearch(trimmed);
+                                        setIsCidadeDropdownOpen(false);
+                                      }}
+                                      className="w-full text-left px-3 py-2 text-xs rounded-lg bg-neutral-800/80 hover:bg-neutral-800 text-emerald-400 font-medium transition-colors flex items-center justify-between cursor-pointer border-t border-neutral-800 mt-1"
+                                    >
+                                      <span>Usar cidade digitada: <strong>"{cidadeSearch.trim()}"</strong></span>
+                                      <Check className="w-3.5 h-3.5 text-emerald-400" />
+                                    </button>
+                                  )}
                                 </div>
                               )}
-                              {touchedCidade && !cidade && (
+                              {touchedCidade && !activeCidade && (
                                 <p className="text-[10px] text-amber-400 mt-1 flex items-center gap-1 animate-fadeIn">
                                   <AlertCircle className="w-2.5 h-2.5 shrink-0" />
-                                  <span>Escolha sua cidade na lista</span>
+                                  <span>Digite ou escolha sua cidade</span>
                                 </p>
                               )}
                             </div>
                           )}
 
                           {/* 3. Escola onde estuda */}
-                          {cidade && (
+                          {activeCidade && (
                             <div className="relative animate-fadeIn space-y-2">
                               <label className="block text-xs font-semibold text-neutral-400 tracking-wider uppercase flex items-center justify-between">
                                 <span className="flex items-center gap-1.5">
