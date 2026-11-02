@@ -1154,8 +1154,8 @@ export default function StudentDashboard({
           }
         }
 
-        // 2. Discover enrolled virtual class if not yet bound
-        let discoveredTurma = profileData?.turma || authMeta.turma || localTurma || '';
+        // 2. Discover enrolled virtual class if not yet bound (ONLY if student email is explicitly listed in student_emails)
+        let discoveredTurma = '';
         let vClasses: any[] | null = null;
         try {
           const { data } = await supabase
@@ -1164,41 +1164,32 @@ export default function StudentDashboard({
           vClasses = data;
           if (vClasses && vClasses.length > 0) {
             const foundClass = vClasses.find((vc: any) => {
+              if (!vc || !vc.student_emails) return false;
               let emails: string[] = [];
-              if (Array.isArray(vc.student_emails)) emails = vc.student_emails;
-              else if (typeof vc.student_emails === 'string') {
-                try { emails = JSON.parse(vc.student_emails); } catch { emails = vc.student_emails.split(',').map((s: string) => s.trim()); }
+              if (Array.isArray(vc.student_emails)) {
+                emails = vc.student_emails;
+              } else if (typeof vc.student_emails === 'string') {
+                try { 
+                  emails = JSON.parse(vc.student_emails); 
+                } catch { 
+                  emails = vc.student_emails.split(',').map((s: string) => s.trim()).filter(Boolean); 
+                }
               }
-              const inEmails = emails.some((e: string) => e && e.toLowerCase().trim() === emailClean);
-              const matchesDiscovered = discoveredTurma ? areTurmasMatching(vc.name, discoveredTurma) || vc.access_code === discoveredTurma : false;
-              return inEmails || matchesDiscovered;
+              return emails.some((e: string) => e && String(e).toLowerCase().trim() === emailClean);
             });
             if (foundClass && foundClass.name) {
               discoveredTurma = foundClass.name;
-              
-              // Ensure student email is in this virtual class
-              let currentEmails: string[] = [];
-              if (Array.isArray(foundClass.student_emails)) currentEmails = foundClass.student_emails;
-              else if (typeof foundClass.student_emails === 'string') {
-                try { currentEmails = JSON.parse(foundClass.student_emails); } catch { currentEmails = foundClass.student_emails.split(',').map((s: string) => s.trim()); }
-              }
-              if (!currentEmails.some((e: string) => e && e.toLowerCase().trim() === emailClean)) {
-                const updatedList = Array.from(new Set([...currentEmails, emailClean]));
-                supabase
-                  .from('wsm_virtual_classes')
-                  .update({ student_emails: updatedList })
-                  .eq('id', foundClass.id)
-                  .then(({ error }) => {
-                    if (error) console.warn('Background auto-enroll error:', error);
-                  });
-              }
             }
           }
         } catch (healErr) {
           console.warn('Virtual classes check error:', healErr);
         }
 
-        const resolvedTurma = profileData?.turma || authMeta.turma || discoveredTurma || localTurma || '';
+        // Student has a real class ONLY if profileData.turma is populated OR found in virtual class student_emails
+        const dbTurma = profileData?.turma ? String(profileData.turma).trim() : '';
+        const resolvedTurma = dbTurma || discoveredTurma || '';
+        const hasRealClass = Boolean(resolvedTurma !== '');
+
         const resolvedChamada = (profileData?.numero_chamada !== undefined && profileData?.numero_chamada !== null)
           ? Number(profileData.numero_chamada)
           : (authMeta.numero_chamada !== undefined && authMeta.numero_chamada !== null
@@ -1208,41 +1199,20 @@ export default function StudentDashboard({
         const resolvedEscola = profileData?.escola || authMeta.escola || localEscola || '';
         const resolvedNotificationGmail = profileData?.notification_gmail || localGmail || null;
 
-        // Check database / auth metadata / local cache for welcome card dismissal
-        const isDismissedInAuth = authMeta.welcome_modal_dismissed === true;
+        // Check explicit dismissal flags from DB or local storage
         const isDismissedInProfile = profileData?.welcome_modal_dismissed === true;
         const localDismissed = localStorage.getItem(`wsm_dismissed_welcome_modal_${emailClean}`) === 'true';
-        const isAlreadyDismissed = isDismissedInAuth || isDismissedInProfile || localDismissed;
+        const isExplicitlyDismissed = isDismissedInProfile || localDismissed;
 
-        let hasEnrolledVClasses = false;
-        try {
-          if (vClasses && vClasses.length > 0) {
-            hasEnrolledVClasses = vClasses.some((vc: any) => {
-              let emails: string[] = [];
-              if (Array.isArray(vc.student_emails)) emails = vc.student_emails;
-              else if (typeof vc.student_emails === 'string') {
-                try { emails = JSON.parse(vc.student_emails); } catch { emails = vc.student_emails.split(',').map((s: string) => s.trim()); }
-              }
-              return emails.some((e: string) => e && e.toLowerCase().trim() === emailClean);
-            });
-          }
-        } catch {}
-
-        const hasAnyClassOrTurma = Boolean(
-          (resolvedTurma && resolvedTurma.trim() !== '') ||
-          (profileData?.turma && profileData.turma.trim() !== '') ||
-          (discoveredTurma && discoveredTurma.trim() !== '') ||
-          hasEnrolledVClasses
-        );
-
-        if (isAlreadyDismissed || hasAnyClassOrTurma) {
+        // Overlay should ONLY be hidden if student has a real class OR explicitly dismissed the modal
+        if (hasRealClass || isExplicitlyDismissed) {
           setShowNoRoomModal(false);
-          // If the user already has a class or was dismissed on another device, persist to DB in background
-          if (!isDismissedInAuth || !isDismissedInProfile) {
+          // Only auto-persist dismissal in DB if student has a REAL confirmed class and DB is not updated yet
+          if (hasRealClass && !isDismissedInProfile) {
             setWelcomeModalDismissedInDb(emailClean, profileData?.id);
           }
         } else {
-          // Genuinely first time access: student has no room and has not seen the modal
+          // Student has no class and has not dismissed: ALWAYS SHOW OVERLAY
           setShowNoRoomModal(true);
         }
 
@@ -1267,7 +1237,7 @@ export default function StudentDashboard({
             email: profileData.email || emailClean,
             escola: resolvedEscola,
             notification_gmail: resolvedNotificationGmail,
-            welcome_modal_dismissed: isAlreadyDismissed || hasAnyClassOrTurma
+            welcome_modal_dismissed: hasRealClass || isExplicitlyDismissed
           });
 
           // Sync active turma
