@@ -1919,6 +1919,12 @@ export default function StudentDashboard({
   const handleDismissWelcomeModal = () => {
     setShowNoRoomModal(false);
     const clean = (email || '').toLowerCase().trim();
+    if (clean) {
+      try {
+        localStorage.setItem(`wsm_dismissed_welcome_modal_${clean}`, 'true');
+      } catch {}
+    }
+    setProfile(prev => prev ? { ...prev, welcome_modal_dismissed: true } : null);
     setWelcomeModalDismissedInDb(clean, profile?.id);
   };
 
@@ -1955,7 +1961,7 @@ export default function StudentDashboard({
         try { currentEmails = JSON.parse(vClass.student_emails); } catch { currentEmails = vClass.student_emails.split(',').map((s: string) => s.trim()).filter(Boolean); }
       }
 
-      if (!currentEmails.map((e: string) => e.toLowerCase()).includes(cleanEmail)) {
+      if (!currentEmails.map((e: string) => String(e).toLowerCase().trim()).includes(cleanEmail)) {
         currentEmails.push(cleanEmail);
         await supabase
           .from('wsm_virtual_classes')
@@ -1963,25 +1969,55 @@ export default function StudentDashboard({
           .eq('id', vClass.id);
       }
 
-      // Update student profile with this turma if empty
-      if (!profile?.turma) {
+      // Persist student profile update with turma and welcome_modal_dismissed
+      if (profile?.id) {
         await supabase
           .from('wsm_user_profiles')
-          .update({ turma: vClass.name })
-          .eq('id', profile?.id || '');
-        setProfile(prev => prev ? { ...prev, turma: vClass.name } : null);
+          .update({ 
+            turma: vClass.name,
+            welcome_modal_dismissed: true
+          })
+          .eq('id', profile.id);
+      } else {
+        await safeUpsertUserProfile({
+          email: cleanEmail,
+          role: 'student',
+          turma: vClass.name,
+          welcome_modal_dismissed: true,
+          nome_completo: profile?.nome_completo || cleanEmail.split('@')[0]
+        });
       }
 
+      // Local storage updates
+      try {
+        localStorage.setItem(`wsm_active_student_class_${cleanEmail}`, vClass.name);
+        localStorage.setItem(`wsm_profile_turma_${cleanEmail}`, vClass.name);
+        localStorage.setItem(`wsm_dismissed_welcome_modal_${cleanEmail}`, 'true');
+      } catch {}
+
+      // Synchronize React state immediately
+      setProfile(prev => prev ? { 
+        ...prev, 
+        turma: vClass.name, 
+        welcome_modal_dismissed: true 
+      } : {
+        id: profile?.id || crypto.randomUUID(),
+        email: cleanEmail,
+        nome_completo: cleanEmail.split('@')[0],
+        turma: vClass.name,
+        numero_chamada: activeChamada || 1,
+        welcome_modal_dismissed: true
+      });
+
       setActiveTurma(vClass.name);
-      localStorage.setItem(`wsm_active_student_class_${cleanEmail}`, vClass.name);
+      setShowNoRoomModal(false);
       setWelcomeModalDismissedInDb(cleanEmail, profile?.id);
 
-      setWelcomeJoinSuccess(`Sucesso! Você ingressou na turma "${vClass.name}". Carregando seus conteúdos...`);
+      setWelcomeJoinSuccess(`Sucesso! Você ingressou na turma "${vClass.name}".`);
       setWelcomeJoinCode('');
-      setTimeout(async () => {
-        await loadData(vClass.name);
-        setShowNoRoomModal(false);
-      }, 1000);
+
+      // Reload dashboard data for this class
+      await loadData(vClass.name);
     } catch (err: any) {
       console.error('Error joining virtual class:', err);
       setWelcomeJoinError(err.message || 'Erro ao entrar na sala. Tente novamente.');

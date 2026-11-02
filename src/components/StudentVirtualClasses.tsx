@@ -19,7 +19,7 @@ import {
 import StudentSimulados from "./StudentSimulados";
 import StudentAnnouncements from "./StudentAnnouncements";
 import type { VirtualClass, UserProfile } from "../types";
-import { areTurmasMatching } from "../utils/profileDb";
+import { areTurmasMatching, safeUpsertUserProfile, setWelcomeModalDismissedInDb } from "../utils/profileDb";
 import { ClassIconDisplay } from "./ClassIconDisplay";
 
 interface StudentVirtualClassesProps {
@@ -194,27 +194,49 @@ export default function StudentVirtualClasses({
         return;
       }
 
-      const currentEmails = Array.isArray(vClass.student_emails)
-        ? vClass.student_emails
-        : [];
-        
-      if (currentEmails.map((e: string) => e.toLowerCase()).includes(email.toLowerCase())) {
-        setJoinError("Você já está cadastrado(a) nesta turma!");
-        setJoining(false);
-        setJoinCode("");
-        return;
+      const cleanEmail = email.toLowerCase().trim();
+      let currentEmails: string[] = [];
+      if (Array.isArray(vClass.student_emails)) {
+        currentEmails = vClass.student_emails;
+      } else if (typeof vClass.student_emails === "string") {
+        try {
+          currentEmails = JSON.parse(vClass.student_emails);
+        } catch {
+          currentEmails = vClass.student_emails.split(",").map((s: string) => s.trim()).filter(Boolean);
+        }
       }
 
-      const updatedEmails = Array.from(
-        new Set([...currentEmails, email.toLowerCase()])
-      );
+      if (!currentEmails.map((e: string) => String(e).toLowerCase().trim()).includes(cleanEmail)) {
+        currentEmails.push(cleanEmail);
+        const { error: updateError } = await supabase
+          .from("wsm_virtual_classes")
+          .update({ student_emails: currentEmails })
+          .eq("id", vClass.id);
 
-      const { error: updateError } = await supabase
-        .from("wsm_virtual_classes")
-        .update({ student_emails: updatedEmails })
-        .eq("id", vClass.id);
+        if (updateError) throw updateError;
+      }
 
-      if (updateError) throw updateError;
+      // Persist student profile update with turma and welcome_modal_dismissed
+      await safeUpsertUserProfile({
+        email: cleanEmail,
+        role: "student",
+        turma: vClass.name,
+        welcome_modal_dismissed: true,
+        nome_completo: studentName || cleanEmail.split("@")[0]
+      });
+
+      // Update local storage
+      try {
+        localStorage.setItem(`wsm_active_student_class_${cleanEmail}`, vClass.name);
+        localStorage.setItem(`wsm_profile_turma_${cleanEmail}`, vClass.name);
+        localStorage.setItem(`wsm_dismissed_welcome_modal_${cleanEmail}`, "true");
+      } catch {}
+
+      setWelcomeModalDismissedInDb(cleanEmail);
+      if (onSelectActiveTurma) {
+        onSelectActiveTurma(vClass.name);
+      }
+      setSelectedClass(vClass.name);
 
       setJoinSuccess(`Entrou na turma "${vClass.name}" com sucesso!`);
       setJoinCode("");
@@ -223,9 +245,9 @@ export default function StudentVirtualClasses({
         setJoinSuccess(null);
       }, 1500);
       fetchClasses();
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error joining class:", err);
-      setJoinError("Erro ao entrar na turma. Tente novamente.");
+      setJoinError(err.message || "Erro ao entrar na turma. Tente novamente.");
     } finally {
       setJoining(false);
     }
