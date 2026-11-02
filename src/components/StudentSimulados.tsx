@@ -26,6 +26,7 @@ import { logSystemAction } from '../utils/auditLogger';
 import { parseExamSettings } from '../utils/examSettings';
 import { matchesStudentTarget } from '../utils/targetMatcher';
 import { areTurmasMatching } from '../utils/profileDb';
+import { computeSubmissionXP } from '../utils/weeklyRanking';
 
 interface StudentSimuladosProps {
   email: string;
@@ -2912,6 +2913,78 @@ export default function StudentSimulados({
                   </p>
                   <span className="text-[10px] text-neutral-450 block mt-1">({reviewSubmission.correct_count} de {reviewSubmission.total_questions} acertos)</span>
                 </div>
+              </div>
+            );
+          })()}
+
+          {/* Conversão da Prova em XP & Penalidades Disciplinares */}
+          {reviewSubmission && (() => {
+            const xpBreakdown = computeSubmissionXP(reviewSubmission);
+            const isNegativeSubmission = xpBreakdown.netXp < 0;
+
+            return (
+              <div className={`p-5 rounded-3xl border ${isNegativeSubmission ? 'bg-rose-950/20 border-rose-900/60 shadow-[0_0_20px_rgba(244,63,94,0.1)]' : 'bg-[#121915] border-[#27322d]'} space-y-3`}>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/5 pb-2.5">
+                  <span className={`text-[11px] font-mono uppercase font-bold tracking-wider flex items-center gap-2 ${isNegativeSubmission ? 'text-rose-400' : 'text-[#55e6b5]'}`}>
+                    {isNegativeSubmission ? <AlertTriangle className="w-4 h-4 text-rose-400" /> : <Sparkles className="w-4 h-4 text-[#55e6b5]" />}
+                    Conversão desta Prova em Conquistas & XP
+                  </span>
+                  <div className={`text-sm font-black font-mono px-3 py-1 rounded-xl border ${isNegativeSubmission ? 'bg-rose-950/60 text-rose-400 border-rose-500/40' : 'bg-[#1b3d30] text-[#55e6b5] border-[#55e6b5]/30'}`}>
+                    {xpBreakdown.netXp > 0 ? `+${xpBreakdown.netXp.toLocaleString('pt-BR')} XP` : `${xpBreakdown.netXp.toLocaleString('pt-BR')} XP`}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-neutral-300">
+                      <span>Conversão da Nota ({reviewSubmission.score !== undefined ? Number(reviewSubmission.score).toFixed(1) : 0} pts):</span>
+                      <b className="font-mono text-[#55e6b5]">+{xpBreakdown.scoreXp} XP</b>
+                    </div>
+                    <div className="flex justify-between text-neutral-300">
+                      <span>Acertos de Múltipla Escolha:</span>
+                      <b className="font-mono text-[#55e6b5]">+{xpBreakdown.correctAnswersXp} XP</b>
+                    </div>
+                    {xpBreakdown.perfectScoreBonus > 0 && (
+                      <div className="flex justify-between text-amber-300">
+                        <span>Bônus Gabarito Perfeito:</span>
+                        <b className="font-mono">+{xpBreakdown.perfectScoreBonus} XP</b>
+                      </div>
+                    )}
+                    {xpBreakdown.integrityBonus > 0 && (
+                      <div className="flex justify-between text-emerald-300">
+                        <span>Bônus Integridade (0 saídas):</span>
+                        <b className="font-mono">+{xpBreakdown.integrityBonus} XP</b>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-1 sm:border-l sm:border-white/5 sm:pl-3">
+                    {xpBreakdown.penaltiesXp > 0 ? (
+                      <>
+                        <div className="flex justify-between text-rose-400 font-semibold">
+                          <span>Penalidades por Cola/Infrações:</span>
+                          <b className="font-mono text-rose-400">-{xpBreakdown.penaltiesXp} XP</b>
+                        </div>
+                        {xpBreakdown.infractionDetails.map((det, dIdx) => (
+                          <div key={dIdx} className="text-[10px] text-rose-300/80 font-mono pl-1">
+                            • {det}
+                          </div>
+                        ))}
+                      </>
+                    ) : (
+                      <div className="text-[11px] text-neutral-400 flex items-center gap-1.5 pt-1">
+                        <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                        Nenhuma violação ou tentativa de cola detectada. Bônus integral creditado!
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {isNegativeSubmission && (
+                  <div className="text-[10px] text-rose-300 bg-rose-950/40 border border-rose-900/50 p-2.5 rounded-xl font-medium">
+                    ⚠️ Atenção: Devido a violações de tela cheia, colagem de texto ou infrações, esta prova resultou em <b>XP Negativo ({xpBreakdown.netXp} XP)</b> debitado na sua conta. Realize novas atividades com integridade para recuperar seu saldo.
+                  </div>
+                )}
               </div>
             );
           })()}

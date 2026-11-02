@@ -37,12 +37,16 @@ import {
   ChevronRight,
   Download,
   Mail,
-  FileCheck
+  FileCheck,
+  AlertTriangle,
+  AlertOctagon,
+  ShieldAlert
 } from 'lucide-react';
 import { supabase } from '../supabase';
 import { 
   getWeeklyCycleInfo, 
   calculateStudentWeeklyXP, 
+  computeSubmissionXP,
   getStudentCertificates, 
   saveWeeklyCycleWinners, 
   StudentCertificateItem, 
@@ -800,16 +804,13 @@ export default function StudentAchievements({
     });
   }, [activeDatesSet, realStreak]);
 
-  // 4. Calculate 100% REAL Total XP earned from real activities:
+  // 4. Calculate 100% REAL Total XP earned from real activities with Exam Score conversion & Cola Penalties:
   const realActivitiesXP = useMemo(() => {
     let xp = 0;
 
     studentSubmissions.forEach((s: any) => {
-      xp += 100;
-      xp += (Number(s.correct_count) || 0) * 20;
-      if (Number(s.score) >= 10) xp += 150;
-      const sw = Number(s.telemetry?.tabSwitches) || Number(s.telemetry?.tab_switch_count) || 0;
-      if (sw === 0) xp += 50;
+      const subXp = computeSubmissionXP(s);
+      xp += subXp.netXp;
     });
 
     xp += notebookStats.pagesCount * 25;
@@ -823,7 +824,7 @@ export default function StudentAchievements({
   const dataContext = useMemo(() => {
     const submissionsCount = studentSubmissions.length;
     const tempXP = realActivitiesXP + manualBonusXP;
-    const computedLevel = Math.floor(tempXP / 500) + 1;
+    const computedLevel = Math.max(1, Math.floor(Math.max(0, tempXP) / 500) + 1);
 
     return {
       submissionsCount,
@@ -869,12 +870,14 @@ export default function StudentAchievements({
     );
   }, [cleanEmail, studentSubmissions, realActiveSeconds, chatQueriesCount, notebookStats, weeklyCycle]);
 
-  const currentLevel = Math.floor(totalXP / 500) + 1;
-  const xpInLevel = totalXP % 500;
-  const xpRemaining = 500 - xpInLevel;
-  const levelFillPct = (xpInLevel / 500) * 100;
+  const isNegativeXP = totalXP < 0;
+  const currentLevel = isNegativeXP ? 0 : Math.floor(totalXP / 500) + 1;
+  const xpInLevel = isNegativeXP ? totalXP : totalXP % 500;
+  const xpRemaining = isNegativeXP ? Math.abs(totalXP) : 500 - xpInLevel;
+  const levelFillPct = isNegativeXP ? 0 : (xpInLevel / 500) * 100;
 
   const levelTitle = useMemo(() => {
+    if (totalXP < 0) return 'Saldo Negativo (Penalidade Disciplinar por Violações/Cola)';
     if (currentLevel < 5) return 'Aspirante Athenas';
     if (currentLevel < 10) return 'Estudante Dedicado';
     if (currentLevel < 20) return 'Investigador Científico';
@@ -882,7 +885,7 @@ export default function StudentAchievements({
     if (currentLevel < 40) return 'Especialista das Ciências';
     if (currentLevel < 50) return 'Mestre da Sabedoria';
     return 'Erudito Athenas Supremo';
-  }, [currentLevel]);
+  }, [totalXP, currentLevel]);
 
   // FETCH REAL PLATFORM RANKING DATA (ONLY REAL ACCOUNTS - NO FAKE / DEMO ROSTER!)
   const fetchRankingData = async () => {
@@ -897,6 +900,23 @@ export default function StudentAchievements({
           .select('id, email, nome_completo, turma, escola, cidade, role');
         dbProfiles = pData || [];
       } catch {}
+
+      let allDbSubmissions: any[] = [];
+      try {
+        const { data: sData } = await supabase
+          .from('wsm_mock_submissions')
+          .select('id, student_email, score, correct_count, telemetry, submitted_at');
+        allDbSubmissions = sData || [];
+      } catch {}
+
+      const submissionsByEmail: Record<string, any[]> = {};
+      allDbSubmissions.forEach((sub: any) => {
+        const sEmail = (sub.student_email || '').toLowerCase().trim();
+        if (sEmail) {
+          if (!submissionsByEmail[sEmail]) submissionsByEmail[sEmail] = [];
+          submissionsByEmail[sEmail].push(sub);
+        }
+      });
 
       try {
         const { data: gData } = await supabase
@@ -923,11 +943,12 @@ export default function StudentAchievements({
         processedEmails.add(pEmail);
 
         const isMe = pEmail === cleanEmail;
+        const studentSubs = isMe ? studentSubmissions : (submissionsByEmail[pEmail] || []);
         const weeklyXpValue = isMe
           ? currentStudentWeeklyXP
           : calculateStudentWeeklyXP(
               pEmail,
-              [],
+              studentSubs,
               0,
               0,
               { count: 0, pagesCount: 0, stampedCount: 0 },
@@ -1019,6 +1040,23 @@ export default function StudentAchievements({
   useEffect(() => {
     fetchRankingData();
   }, [cleanEmail, currentStudentWeeklyXP, activeView]);
+
+  // Auto-sync calculated total XP (including negative balances) to Supabase gamification table
+  useEffect(() => {
+    if (!cleanEmail) return;
+    const timer = setTimeout(async () => {
+      try {
+        await supabase
+          .from('wsm_student_gamification')
+          .upsert({
+            student_email: cleanEmail,
+            total_xp: totalXP,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'student_email' });
+      } catch {}
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [cleanEmail, totalXP]);
 
   const handleClaimMission = async (missionId: string, xpAmount: number) => {
     if (claimedMissions[missionId]) return;
@@ -1220,15 +1258,17 @@ export default function StudentAchievements({
                 Todos os dados exibidos aqui refletem <strong className="text-[#55e6b5]">estritamente o uso real da sua conta</strong>:
               </p>
               <ul className="list-disc pl-5 space-y-1.5 text-[#f1f5f3]">
-                <li><strong>Simulados Entregues:</strong> +100 XP por prova enviada + 20 XP por questão correta.</li>
-                <li><strong>Gabarito Perfeito / Foco 100%:</strong> +150 XP por nota 10,0 e +50 XP por provas sem trocar de aba.</li>
+                <li><strong>⭐ Conversão Real de Nota em XP:</strong> Suas notas nos simulados se convertem diretamente em XP considerável (ex: Nota 10,0 = <span className="text-[#e4bf74] font-bold">+1.000 XP</span>; Nota 8,5 = <span className="text-[#55e6b5] font-bold">+850 XP</span>; Nota 5,0 = +500 XP) + 20 XP por questão acertada.</li>
+                <li><strong>Gabarito Perfeito & Integridade:</strong> +250 XP adicionais por gabaritar (nota 10) e +100 XP por simulados sem qualquer troca de aba.</li>
+                <li><strong>⚠️ Penalidades Severas por Violações & Cola:</strong> Cada saída de aba ou tela cheia deduz <span className="text-rose-400 font-bold">-150 XP</span>. Colar trechos externos na prova deduz <span className="text-rose-400 font-bold">-300 XP</span>. Bloqueio por cola flagrante deduz <span className="text-rose-400 font-bold">-500 XP</span> com perda total de bônus!</li>
+                <li><strong>📉 XP Negativo (Saldo Devedor):</strong> Estudantes que cometem infrações de cola ou não participam podem ficar com <span className="text-rose-400 font-bold font-mono">XP Negativo (ex: -200 XP)</span>, igual saldo bancário devedor! Para quitar a dívida e voltar ao positivo, o aluno deve realizar novos simulados com integridade e boas notas.</li>
                 <li><strong>Caderno Virtual:</strong> +25 XP por página criada + 100 XP por Visto Pedagógico oficial do professor.</li>
                 <li><strong>Athenas IA:</strong> +15 XP por dúvida e pergunta formulada no Chat.</li>
-                <li><strong>Tempo Ativo de Estudos:</strong> +10 XP a cada 15 minutos com o site em uso.</li>
-                <li><strong>Ranking Semanal:</strong> Pontuação calculada do ciclo semanal de <strong className="text-[#e4bf74]">Domingo 18h a Domingo 18h (Horário de Brasília)</strong>.</li>
+                <li><strong>Tempo Ativo de Estudos:</strong> +10 XP a cada 15 minutos com o site em uso ativo.</li>
+                <li><strong>Ranking Semanal:</strong> Ciclo oficial reiniciado todos os domingos às <strong className="text-[#e4bf74]">18:00 (Horário de Brasília)</strong> com premiação de certificados em PNG para os 3 primeiros colocados.</li>
               </ul>
               <p className="text-[11px] text-[#77827c] border-t border-[#27322d] pt-2">
-                Nível atual: <strong>Nível {currentLevel}</strong> ({totalXP.toLocaleString('pt-BR')} XP total). Suba de nível a cada 500 XP acumulados.
+                Nível atual: <strong>{isNegativeXP ? 'Nível 0 (Em Débito)' : `Nível ${currentLevel}`}</strong> ({totalXP.toLocaleString('pt-BR')} XP total).
               </p>
             </div>
 
@@ -1419,54 +1459,86 @@ export default function StudentAchievements({
           <section className="grid grid-cols-1 lg:grid-cols-12 gap-3.5">
             
             {/* Level Banner Card (8 cols) */}
-            <article className="lg:col-span-8 bg-[#111715] border border-[#27322d] rounded-2xl p-5 sm:p-6 relative overflow-hidden flex flex-col justify-between space-y-4">
+            <article className={`lg:col-span-8 ${isNegativeXP ? 'bg-[#181012] border-rose-900/60 shadow-[0_0_25px_rgba(244,63,94,0.1)]' : 'bg-[#111715] border-[#27322d]'} border rounded-2xl p-5 sm:p-6 relative overflow-hidden flex flex-col justify-between space-y-4`}>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
                   {/* Emblem Badge Icon */}
-                  <div className="w-14 h-14 rounded-full border-2 border-[#e4bf74] bg-[#211b12] flex items-center justify-center text-[#e3bb74] shrink-0 shadow-lg relative">
-                    <Award className="w-7 h-7 stroke-[1.7]" />
-                  </div>
+                  {isNegativeXP ? (
+                    <div className="w-14 h-14 rounded-full border-2 border-rose-500/60 bg-[#2b1216] flex items-center justify-center text-rose-400 shrink-0 shadow-lg relative">
+                      <ShieldAlert className="w-7 h-7 stroke-[1.8]" />
+                    </div>
+                  ) : (
+                    <div className="w-14 h-14 rounded-full border-2 border-[#e4bf74] bg-[#211b12] flex items-center justify-center text-[#e3bb74] shrink-0 shadow-lg relative">
+                      <Award className="w-7 h-7 stroke-[1.7]" />
+                    </div>
+                  )}
 
                   <div>
-                    <div className="text-[10px] text-[#77827c] uppercase font-mono font-bold tracking-wider">
-                      NÍVEL {currentLevel}
+                    <div className={`text-[10px] uppercase font-mono font-bold tracking-wider ${isNegativeXP ? 'text-rose-400' : 'text-[#77827c]'}`}>
+                      {isNegativeXP ? 'CONTA NEGATIVADA · DÉBITO DISCIPLINAR' : `NÍVEL ${currentLevel}`}
                     </div>
                     <div className="text-lg sm:text-xl font-semibold text-[#f1f5f3] tracking-tight mt-0.5">
                       {levelTitle}
                     </div>
-                    <div className="text-[11px] text-[#d6b570] font-mono mt-0.5">
-                      Título Honorífico · Moldura Ouro
+                    <div className={`text-[11px] font-mono mt-0.5 ${isNegativeXP ? 'text-rose-400/90 font-medium' : 'text-[#d6b570]'}`}>
+                      {isNegativeXP ? '⚠️ Penalidades por cola ou infrações aplicadas' : 'Título Honorífico · Moldura Ouro'}
                     </div>
                   </div>
                 </div>
 
                 <div className="text-left sm:text-right">
-                  <div className="text-2xl sm:text-3xl font-semibold tracking-tight text-[#f1f5f3]">
-                    {totalXP.toLocaleString('pt-BR')} <small className="text-xs text-[#77827c]">XP</small>
+                  <div className={`text-2xl sm:text-3xl font-black tracking-tight font-mono ${isNegativeXP ? 'text-rose-400 drop-shadow-[0_0_8px_rgba(244,63,94,0.3)]' : 'text-[#f1f5f3]'}`}>
+                    {totalXP.toLocaleString('pt-BR')} <small className={`text-xs ${isNegativeXP ? 'text-rose-300 font-bold' : 'text-[#77827c]'}`}>XP</small>
                   </div>
-                  <div className="text-[10px] text-[#77827c] mt-0.5">experiência total calculada</div>
+                  <div className={`text-[10px] mt-0.5 ${isNegativeXP ? 'text-rose-400/90 font-semibold' : 'text-[#77827c]'}`}>
+                    {isNegativeXP ? 'saldo negativo devedor (em dívida)' : 'experiência total calculada'}
+                  </div>
                 </div>
               </div>
 
-              {/* Level Progress Bar */}
-              <div className="space-y-2 pt-2 border-t border-[#27322d]">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-[#a5b0aa]">Progresso para o nível {currentLevel + 1}</span>
-                  <strong className="text-[#f1f5f3] font-mono">{xpInLevel} / 500 XP</strong>
-                </div>
+              {/* Level Progress Bar or Negative Debt Recovery Bar */}
+              {isNegativeXP ? (
+                <div className="space-y-2 pt-2 border-t border-rose-900/40">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-rose-300 flex items-center gap-1.5 font-semibold">
+                      <AlertTriangle className="w-3.5 h-3.5 text-rose-400" />
+                      Saldo devedor por infrações disciplinares
+                    </span>
+                    <strong className="text-rose-400 font-mono font-bold">{totalXP} XP</strong>
+                  </div>
 
-                <div className="w-full bg-[#29312c] h-2.5 rounded-full overflow-hidden p-0.5">
-                  <div 
-                    className="bg-[#55e6b5] h-full rounded-full transition-all duration-500 shadow-sm"
-                    style={{ width: `${Math.min(100, Math.max(2, levelFillPct))}%` }}
-                  />
-                </div>
+                  <div className="w-full bg-[#2a1317] border border-rose-900/60 h-2.5 rounded-full overflow-hidden p-0.5">
+                    <div 
+                      className="bg-gradient-to-r from-rose-600 to-rose-400 h-full rounded-full transition-all duration-500 shadow-sm"
+                      style={{ width: '100%' }}
+                    />
+                  </div>
 
-                <div className="flex items-center justify-between text-[10px] text-[#77827c]">
-                  <span>Faltam <b className="text-[#a5b0aa]">{xpRemaining} XP</b> para subir de nível</span>
-                  <span>Próximo nível: <b className="text-[#a5b0aa]">Nível {currentLevel + 1}</b></span>
+                  <div className="flex items-center justify-between text-[10px] text-rose-300">
+                    <span>Recupere <b className="text-white font-mono font-bold">+{Math.abs(totalXP)} XP</b> com simulados sem infrações para zerar o débito</span>
+                    <span className="font-semibold text-rose-400 font-mono uppercase">Status: Conta no Vermelho</span>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="space-y-2 pt-2 border-t border-[#27322d]">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-[#a5b0aa]">Progresso para o nível {currentLevel + 1}</span>
+                    <strong className="text-[#f1f5f3] font-mono">{xpInLevel} / 500 XP</strong>
+                  </div>
+
+                  <div className="w-full bg-[#29312c] h-2.5 rounded-full overflow-hidden p-0.5">
+                    <div 
+                      className="bg-[#55e6b5] h-full rounded-full transition-all duration-500 shadow-sm"
+                      style={{ width: `${Math.min(100, Math.max(2, levelFillPct))}%` }}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between text-[10px] text-[#77827c]">
+                    <span>Faltam <b className="text-[#a5b0aa]">{xpRemaining} XP</b> para subir de nível</span>
+                    <span>Próximo nível: <b className="text-[#a5b0aa]">Nível {currentLevel + 1}</b></span>
+                  </div>
+                </div>
+              )}
             </article>
 
             {/* Streak Card (4 cols) */}
@@ -2157,7 +2229,9 @@ export default function StudentAchievements({
                         {/* Weekly XP */}
                         <td className="py-3 px-4 text-right">
                           <span className={`inline-block px-2.5 py-1 rounded-lg text-xs font-mono font-bold ${
-                            isTop1
+                            st.totalXp < 0
+                              ? 'bg-[#381419] text-[#ff6e78] border border-[#ff6e78]/40 shadow-sm'
+                              : isTop1
                               ? 'bg-[#332716] text-[#e4bf74] border border-[#e4bf74]/40'
                               : isMe
                               ? 'bg-[#1b3d30] text-[#55e6b5] border border-[#55e6b5]/40'
@@ -2176,12 +2250,12 @@ export default function StudentAchievements({
 
           {/* FLOATING / STICKY "GOMINHA" FOR LOGGED-IN STUDENT IF NOT IN TOP 30 */}
           {!isCurrentStudentInTop30 && currentStudentRankItem && (
-            <div className="p-4 bg-gradient-to-r from-[#182620] via-[#111715] to-[#182620] border-2 border-[#55e6b5] rounded-2xl shadow-[0_0_20px_rgba(85,230,181,0.15)] space-y-3">
+            <div className={`p-4 bg-gradient-to-r ${currentStudentWeeklyXP < 0 ? 'from-[#251216] via-[#111715] to-[#251216] border-2 border-rose-500 shadow-[0_0_20px_rgba(244,63,94,0.15)]' : 'from-[#182620] via-[#111715] to-[#182620] border-2 border-[#55e6b5] shadow-[0_0_20px_rgba(85,230,181,0.15)]'} rounded-2xl space-y-3`}>
               <div className="flex items-center justify-between border-b border-[#27322d] pb-2">
                 <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-[#55e6b5] animate-pulse" />
-                  <span className="text-xs font-bold text-[#55e6b5] uppercase tracking-wider">
-                    Sua Posição Oficial no Ranking Semanal
+                  <span className={`w-2.5 h-2.5 rounded-full animate-pulse ${currentStudentWeeklyXP < 0 ? 'bg-rose-500' : 'bg-[#55e6b5]'}`} />
+                  <span className={`text-xs font-bold uppercase tracking-wider ${currentStudentWeeklyXP < 0 ? 'text-rose-400' : 'text-[#55e6b5]'}`}>
+                    {currentStudentWeeklyXP < 0 ? 'Sua Posição Oficial no Ranking (Em Débito)' : 'Sua Posição Oficial no Ranking Semanal'}
                   </span>
                 </div>
                 <span className="text-xs text-[#a5b0aa] font-mono">
@@ -2190,9 +2264,9 @@ export default function StudentAchievements({
               </div>
 
               {/* Exact Gominha Row matching table layout */}
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3 bg-[#17251f] rounded-xl border border-[#55e6b5]/30">
+              <div className={`flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3 ${currentStudentWeeklyXP < 0 ? 'bg-[#251317] border border-rose-500/30' : 'bg-[#17251f] border border-[#55e6b5]/30'} rounded-xl`}>
                 <div className="flex items-center gap-3">
-                  <span className="w-9 h-9 rounded-xl bg-[#55e6b5] text-[#0b0f0e] font-black text-xs flex items-center justify-center font-mono shadow">
+                  <span className={`w-9 h-9 rounded-xl ${currentStudentWeeklyXP < 0 ? 'bg-rose-500 text-white' : 'bg-[#55e6b5] text-[#0b0f0e]'} font-black text-xs flex items-center justify-center font-mono shadow`}>
                     #{currentStudentRankNumber}
                   </span>
                   <div>
@@ -2200,7 +2274,7 @@ export default function StudentAchievements({
                       <span className="text-sm font-extrabold text-[#f1f5f3]">
                         {currentStudentRankItem.name}
                       </span>
-                      <span className="px-1.5 py-0.5 bg-[#55e6b5]/20 text-[#55e6b5] border border-[#55e6b5]/30 text-[9px] font-extrabold uppercase rounded">
+                      <span className={`px-1.5 py-0.5 text-[9px] font-extrabold uppercase rounded ${currentStudentWeeklyXP < 0 ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' : 'bg-[#55e6b5]/20 text-[#55e6b5] border border-[#55e6b5]/30'}`}>
                         VOCÊ
                       </span>
                     </div>
@@ -2214,10 +2288,10 @@ export default function StudentAchievements({
 
                 <div className="flex items-center gap-3 self-end sm:self-auto">
                   <div className="text-right">
-                    <div className="text-xs font-mono font-bold text-[#55e6b5]">
-                      {currentStudentWeeklyXP.toLocaleString('pt-BR')} XP
+                    <div className={`text-xs font-mono font-bold ${currentStudentWeeklyXP < 0 ? 'text-rose-400' : 'text-[#55e6b5]'}`}>
+                      {currentStudentWeeklyXP.toLocaleString('pt-BR')} XP {currentStudentWeeklyXP < 0 ? '(Negativado)' : ''}
                     </div>
-                    <div className="text-[10px] text-[#77827c]">XP Semanal</div>
+                    <div className="text-[10px] text-[#77827c]">{currentStudentWeeklyXP < 0 ? 'Saldo Devedor' : 'XP Semanal'}</div>
                   </div>
                 </div>
               </div>

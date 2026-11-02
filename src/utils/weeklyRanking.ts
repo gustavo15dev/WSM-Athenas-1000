@@ -117,7 +117,118 @@ export function getWeeklyCycleInfo(referenceDate?: Date): WeeklyCycleInfo {
 }
 
 /**
+ * Detailed breakdown of XP earned or penalized in a mock exam submission
+ */
+export interface SimuladoXpBreakdown {
+  scoreXp: number;
+  correctAnswersXp: number;
+  baseCompletionXp: number;
+  perfectScoreBonus: number;
+  integrityBonus: number;
+  penaltiesXp: number;
+  netXp: number;
+  hasCheatingViolation: boolean;
+  infractionDetails: string[];
+}
+
+/**
+ * Convert exam score to considerable XP and deduct heavy penalties for violations/cheating.
+ * Rules:
+ * 1. Simulado score converts directly to high XP: e.g. grade 10.0 = +1.000 XP, grade 8.5 = +850 XP, grade 5.0 = +500 XP.
+ * 2. Cheating violations / attempts (tab switches, pasted external text, auto-submit from limit) incur severe penalties.
+ * 3. Supports negative net XP when penalties exceed gains (e.g. -200 XP).
+ */
+export function computeSubmissionXP(s: any): SimuladoXpBreakdown {
+  const rawScore = Number(s.score) || 0;
+  // Convert score to a substantial amount of XP (0-10 scale -> * 100, 0-100 scale -> * 10)
+  const scoreXp = Math.round(rawScore <= 10 ? rawScore * 100 : rawScore * 10);
+  
+  const correctCount = Number(s.correct_count) || 0;
+  const correctAnswersXp = Math.round(correctCount * 20);
+
+  // Safely parse telemetry
+  let tel = s.telemetry;
+  if (typeof tel === 'string') {
+    try { tel = JSON.parse(tel); } catch { tel = {}; }
+  } else if (!tel || typeof tel !== 'object') {
+    tel = {};
+  }
+
+  const tabSwitches = Number(tel.tabSwitches || tel.tab_switch_count || 0);
+  const pastedCount = Array.isArray(tel.pasted_texts)
+    ? tel.pasted_texts.length
+    : (tel.pasted_texts ? 1 : 0);
+  const isViolationSubmitted = tel.violation_submitted === true || tel.violation === true;
+  const isAutoSubmitted = tel.auto_submitted_due_to_violations === true || isViolationSubmitted || tabSwitches >= 3;
+  const suspiciousCount = Array.isArray(tel.suspicious_events) ? tel.suspicious_events.length : 0;
+
+  // Severe Cheating / Anti-cheat Penalties (Deductions that can make XP negative!)
+  let penaltiesXp = 0;
+  const infractionDetails: string[] = [];
+
+  if (tabSwitches > 0) {
+    const swPenalty = tabSwitches * 150; // -150 XP per tab switch / window blur / screen exit
+    penaltiesXp += swPenalty;
+    infractionDetails.push(`${tabSwitches} saída(s) de tela/aba detectadas (-${swPenalty} XP)`);
+  }
+
+  if (pastedCount > 0) {
+    const pastePenalty = pastedCount * 300; // -300 XP per external text pasted into the exam
+    penaltiesXp += pastePenalty;
+    infractionDetails.push(`${pastedCount} colagem(ns) de texto externo (-${pastePenalty} XP)`);
+  }
+
+  if (isAutoSubmitted) {
+    const autoPenalty = 500; // -500 XP for severe violation / cola flagrante
+    penaltiesXp += autoPenalty;
+    infractionDetails.push(`Bloqueio de prova por violação de integridade/cola (-${autoPenalty} XP)`);
+  }
+
+  if (suspiciousCount > 0) {
+    const suspPenalty = suspiciousCount * 100;
+    penaltiesXp += suspPenalty;
+    infractionDetails.push(`${suspiciousCount} evento(s) suspeito(s) (-${suspPenalty} XP)`);
+  }
+
+  const hasCheatingViolation = penaltiesXp > 0 || isAutoSubmitted;
+
+  // Base completion & bonuses:
+  let baseCompletionXp = 0;
+  let perfectScoreBonus = 0;
+  let integrityBonus = 0;
+
+  if (isAutoSubmitted || tabSwitches >= 3) {
+    // If flagged or caught cheating, forfeit base completion and bonuses
+    baseCompletionXp = 0;
+    perfectScoreBonus = 0;
+    integrityBonus = 0;
+  } else {
+    baseCompletionXp = 100;
+    if (rawScore >= 9.8) perfectScoreBonus = 250;
+    if (tabSwitches === 0 && pastedCount === 0) integrityBonus = 100;
+  }
+
+  // Net XP = Earned (Exam Score + Answers + Completion) - Penalties
+  // If caught cheating / auto-submitted, even the score is invalidated
+  const positiveEarned = (isAutoSubmitted ? 0 : scoreXp) + (isAutoSubmitted ? 0 : correctAnswersXp) + baseCompletionXp + perfectScoreBonus + integrityBonus;
+  const netXp = positiveEarned - penaltiesXp;
+
+  return {
+    scoreXp,
+    correctAnswersXp,
+    baseCompletionXp,
+    perfectScoreBonus,
+    integrityBonus,
+    penaltiesXp,
+    netXp,
+    hasCheatingViolation,
+    infractionDetails
+  };
+}
+
+/**
  * Calculate weekly XP earned strictly between cycleStart and cycleEnd
+ * Allows negative XP when penalties outweigh study gains.
  */
 export function calculateStudentWeeklyXP(
   studentEmail: string,
@@ -140,11 +251,8 @@ export function calculateStudentWeeklyXP(
     if (s.submitted_at) {
       const subTime = new Date(s.submitted_at).getTime();
       if (subTime >= cStart && subTime <= cEnd) {
-        weeklyXp += 100; // Base completion
-        weeklyXp += (Number(s.correct_count) || 0) * 20; // 20 XP per correct question
-        if (Number(s.score) >= 10) weeklyXp += 150; // Perfect score bonus
-        const sw = Number(s.telemetry?.tabSwitches) || Number(s.telemetry?.tab_switch_count) || 0;
-        if (sw === 0) weeklyXp += 50; // Integrity bonus
+        const subXp = computeSubmissionXP(s);
+        weeklyXp += subXp.netXp;
       }
     }
   });
@@ -157,7 +265,8 @@ export function calculateStudentWeeklyXP(
   weeklyXp += Math.min(notebookStats.pagesCount, 20) * 25;
   weeklyXp += Math.min(chatQueriesCount, 30) * 15;
 
-  return Math.max(120, weeklyXp); // Default minimum base participation for active accounts
+  // STRICTLY allow negative XP (like bank balance in the red) - NO Math.max(0, ...) or Math.max(120, ...)
+  return weeklyXp;
 }
 
 /**
