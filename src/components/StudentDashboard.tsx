@@ -48,7 +48,10 @@ import {
   Check,
   ShieldCheck,
   ArrowLeft,
-  User
+  User,
+  Award,
+  Flame,
+  Star
 } from 'lucide-react';
 import { matchesStudentTarget, matchesStudentExam, formatTargetDisplayName } from '../utils/targetMatcher';
 import { parseExamSettings, cleanExamContent, cleanNotificationMessage, formatExamDateDisplay, cleanExamObservations, extractExamTime } from '../utils/examSettings';
@@ -76,6 +79,7 @@ import BrowserNotificationPrompt from './BrowserNotificationPrompt';
 import VirtualNotebook from './VirtualNotebook';
 import StudentProgress from './StudentProgress';
 import StudentAnnouncementBanner from './StudentAnnouncementBanner';
+import StudentAchievements from './StudentAchievements';
 import { startRealtimeNotificationListener } from '../utils/browserNotifications';
 import { supabase } from '../supabase';
 import { 
@@ -106,12 +110,12 @@ export default function StudentDashboard({
   onToggleTask 
 }: StudentDashboardProps) {
   
-  const [activeTab, setActiveTab] = useState<'inicio' | 'mural' | 'calendario' | 'conversas' | 'caderno' | 'wsm_athenas' | 'simulados' | 'progresso'>('inicio');
+  const [activeTab, setActiveTab] = useState<'inicio' | 'mural' | 'calendario' | 'conversas' | 'caderno' | 'wsm_athenas' | 'simulados' | 'progresso' | 'conquistas'>('inicio');
   const [isExamActive, setIsExamActive] = useState(false);
   const [isTabTransitioning, setIsTabTransitioning] = useState(false);
   const [hasUnsavedNotebook, setHasUnsavedNotebook] = useState(false);
   const [showUnsavedModal, setShowUnsavedModal] = useState(false);
-  const [pendingTargetTab, setPendingTargetTab] = useState<'inicio' | 'mural' | 'calendario' | 'conversas' | 'caderno' | 'wsm_athenas' | 'simulados' | 'progresso' | null>(null);
+  const [pendingTargetTab, setPendingTargetTab] = useState<'inicio' | 'mural' | 'calendario' | 'conversas' | 'caderno' | 'wsm_athenas' | 'simulados' | 'progresso' | 'conquistas' | null>(null);
 
   // Explicit active class context for multi-room students
   const [activeTurma, setActiveTurma] = useState<string>(() => {
@@ -2817,6 +2821,24 @@ export default function StudentDashboard({
               <span className={isSidebarCollapsed ? 'text-[9.5px] font-medium leading-normal tracking-wide block truncate w-full' : 'truncate'}>Meu Progresso</span>
             </button>
 
+            {/* NEW Jornada & Conquistas Tab */}
+            <button
+              id="student-tab-conquistas"
+              onClick={() => handleTabClick('conquistas')}
+              className={`${
+                isSidebarCollapsed 
+                  ? 'w-full flex flex-col items-center justify-center py-2 px-1 text-[10px] text-center gap-1' 
+                  : 'w-full flex items-center gap-3 px-3.5 py-2.5 text-xs'
+              } rounded-xl font-semibold transition-all border cursor-pointer ${
+                activeTab === 'conquistas'
+                  ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/15 font-bold shadow-[0_0_12px_rgba(30, 185, 150,0.03)]'
+                  : 'bg-transparent text-neutral-400 border-transparent hover:bg-neutral-900/40 hover:text-neutral-200'
+              }`}
+            >
+              <Award className={`${isSidebarCollapsed ? 'w-5 h-5' : 'w-4 h-4'} text-emerald-400`} />
+              <span className={isSidebarCollapsed ? 'text-[9.5px] font-medium leading-normal tracking-wide block truncate w-full' : 'truncate'}>Conquistas</span>
+            </button>
+
             {/* Ouvir música ambiente Tab */}
             <button
               id="student-tab-musica"
@@ -3044,6 +3066,19 @@ export default function StudentDashboard({
               <span>Progresso</span>
             </button>
 
+            {/* Mobile Conquistas Button */}
+            <button
+              onClick={() => handleTabClick('conquistas')}
+              className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-2 py-2 rounded-xl text-[11px] font-semibold transition-all border shrink-0 ${
+                activeTab === 'conquistas' 
+                  ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20' 
+                  : 'bg-neutral-900/60 text-neutral-450 border-transparent hover:text-neutral-200'
+              }`}
+            >
+              <Award className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Conquistas</span>
+            </button>
+
 
             <button
               onClick={() => {
@@ -3191,12 +3226,22 @@ export default function StudentDashboard({
             openTimeSeconds={openTime}
             activeTimeSeconds={activeTime}
           />
+        ) : activeTab === 'conquistas' ? (
+          <StudentAchievements
+            userEmail={email}
+            userName={profile?.nome_completo || 'Aluno'}
+            userTurma={activeTurma || profile?.turma || ''}
+            studentSubmissions={studentSubmissions}
+            mockExams={mockExams}
+            openTimeSeconds={openTime}
+            activeTimeSeconds={activeTime}
+          />
         ) : (
           /* Main Dashboard Content Layout (Início) */
           <div className="max-w-4xl mx-auto w-full space-y-10 animate-fadeIn pb-12">
             
             {/* Banner Mostrador de Anúncios / Destaques Rotativo (Troca a cada 5 segundos) */}
-            <StudentAnnouncementBanner onNavigate={handleTabClick} />
+            <StudentAnnouncementBanner onNavigate={handleTabClick} userEmail={email} />
 
             {/* CARDS VERMELHOS DE NOTIFICAÇÕES (Simulados, Provas e Avisos Pendentes) */}
             {(() => {

@@ -20,6 +20,7 @@ import StudentSimulados from "./StudentSimulados";
 import StudentAnnouncements from "./StudentAnnouncements";
 import type { VirtualClass, UserProfile } from "../types";
 import { areTurmasMatching } from "../utils/profileDb";
+import { ClassIconDisplay } from "./ClassIconDisplay";
 
 interface StudentVirtualClassesProps {
   email: string;
@@ -396,14 +397,14 @@ export default function StudentVirtualClasses({
                 >
                   <div className="flex justify-between items-start gap-2">
                     <div className="flex items-center gap-3">
-                      <div className={`p-2.5 rounded-xl border ${
+                      <div className={`p-2.5 rounded-xl border flex items-center justify-center ${
                         isActive
                           ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-300"
                           : hasNotif
                           ? "bg-red-500/10 border-red-500/20 text-red-400"
                           : "bg-neutral-800/80 border-neutral-700 text-neutral-300"
                       }`}>
-                        <BookOpen className="w-5 h-5" />
+                        <ClassIconDisplay icon={vc?.room_icon} className="w-5 h-5" />
                       </div>
                     </div>
                     <div className="flex items-center gap-1.5 flex-wrap justify-end">

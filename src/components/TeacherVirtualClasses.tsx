@@ -46,6 +46,7 @@ import { areTurmasMatching, areClassNamesDuplicate } from "../utils/profileDb";
 import { sendBrowserNotification } from "../utils/browserNotifications";
 import PublishSuccessModal from "./PublishSuccessModal";
 import { getUniqueRA } from "../types";
+import { ClassIconDisplay, CLASS_ICON_OPTIONS } from "./ClassIconDisplay";
 
 // Recharts components
 import {
@@ -367,6 +368,45 @@ export default function TeacherVirtualClasses({
       setVirtualClasses(parentVirtualClasses);
     }
   }, [parentVirtualClasses]);
+  const [newClassIcon, setNewClassIcon] = useState<string>("BookOpen");
+  const [editingIconClass, setEditingIconClass] = useState<any | null>(null);
+  const [selectedIconToSave, setSelectedIconToSave] = useState<string>("BookOpen");
+  const [isSavingIcon, setIsSavingIcon] = useState(false);
+
+  const handleSaveClassIcon = async (classId: string, iconKey: string) => {
+    setIsSavingIcon(true);
+    try {
+      const { error } = await supabase
+        .from("wsm_virtual_classes")
+        .update({ room_icon: iconKey })
+        .eq("id", classId);
+        
+      if (error) {
+        const isColumnMissing = error.code === 'PGRST204' || (error.message && error.message.includes('room_icon'));
+        if (isColumnMissing) {
+          alert(
+            "A coluna 'room_icon' ainda não foi criada no Supabase.\n\nExecute o seguinte SQL no seu Editor SQL do Supabase:\n\nALTER TABLE wsm_virtual_classes ADD COLUMN IF NOT EXISTS room_icon text DEFAULT 'BookOpen';"
+          );
+          return;
+        }
+        throw error;
+      }
+
+      setVirtualClasses((prev) =>
+        prev.map((c) => (c.id === classId ? { ...c, room_icon: iconKey } : c))
+      );
+      setEditingIconClass(null);
+      if (onRefreshData) {
+        await onRefreshData();
+      }
+    } catch (err: any) {
+      console.error("Error updating room icon:", err);
+      alert("Erro ao atualizar o ícone da sala. Tente novamente.");
+    } finally {
+      setIsSavingIcon(false);
+    }
+  };
+
   const [isCreatingClass, setIsCreatingClass] = useState(false);
   const [newClassName, setNewClassName] = useState("");
   const [createClassError, setCreateClassError] = useState<string | null>(null);
@@ -667,20 +707,46 @@ export default function TeacherVirtualClasses({
         }
       }
 
-      const { data, error } = await supabase
+      let data: any = null;
+      let error: any = null;
+
+      // 1st attempt: try inserting with room_icon
+      const res1 = await supabase
         .from("wsm_virtual_classes")
         .insert({
           name: trimmedName,
           teacher_email: email.toLowerCase().trim(),
           teacher_id: teacherId,
           access_code: code,
-          student_emails: []
+          student_emails: [],
+          room_icon: newClassIcon,
         })
         .select()
         .single();
-        
+
+      if (res1.error && (res1.error.code === 'PGRST204' || (res1.error.message && res1.error.message.includes('room_icon')))) {
+        // Fallback 2nd attempt: insert without room_icon if DB schema lacks column
+        const res2 = await supabase
+          .from("wsm_virtual_classes")
+          .insert({
+            name: trimmedName,
+            teacher_email: email.toLowerCase().trim(),
+            teacher_id: teacherId,
+            access_code: code,
+            student_emails: [],
+          })
+          .select()
+          .single();
+
+        data = res2.data ? { ...res2.data, room_icon: newClassIcon } : null;
+        error = res2.error;
+      } else {
+        data = res1.data;
+        error = res1.error;
+      }
+
       if (error) throw error;
-      
+
       // Synchronize teacher profile anos_lecionados
       try {
         const { data: profData } = await supabase
@@ -705,6 +771,7 @@ export default function TeacherVirtualClasses({
 
       setVirtualClasses([data, ...virtualClasses]);
       setNewClassName("");
+      setNewClassIcon("BookOpen");
       setCreateClassError(null);
       setIsCreatingClass(false);
 
@@ -2232,7 +2299,7 @@ export default function TeacherVirtualClasses({
                         <div className="flex justify-between items-start">
                           <div className="flex items-center gap-3">
                             <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-                              <BookOpen className="w-5 h-5" />
+                              <ClassIconDisplay icon={vc?.room_icon} className="w-5 h-5" />
                             </div>
                             {vc && (
                               <div className="text-left">
@@ -2243,9 +2310,25 @@ export default function TeacherVirtualClasses({
                               </div>
                             )}
                           </div>
-                          <span className="text-[9px] font-mono bg-neutral-950 border border-neutral-850 text-neutral-400 px-2 py-0.5 rounded">
-                            {vc ? 'Virtual' : 'Oficial'}
-                          </span>
+                          <div className="flex items-center gap-1.5">
+                            {vc && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingIconClass(vc);
+                                  setSelectedIconToSave(vc.room_icon || "BookOpen");
+                                }}
+                                className="text-[9px] font-mono bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-neutral-300 hover:text-emerald-400 px-2 py-0.5 rounded transition-colors cursor-pointer"
+                                title="Alterar o ícone personalizado da turma"
+                              >
+                                Trocar ícone
+                              </button>
+                            )}
+                            <span className="text-[9px] font-mono bg-neutral-950 border border-neutral-850 text-neutral-400 px-2 py-0.5 rounded">
+                              {vc ? 'Virtual' : 'Oficial'}
+                            </span>
+                          </div>
                         </div>
 
                         <div>
@@ -2305,7 +2388,10 @@ export default function TeacherVirtualClasses({
                   </button>
                   <div>
                     <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2.5">
+                        <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                          <ClassIconDisplay icon={virtualClasses.find(vc => vc.name === selectedClass)?.room_icon} className="w-5 h-5" />
+                        </div>
                         <h4 className="text-base font-bold text-neutral-100 font-display">
                           Sala {selectedClass}
                         </h4>
@@ -3259,6 +3345,29 @@ export default function TeacherVirtualClasses({
                   />
                 </div>
 
+                <div>
+                  <label className="block text-xs font-semibold text-neutral-300 mb-1.5 uppercase tracking-wider font-mono">
+                    Ícone da Sala
+                  </label>
+                  <div className="grid grid-cols-5 gap-2 max-h-36 overflow-y-auto p-1.5 bg-neutral-950 border border-neutral-800 rounded-xl">
+                    {CLASS_ICON_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => setNewClassIcon(opt.id)}
+                        className={`p-2 rounded-lg flex items-center justify-center transition-all cursor-pointer border ${
+                          newClassIcon === opt.id
+                            ? "bg-emerald-500/20 border-emerald-500 text-emerald-400 font-bold"
+                            : "bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-neutral-200 hover:border-neutral-700"
+                        }`}
+                        title={opt.label}
+                      >
+                        <ClassIconDisplay icon={opt.id} className="w-4 h-4" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 {createClassError && (
                   <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-center gap-2 font-medium animate-fadeIn">
                     <AlertTriangle className="w-4 h-4 shrink-0 text-red-400" />
@@ -3290,6 +3399,85 @@ export default function TeacherVirtualClasses({
                       </>
                     ) : (
                       <span>Criar Sala</span>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal: Trocar Ícone da Sala */}
+      <AnimatePresence>
+        {editingIconClass && (
+          <div className="fixed inset-0 bg-neutral-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="bg-neutral-900 border border-neutral-800 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl relative space-y-6"
+            >
+              <button
+                type="button"
+                onClick={() => setEditingIconClass(null)}
+                className="absolute top-5 right-5 p-2 text-neutral-400 hover:text-white bg-neutral-800/50 hover:bg-neutral-800 rounded-full transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+
+              <div className="space-y-2">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mb-4">
+                  <ClassIconDisplay icon={selectedIconToSave} className="w-6 h-6" />
+                </div>
+                <h3 className="text-xl font-bold text-neutral-100 font-display">
+                  Personalizar Ícone da Sala
+                </h3>
+                <p className="text-xs text-neutral-400">
+                  Escolha um ícone para a turma <strong className="text-emerald-400">{editingIconClass.name}</strong>. Ele será exibido em tempo real para todos os alunos matriculados nesta sala.
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                <div className="grid grid-cols-5 gap-2 max-h-48 overflow-y-auto p-2 bg-neutral-950 border border-neutral-800 rounded-xl">
+                  {CLASS_ICON_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setSelectedIconToSave(opt.id)}
+                      className={`p-2.5 rounded-xl flex items-center justify-center transition-all cursor-pointer border ${
+                        selectedIconToSave === opt.id
+                          ? "bg-emerald-500/20 border-emerald-500 text-emerald-400 font-bold scale-105"
+                          : "bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-neutral-200 hover:border-neutral-700"
+                      }`}
+                      title={opt.label}
+                    >
+                      <ClassIconDisplay icon={opt.id} className="w-5 h-5" />
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex items-center justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditingIconClass(null)}
+                    className="px-4 py-2.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-semibold text-xs rounded-xl transition-colors cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSaveClassIcon(editingIconClass.id, selectedIconToSave)}
+                    disabled={isSavingIcon}
+                    className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-neutral-950 font-bold text-xs rounded-xl transition-all cursor-pointer shadow-lg shadow-emerald-500/20 flex items-center gap-2"
+                  >
+                    {isSavingIcon ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>Salvando...</span>
+                      </>
+                    ) : (
+                      <span>Salvar Ícone</span>
                     )}
                   </button>
                 </div>

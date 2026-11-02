@@ -143,6 +143,7 @@ export interface VirtualClass {
   teacher_id?: string;
   student_emails: string[];
   access_code?: string;
+  room_icon?: string;
   created_at?: string;
 }
 

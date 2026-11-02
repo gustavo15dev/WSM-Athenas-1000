@@ -892,8 +892,6 @@ export default function TeacherDashboard({
   useEffect(() => {
     if (profile) {
       loadTeacherData();
-      const interval = setInterval(loadTeacherData, 5000);
-      return () => clearInterval(interval);
     }
   }, [profile]);
 

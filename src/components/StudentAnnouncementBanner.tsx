@@ -1,61 +1,99 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Sparkles, ClipboardList, BookOpen, TrendingUp, ChevronRight, Bot } from 'lucide-react';
+import { Sparkles, ClipboardList, BookOpen, TrendingUp, ChevronRight, Trophy } from 'lucide-react';
+import { getStudentCertificates, StudentCertificateItem } from '../utils/weeklyRanking';
 
 interface StudentAnnouncementBannerProps {
-  onNavigate: (tab: 'wsm_athenas' | 'simulados' | 'caderno' | 'progresso' | 'mural') => void;
+  onNavigate: (tab: 'wsm_athenas' | 'simulados' | 'caderno' | 'progresso' | 'mural' | 'conquistas') => void;
+  userEmail?: string;
 }
 
-export default function StudentAnnouncementBanner({ onNavigate }: StudentAnnouncementBannerProps) {
+export default function StudentAnnouncementBanner({ onNavigate, userEmail }: StudentAnnouncementBannerProps) {
   const [slideIndex, setSlideIndex] = useState(0);
+  const [userCerts, setUserCerts] = useState<StudentCertificateItem[]>([]);
 
-  const slides = [
-    {
-      id: 'athenas_ai',
-      badge: 'TUTOR INTELIGENTE',
-      iconUrl: 'https://res.cloudinary.com/dqx8p8orf/image/upload/f_auto/q_auto/gallery_image_20260927_114822-sem-mexer-em-mais-nada-nesse-boneco-mantenha-a-con-removebg-preview_3_ewaz6x.png',
-      title: 'Athenas AI',
-      subtitle: 'Tire dúvidas em tempo real, peça resumos de matérias e mapas de estudos com seu tutor de IA.',
-      buttonText: 'Ir para o Athenas AI',
-      targetTab: 'wsm_athenas' as const,
-      accentColor: '#55e6b5'
-    },
-    {
-      id: 'simulados',
-      badge: 'PROVAS & AVALIAÇÕES',
-      iconUrl: null,
-      iconComponent: ClipboardList,
-      title: 'Simulados Online',
-      subtitle: 'Pratique com simulados agendados por seus professores e receba gabarito com nota imediata.',
-      buttonText: 'Ver Simulados',
-      targetTab: 'simulados' as const,
-      accentColor: '#83a9ff'
-    },
-    {
-      id: 'caderno',
-      badge: 'ANOTAÇÕES OFICIAIS',
-      iconUrl: null,
-      iconComponent: BookOpen,
-      title: 'Caderno Virtual de Biologia',
-      subtitle: 'Escreva suas folhas de estudo e solicite carimbos e vistos pedagógicos dos professores.',
-      buttonText: 'Abrir Caderno',
-      targetTab: 'caderno' as const,
-      accentColor: '#b7a0ff'
-    },
-    {
-      id: 'progresso',
-      badge: 'DESEMPENHO',
-      iconUrl: null,
-      iconComponent: TrendingUp,
-      title: 'Minhas Métricas & Gráficos',
-      subtitle: 'Acompanhe a evolução das suas notas, mapa de calor de presença e horas ativas de estudo.',
-      buttonText: 'Ver Minhas Métricas',
-      targetTab: 'progresso' as const,
-      accentColor: '#efbd77'
+  useEffect(() => {
+    if (userEmail) {
+      getStudentCertificates(userEmail).then((certs) => {
+        if (certs && certs.length > 0) {
+          setUserCerts(certs);
+        }
+      }).catch(() => {});
     }
-  ];
+  }, [userEmail]);
 
-  // Auto rotation every 5 seconds (5000ms)
+  const latestCert = userCerts[0];
+
+  const slides = useMemo(() => {
+    const defaultSlides = [
+      {
+        id: 'athenas_ai',
+        badge: 'TUTOR INTELIGENTE',
+        iconUrl: 'https://res.cloudinary.com/dqx8p8orf/image/upload/f_auto/q_auto/gallery_image_20260927_114822-sem-mexer-em-mais-nada-nesse-boneco-mantenha-a-con-removebg-preview_3_ewaz6x.png',
+        iconComponent: null,
+        title: 'Athenas AI',
+        subtitle: 'Tire dúvidas em tempo real, peça resumos de matérias e mapas de estudos com seu tutor de IA.',
+        buttonText: 'Ir para o Athenas AI',
+        targetTab: 'wsm_athenas' as const,
+        accentColor: '#55e6b5'
+      },
+      {
+        id: 'simulados',
+        badge: 'PROVAS & AVALIAÇÕES',
+        iconUrl: null,
+        iconComponent: ClipboardList,
+        title: 'Simulados Online',
+        subtitle: 'Pratique com simulados agendados por seus professores e receba gabarito com nota imediata.',
+        buttonText: 'Ver Simulados',
+        targetTab: 'simulados' as const,
+        accentColor: '#83a9ff'
+      },
+      {
+        id: 'caderno',
+        badge: 'ANOTAÇÕES OFICIAIS',
+        iconUrl: null,
+        iconComponent: BookOpen,
+        title: 'Caderno Virtual de Biologia',
+        subtitle: 'Escreva suas folhas de estudo e solicite carimbos e vistos pedagógicos dos professores.',
+        buttonText: 'Abrir Caderno',
+        targetTab: 'caderno' as const,
+        accentColor: '#b7a0ff'
+      },
+      {
+        id: 'progresso',
+        badge: 'DESEMPENHO',
+        iconUrl: null,
+        iconComponent: TrendingUp,
+        title: 'Minhas Métricas & Gráficos',
+        subtitle: 'Acompanhe a evolução das suas notas, mapa de calor de presença e horas ativas de estudo.',
+        buttonText: 'Ver Minhas Métricas',
+        targetTab: 'progresso' as const,
+        accentColor: '#efbd77'
+      }
+    ];
+
+    if (latestCert) {
+      const placeText = latestCert.place === 'gold' ? '1º Lugar (Ouro)' : latestCert.place === 'silver' ? '2º Lugar (Prata)' : '3º Lugar (Bronze)';
+      return [
+        {
+          id: 'certificate_winner_slide',
+          badge: '🏆 CERTIFICADO DE RECONHECIMENTO',
+          iconUrl: null,
+          iconComponent: Trophy,
+          title: `Parabéns! Você conquistou o ${placeText} no Ranking Semanal!`,
+          subtitle: `Sua dedicação no ciclo ${latestCert.cycleRangeText} foi reconhecida! Clique para visualizar e baixar seu Certificado em PNG.`,
+          buttonText: 'Baixar Certificado PNG',
+          targetTab: 'conquistas' as const,
+          accentColor: '#e4bf74'
+        },
+        ...defaultSlides
+      ];
+    }
+
+    return defaultSlides;
+  }, [latestCert]);
+
+  // Auto rotation every 5 seconds
   useEffect(() => {
     const timer = setInterval(() => {
       setSlideIndex((prev) => (prev + 1) % slides.length);
@@ -63,7 +101,7 @@ export default function StudentAnnouncementBanner({ onNavigate }: StudentAnnounc
     return () => clearInterval(timer);
   }, [slides.length]);
 
-  const current = slides[slideIndex];
+  const current = slides[slideIndex] || slides[0];
   const IconComp = current.iconComponent;
 
   return (
@@ -131,6 +169,7 @@ export default function StudentAnnouncementBanner({ onNavigate }: StudentAnnounc
             <button
               onClick={() => onNavigate(current.targetTab)}
               className="px-4 py-2.5 bg-[#55e6b5] hover:bg-[#42d4a3] active:scale-98 text-[#0b0f0e] font-extrabold rounded-xl text-xs transition-all shadow-md flex items-center gap-2 cursor-pointer shrink-0"
+              style={{ backgroundColor: current.id === 'certificate_winner_slide' ? '#e4bf74' : undefined }}
             >
               <span>{current.buttonText}</span>
               <ChevronRight className="w-4 h-4 stroke-[2.5]" />
@@ -145,6 +184,7 @@ export default function StudentAnnouncementBanner({ onNavigate }: StudentAnnounc
                   className={`h-1.5 rounded-full transition-all cursor-pointer ${
                     slideIndex === idx ? 'w-5 bg-[#55e6b5]' : 'w-1.5 bg-[#27322d] hover:bg-[#77827c]'
                   }`}
+                  style={{ backgroundColor: slideIndex === idx && s.id === 'certificate_winner_slide' ? '#e4bf74' : undefined }}
                   aria-label={`Slide ${idx + 1}`}
                 />
               ))}
