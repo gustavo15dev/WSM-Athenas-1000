@@ -1943,20 +1943,26 @@ export default function StudentDashboard({
     const cleanEmail = (email || '').toLowerCase().trim();
 
     try {
-      // Fetch all virtual classes to perform resilient matching (handles numeric vs text access codes)
+      // 1. Fetch all virtual classes to perform resilient matching (handles numeric vs text access codes safely)
       const { data: allVClasses, error: fetchErr } = await supabase
         .from('wsm_virtual_classes')
         .select('*');
 
       if (fetchErr) {
-        console.warn('Error querying virtual classes:', fetchErr);
+        console.warn('[handleJoinClassFromWelcomeCard] Error querying virtual classes:', fetchErr);
       }
 
-      const vClass = (allVClasses || []).find((vc: any) => 
-        String(vc.access_code || '').trim() === cleanCode ||
-        areTurmasMatching(vc.name, cleanCode) ||
-        areTurmasMatching(vc.access_code, cleanCode)
-      );
+      const vClass = (allVClasses || []).find((vc: any) => {
+        if (!vc) return false;
+        const codeStr = String(vc.access_code ?? '').trim();
+        const nameStr = String(vc.name ?? '').trim();
+        return (
+          codeStr === cleanCode ||
+          nameStr === cleanCode ||
+          areTurmasMatching(nameStr, cleanCode) ||
+          areTurmasMatching(codeStr, cleanCode)
+        );
+      });
 
       if (!vClass) {
         setWelcomeJoinError('Código de sala não encontrado. Verifique os 4 dígitos com o seu professor e tente novamente.');
@@ -1964,49 +1970,72 @@ export default function StudentDashboard({
         return;
       }
 
+      console.log('[handleJoinClassFromWelcomeCard] Found matching virtual class:', vClass);
+
+      // 2. Parse existing student emails in the class
       let currentEmails: string[] = [];
       if (Array.isArray(vClass.student_emails)) {
-        currentEmails = vClass.student_emails;
+        currentEmails = [...vClass.student_emails];
       } else if (typeof vClass.student_emails === 'string') {
-        try { currentEmails = JSON.parse(vClass.student_emails); } catch { currentEmails = vClass.student_emails.split(',').map((s: string) => s.trim()).filter(Boolean); }
+        try { 
+          currentEmails = JSON.parse(vClass.student_emails); 
+        } catch { 
+          currentEmails = vClass.student_emails.split(',').map((s: string) => s.trim()).filter(Boolean); 
+        }
       }
 
-      if (!currentEmails.map((e: string) => String(e).toLowerCase().trim()).includes(cleanEmail)) {
+      // 3. Add student email to virtual class if not present
+      const normalizedEmails = currentEmails.map((e: string) => String(e).toLowerCase().trim());
+      if (!normalizedEmails.includes(cleanEmail)) {
         currentEmails.push(cleanEmail);
-        await supabase
+        const { error: vClassUpdateErr } = await supabase
           .from('wsm_virtual_classes')
           .update({ student_emails: currentEmails })
           .eq('id', vClass.id);
+
+        if (vClassUpdateErr) {
+          console.error('[handleJoinClassFromWelcomeCard] Error updating wsm_virtual_classes:', vClassUpdateErr);
+        } else {
+          console.log('[handleJoinClassFromWelcomeCard] Successfully updated wsm_virtual_classes for student:', cleanEmail);
+        }
       }
 
-      // Persist student profile update with turma and welcome_modal_dismissed
-      if (profile?.id) {
-        await supabase
+      // 4. Update student profile in wsm_user_profiles (by email and id)
+      try {
+        const { error: directUpdateErr } = await supabase
           .from('wsm_user_profiles')
           .update({ 
             turma: vClass.name,
             welcome_modal_dismissed: true
           })
-          .eq('id', profile.id);
+          .ilike('email', cleanEmail);
+
+        if (directUpdateErr) {
+          console.warn('[handleJoinClassFromWelcomeCard] Direct profile update warning:', directUpdateErr.message);
+        }
+      } catch (profErr) {
+        console.warn('[handleJoinClassFromWelcomeCard] Direct profile update exception:', profErr);
       }
-      
+
+      // 5. Ensure profile is safely upserted
       await safeUpsertUserProfile({
+        id: profile?.id,
         email: cleanEmail,
         role: 'student',
         turma: vClass.name,
         welcome_modal_dismissed: true,
         nome_completo: profile?.nome_completo || cleanEmail.split('@')[0],
-        numero_chamada: activeChamada || 1
+        numero_chamada: activeChamada || profile?.numero_chamada || 1
       });
 
-      // Local storage updates
+      // 6. Local storage updates
       try {
         localStorage.setItem(`wsm_active_student_class_${cleanEmail}`, vClass.name);
         localStorage.setItem(`wsm_profile_turma_${cleanEmail}`, vClass.name);
         localStorage.setItem(`wsm_dismissed_welcome_modal_${cleanEmail}`, 'true');
       } catch {}
 
-      // Synchronize React state immediately
+      // 7. Synchronize React state immediately and close welcome modal
       setProfile(prev => prev ? { 
         ...prev, 
         turma: vClass.name, 
@@ -2030,7 +2059,7 @@ export default function StudentDashboard({
       // Reload dashboard data for this class
       await loadData(vClass.name);
     } catch (err: any) {
-      console.error('Error joining virtual class:', err);
+      console.error('[handleJoinClassFromWelcomeCard] Fatal exception while joining virtual class:', err);
       setWelcomeJoinError(err.message || 'Erro ao entrar na sala. Tente novamente.');
     } finally {
       setWelcomeJoinLoading(false);
@@ -4622,11 +4651,6 @@ export default function StudentDashboard({
                 </div>
                 <button
                   type="submit"
-                  onClick={(e) => {
-                    if (welcomeJoinCode.trim().length === 4) {
-                      handleJoinClassFromWelcomeCard(e);
-                    }
-                  }}
                   disabled={welcomeJoinLoading || welcomeJoinCode.trim().length !== 4}
                   className="w-full sm:w-auto px-6 py-3 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed text-neutral-950 font-extrabold rounded-xl text-xs transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 shrink-0"
                 >

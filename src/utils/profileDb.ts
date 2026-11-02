@@ -1,7 +1,9 @@
 import { supabase } from '../supabase';
 
-export function normalizeTurmaToken(str: string): string {
-  return str
+export function normalizeTurmaToken(str: string | number | null | undefined): string {
+  if (str === null || str === undefined) return '';
+  const s = typeof str === 'string' ? str : String(str);
+  return s
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
@@ -10,8 +12,10 @@ export function normalizeTurmaToken(str: string): string {
     .trim();
 }
 
-export function extractCohortKey(str: string): string | null {
-  const cleaned = str
+export function extractCohortKey(str: string | number | null | undefined): string | null {
+  if (str === null || str === undefined) return null;
+  const s = typeof str === 'string' ? str : String(str);
+  const cleaned = s
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
@@ -22,16 +26,16 @@ export function extractCohortKey(str: string): string | null {
   return match ? match[1].toLowerCase() : null;
 }
 
-export function areClassNamesDuplicate(name1: string | null | undefined, name2: string | null | undefined): boolean {
-  if (!name1 || !name2) return false;
+export function areClassNamesDuplicate(name1: string | number | null | undefined, name2: string | number | null | undefined): boolean {
+  if (name1 === null || name1 === undefined || name2 === null || name2 === undefined) return false;
   const n1 = normalizeTurmaToken(name1);
   const n2 = normalizeTurmaToken(name2);
   if (!n1 || !n2) return false;
   return n1 === n2;
 }
 
-export function areTurmasMatching(t1: string | null | undefined, t2: string | null | undefined): boolean {
-  if (!t1 || !t2) return false;
+export function areTurmasMatching(t1: string | number | null | undefined, t2: string | number | null | undefined): boolean {
+  if (t1 === null || t1 === undefined || t2 === null || t2 === undefined) return false;
   const n1 = normalizeTurmaToken(t1);
   const n2 = normalizeTurmaToken(t2);
   if (!n1 || !n2) return false;
