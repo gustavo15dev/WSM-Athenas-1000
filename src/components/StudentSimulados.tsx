@@ -661,10 +661,20 @@ export default function StudentSimulados({
       const { data: dbExams, error: exErr } = await supabase
         .from('wsm_mock_exams')
         .select('*')
-        .neq('status', 'draft')
         .order('created_at', { ascending: false });
 
       if (!exErr && dbExams) {
+        const normalizedDbExams = dbExams.map((exam: any) => {
+          let qs = exam.questions;
+          if (typeof qs === 'string') {
+            try { qs = JSON.parse(qs); } catch { qs = []; }
+          }
+          return {
+            ...exam,
+            questions: Array.isArray(qs) ? qs : []
+          };
+        });
+
         // Find if studentClass matches any virtual class the student is in (by name, ID or access code)
         const selectedVC = isRoomContext
           ? (allDbVClasses.find((vc: any) => vc.name === studentClass || vc.id === studentClass || vc.access_code === studentClass || areTurmasMatching(vc.name, studentClass)) ||
@@ -680,7 +690,7 @@ export default function StudentSimulados({
         if (effectiveClass) studentVCIdentifiers.push(effectiveClass);
         if (studentClass) studentVCIdentifiers.push(studentClass);
 
-        const filteredExams = dbExams.filter((exam: any) => {
+        const filteredExams = normalizedDbExams.filter((exam: any) => {
           // ALWAYS include exams that the student has already submitted or started
           if (submittedExamIds.has(exam.id)) return true;
 
@@ -1230,8 +1240,40 @@ export default function StudentSimulados({
   }, [activeExam, examStartTime]);
 
   // Start exam trigger - asks for single-attempt confirmation
-  const handleStartExam = (exam: MockExam) => {
-    setShowConfirmStart(exam);
+  const handleStartExam = async (exam: MockExam) => {
+    let targetExam = exam;
+    let qs = targetExam.questions;
+    if (typeof qs === 'string') {
+      try { qs = JSON.parse(qs); } catch { qs = []; }
+      targetExam = { ...targetExam, questions: Array.isArray(qs) ? qs : [] };
+    }
+    setShowConfirmStart(targetExam);
+
+    // If questions aren't loaded yet, fetch immediately and update modal state
+    if (!targetExam.questions || targetExam.questions.length === 0) {
+      try {
+        const { data: freshExam } = await supabase
+          .from('wsm_mock_exams')
+          .select('*')
+          .eq('id', exam.id)
+          .maybeSingle();
+        if (freshExam) {
+          let fetchedQs = freshExam.questions;
+          if (typeof fetchedQs === 'string') {
+            try { fetchedQs = JSON.parse(fetchedQs); } catch { fetchedQs = []; }
+          }
+          const populatedExam = {
+            ...targetExam,
+            ...freshExam,
+            questions: Array.isArray(fetchedQs) ? fetchedQs : []
+          };
+          setShowConfirmStart(prev => prev && prev.id === exam.id ? populatedExam : prev);
+          setAvailableExams(prev => prev.map(e => e.id === exam.id ? populatedExam : e));
+        }
+      } catch (err) {
+        console.warn("Could not pre-load exam questions:", err);
+      }
+    }
   };
 
   // Actual confirm start exam inside modal
@@ -1240,12 +1282,46 @@ export default function StudentSimulados({
     setSubmitting(true);
 
     try {
+      // 0. Ensure we have complete exam data with questions (fetch fresh from Supabase if needed)
+      let fullExam: MockExam = { ...exam };
+      let examQuestions: MockExamQuestion[] = Array.isArray(fullExam.questions)
+        ? fullExam.questions
+        : typeof fullExam.questions === 'string'
+          ? (() => { try { return JSON.parse(fullExam.questions); } catch { return []; } })()
+          : [];
+
+      if ((!examQuestions || examQuestions.length === 0) && fullExam.id) {
+        try {
+          const { data: fetchedExam } = await supabase
+            .from('wsm_mock_exams')
+            .select('*')
+            .eq('id', fullExam.id)
+            .maybeSingle();
+
+          if (fetchedExam) {
+            let fetchedQs = fetchedExam.questions;
+            if (typeof fetchedQs === 'string') {
+              try { fetchedQs = JSON.parse(fetchedQs); } catch { fetchedQs = []; }
+            }
+            examQuestions = Array.isArray(fetchedQs) ? fetchedQs : [];
+            fullExam = {
+              ...fullExam,
+              ...fetchedExam,
+              questions: examQuestions
+            };
+            setAvailableExams(prev => prev.map(e => e.id === fullExam.id ? fullExam : e));
+          }
+        } catch (fetchExamErr) {
+          console.warn("Could not fetch full exam details in handleConfirmStartExam:", fetchExamErr);
+        }
+      }
+
       // 1. Check if they already have an existing submission for this exam
       const cleanEmail = (email || '').toLowerCase().trim();
       const { data: existing, error: exCheckErr } = await supabase
         .from('wsm_mock_submissions')
         .select('*')
-        .eq('mock_exam_id', exam.id)
+        .eq('mock_exam_id', fullExam.id)
         .ilike('student_email', cleanEmail);
 
       let subIdToUse: string | null = null;
@@ -1277,7 +1353,7 @@ export default function StudentSimulados({
           existingAnswers = unfinishedSub.answers || {};
           originalStartTime = unfinishedSub.telemetry?.started_at || unfinishedSub.submitted_at;
         } else {
-          const { settings } = parseExamSettings(exam.description);
+          const { settings } = parseExamSettings(fullExam.description);
           if (settings.is_controlled === true) {
             setErrorMsg("Você já realizou este simulado ou iniciou uma tentativa anterior. Não é permitido entrar novamente.");
             setSubmitting(false);
@@ -1288,16 +1364,16 @@ export default function StudentSimulados({
       }
 
       // Check if deadline has passed for new attempts
-      if (!subIdToUse && exam.deadline) {
-        if (new Date(exam.deadline).getTime() < Date.now()) {
-          setErrorMsg(`O prazo para realização deste simulado foi encerrado em ${new Date(exam.deadline).toLocaleString('pt-BR')}. Não é mais possível iniciar este simulado.`);
+      if (!subIdToUse && fullExam.deadline) {
+        if (new Date(fullExam.deadline).getTime() < Date.now()) {
+          setErrorMsg(`O prazo para realização deste simulado foi encerrado em ${new Date(fullExam.deadline).toLocaleString('pt-BR')}. Não é mais possível iniciar este simulado.`);
           setSubmitting(false);
           return;
         }
       }
 
       // 2. Request fullscreen immediately inside the button click gesture if controlled
-      const { settings } = parseExamSettings(exam.description);
+      const { settings } = parseExamSettings(fullExam.description);
       if (settings.is_controlled === true) {
         requestFullscreen();
       }
@@ -1306,13 +1382,13 @@ export default function StudentSimulados({
       if (!subIdToUse) {
         const nowIso = new Date().toISOString();
         const initialPayload = {
-          mock_exam_id: exam.id,
+          mock_exam_id: fullExam.id,
           student_email: email.toLowerCase(),
           student_name: studentName,
           student_class: studentClass,
           answers: {},
           score: 0.0,
-          total_questions: exam.questions.length,
+          total_questions: examQuestions.length,
           correct_count: 0,
           telemetry: {
             totalTimeSeconds: 0,
@@ -1340,13 +1416,13 @@ export default function StudentSimulados({
       }
 
       setCurrentSubmissionId(subIdToUse);
-      originalExamRef.current = exam;
+      originalExamRef.current = fullExam;
 
-      const shouldShuffleOptions = (exam.shuffle_options === true) || (settings.shuffle_options === true);
-      const shouldShuffleQuestions = (exam.shuffle_questions === true) || (settings.shuffle_questions === true);
+      const shouldShuffleOptions = (fullExam.shuffle_options === true) || (settings.shuffle_options === true);
+      const shouldShuffleQuestions = (fullExam.shuffle_questions === true) || (settings.shuffle_questions === true);
 
       // Shuffling logic
-      let finalQuestions = (exam.questions || []).map(q => ({ ...q }));
+      let finalQuestions = examQuestions.map(q => ({ ...q }));
 
       if (shouldShuffleOptions) {
         finalQuestions = finalQuestions.map(q => {
@@ -1382,7 +1458,7 @@ export default function StudentSimulados({
       });
 
       const shuffledExam: MockExam = {
-        ...exam,
+        ...fullExam,
         questions: sanitizedForStudentView
       };
 

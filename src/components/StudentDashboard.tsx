@@ -1619,15 +1619,24 @@ export default function StudentDashboard({
       }
 
       // 2b. Fetch Mock Exams (Simulados Online) for this class, virtual class, or individual email
-      // Exclude questions/gabarito from dashboard preview to prevent data leakage
+      // Select full exam data (*) so student exam views and simulation flow have questions available
       const { data: dbMockExams } = await supabase
         .from('wsm_mock_exams')
-        .select('id, title, subject, class_name, deadline, description, teacher_name, teacher_email, created_at')
+        .select('*')
         .order('created_at', { ascending: false });
       
       let filteredMockExams: any[] = [];
       if (dbMockExams) {
-        filteredMockExams = dbMockExams.filter((mock: any) => {
+        filteredMockExams = dbMockExams.map((mock: any) => {
+          let qs = mock.questions;
+          if (typeof qs === 'string') {
+            try { qs = JSON.parse(qs); } catch { qs = []; }
+          }
+          return {
+            ...mock,
+            questions: Array.isArray(qs) ? qs : []
+          };
+        }).filter((mock: any) => {
           const { settings } = parseExamSettings(mock.description || '');
           if (settings.is_draft || mock.is_draft === true || mock.status === 'draft') return false;
           return matchesStudentTarget(mock.class_name, email, currentActiveTurma, studentVirtualClassIds);

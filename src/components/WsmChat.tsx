@@ -634,11 +634,14 @@ export default function WsmChat({
         try {
           const { data: dbMocks } = await supabase
             .from('wsm_mock_exams')
-            .select('id, title, subject, class_name, deadline, description, teacher_name, teacher_email, status, is_draft')
-            .neq('status', 'draft')
+            .select('id, title, subject, class_name, deadline, description, teacher_name, teacher_email, created_at')
             .order('created_at', { ascending: false });
           if (dbMocks) {
-            setInternalMockExams(dbMocks);
+            const filtered = dbMocks.filter((mock: any) => {
+              const { settings } = parseExamSettings(mock.description || '');
+              return !settings.is_draft && mock.is_draft !== true && mock.status !== 'draft';
+            });
+            setInternalMockExams(filtered);
           }
         } catch (err) {
           console.warn('Fallback mock exams fetch error:', err);
